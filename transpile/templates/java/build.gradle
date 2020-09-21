@@ -1,0 +1,33 @@
+plugins {
+    id 'java'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'com.fasterxml.jackson.jr:jackson-jr-objects:2.9.0'
+    testImplementation(platform('org.junit:junit-bom:5.7.0'))
+    testImplementation('org.junit.jupiter:junit-jupiter')
+}
+
+test {
+    useJUnitPlatform()
+    testLogging {
+        events "passed", "skipped", "failed", "standardOut", "standardError"
+    }
+}
+
+jar {
+    archiveBaseName = 'trld'
+}
+
+task uberjar(type: Jar) {
+    manifest {
+        attributes 'Main-Class': 'trld.jsonld.Cmd'
+    }
+    archiveBaseName = 'trld-with-deps'
+    from { configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) } }
+    with jar
+}
