@@ -132,7 +132,7 @@ def compaction(
         if expanded_property == ID:
             # 12.1.1)
             if isinstance(expanded_value, str):
-                compacted_value = iri_compaction(active_context, expanded_value, vocab=False)
+                compacted_value = iri_compaction(active_context, expanded_value, None, vocab=False)
             # 12.1.2)
             # (see 5f594ad1)
             # 12.1.3)
@@ -179,7 +179,7 @@ def compaction(
                     # 12.3.2.1.2)
                     add_value(result_map, prop, value, as_array)
                     # 12.3.2.1.3)
-                    del compacted_map[prop]
+                    compacted_map.pop(prop)
             # 12.3.3)
             if len(compacted_map) > 0:
                 # 12.3.3.1)
@@ -290,7 +290,7 @@ def compaction(
                     map_object = cast(JsonMap, nest_result.setdefault(item_active_property, {}))
                     # 12.8.8.1.2)
                     id_or_none: str = cast(str, expanded_item[ID]) if ID in expanded_item else NONE
-                    map_key = iri_compaction(active_context, id_or_none, vocab=ID not in expanded_item)
+                    map_key = iri_compaction(active_context, id_or_none, None, vocab=ID not in expanded_item)
                     # 12.8.8.1.3)
                     add_value(map_object, map_key, compacted_item, as_array)
                 # 12.8.8.2)
@@ -316,7 +316,7 @@ def compaction(
                     assert isinstance(compacted_item, Dict)
                     # 12.8.8.4.2)
                     if ID in expanded_item:
-                        compacted_item[iri_compaction(active_context, ID)] = iri_compaction(active_context, cast(str, expanded_item[ID]), vocab=False)
+                        compacted_item[iri_compaction(active_context, ID)] = iri_compaction(active_context, cast(str, expanded_item[ID]), None, vocab=False)
                     # 12.8.8.4.3)
                     if INDEX in expanded_item:
                         compacted_item[iri_compaction(active_context, INDEX)] = iri_compaction(active_context, cast(str, expanded_item[INDEX]))
@@ -754,7 +754,7 @@ def value_compaction(
     if ID in value and len(value) == 1 or len(value) == 2 and INDEX in value:
         # 6.1)
         if active_term and active_term.type_mapping == ID:
-            result = iri_compaction(active_context, cast(str, value[ID]), vocab=False)
+            result = iri_compaction(active_context, cast(str, value[ID]), None, vocab=False)
         # 6.2)
         elif active_term and active_term.type_mapping == VOCAB:
             result = iri_compaction(active_context, cast(str, value[ID]))

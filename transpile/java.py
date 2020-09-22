@@ -701,13 +701,17 @@ class Transpiler(ast.NodeVisitor):
         raise NotImplementedError(f'unhandled: {(expr)}')
 
     def _map_call(self, expr: ast.Call, isowner=False):
+        call_args: list = expr.args
+        if expr.keywords:
+            # FIXME: [5f55548d] handle order of kwargs and transpile Lambdas
+            print(f'WARNING: keywords in call: {ast.dump(expr)}', file=sys.stderr)
+            call_args += [kw.value for kw in expr.keywords if kw.arg
+                          and not isinstance(kw.value, ast.Lambda)]
+
         if isinstance(expr.func, ast.Name):
             funcname = expr.func.id
-            # TODO: [5f55548d] handle or forbid kwargs
-            if expr.keywords:
-                print(f'WARNING: keywords in call: {ast.dump(expr)}', file=sys.stderr)
-            if expr.args:
-                arg0repr = self.repr_expr(expr.args[0])
+            if call_args:
+                arg0repr = self.repr_expr(call_args[0])
                 arg0cast = self._cast(arg0repr, parens=True)
 
             if funcname == 'isinstance':
@@ -717,8 +721,8 @@ class Transpiler(ast.NodeVisitor):
                 arg0type = arg0typeinfo[0] if arg0typeinfo else None
                 return f"{arg0cast}.{'length' if arg0type == 'String' else 'size'}()"
             elif funcname == 'cast':
-                arg0typerepr = self.repr_expr(expr.args[0], annot=True)
-                castvalue = f'({arg0typerepr}) {self.repr_expr(expr.args[1])}'
+                arg0typerepr = self.repr_expr(call_args[0], annot=True)
+                castvalue = f'({arg0typerepr}) {self.repr_expr(call_args[1])}'
                 if isowner:
                     castvalue = f'({castvalue})'
                 return castvalue
@@ -728,11 +732,12 @@ class Transpiler(ast.NodeVisitor):
                 'all': self._map_all,
                 'str': (lambda expr: f'{arg0cast}.toString()'),
                 'id': (lambda expr: f'{arg0cast}.hashCode()'),
+                'print': (lambda expr: f'System.out.println({arg0cast})'),
             }.get(funcname)
             if do_map:
                 return do_map(expr)
 
-        callargs = [self._cast(self.repr_expr(arg)) for arg in expr.args]
+        callargs = [self._cast(self.repr_expr(arg)) for arg in call_args]
 
         if isinstance(expr.func, ast.Attribute):
             owner = self.repr_expr(expr.func.value)

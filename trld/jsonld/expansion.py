@@ -291,12 +291,10 @@ def _expand_element(active_context: Context,
                     expanded_value = expanded_list = []
                     for v in expanded_list:
                         expanded_list.append(
-                            active_context.expand_iri(v,
-                                doc_relative=True)
+                            active_context.expand_doc_relative_iri(v)
                             if isinstance(v, str) else v)
                 else:
-                    expanded_value = active_context.expand_iri(
-                            value, doc_relative=True)
+                    expanded_value = active_context.expand_doc_relative_iri(value)
 
             # 13.4.4)
             elif expanded_property == TYPE:
@@ -316,8 +314,7 @@ def _expand_element(active_context: Context,
                 else:
                     expanded_value = expanded_list = []
                     for v in as_list(cast(JsonObject, value)):
-                        expanded_list.append(type_scoped_context.expand_iri(
-                            cast(str, v), doc_relative=True, vocab=True))
+                        expanded_list.append(type_scoped_context.expand_doc_relative_vocab_iri(cast(str, v)))
                     # TODO: spec errata: be more explicit about collapsing singe-item list
                     if len(expanded_list) == 1:
                         expanded_value = expanded_list[0]
@@ -678,13 +675,11 @@ def value_expansion(active_context: Context, active_property: str, value: Scalar
     # 1)
     active_term: Optional[Term] = active_context.terms.get(active_property)
     if active_term and active_term.type_mapping == ID and isinstance(value, str):
-        return {ID: active_context.expand_iri(value,
-                                              doc_relative=True, vocab=False)}
+        return {ID: active_context.expand_doc_relative_iri(value)}
 
     # 2)
     if active_term and active_term.type_mapping == VOCAB and isinstance(value, str):
-        return {ID: active_context.expand_iri(value,
-                                              doc_relative=True, vocab=True)}
+        return {ID: active_context.expand_doc_relative_vocab_iri(value)}
 
     # 3)
     result: Dict[str, Optional[JsonObject]] = {VALUE: value}
