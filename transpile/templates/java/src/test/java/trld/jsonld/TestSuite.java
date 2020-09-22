@@ -11,13 +11,15 @@ import static trld.jsonld.Base.CONTEXT;
 
 public class TestSuite {
 
-    static final String TESTSUITE_DIR = "file://" + System.getProperties().get("user.home") + "/repos/github/w3c/json-ld-api/tests";
+    static final String TESTSUITE_DIR = "file://" + System.getProperties().get("user.home") + "/repos/github/w3c/json-ld-api/tests/";
+    static final String TESTSUITE_BASE_URL = "https://w3c.github.io/json-ld-api/tests";
 
     static List<Arguments> testCaseProvider(String manifestFile) {
         List<Arguments> cases = new ArrayList<>();
-        Map manifest = (Map) Common.loadJson(TESTSUITE_DIR + "/" + manifestFile);
+        Map manifest = (Map) Common.loadJson(TESTSUITE_DIR + manifestFile);
         for (Map tc : (List<Map>) manifest.get("sequence")) {
-            cases.add(Arguments.of(((String) ((Map) tc).get("@id")), tc));
+            cases.add(Arguments.of(((String) tc.get("@id")),
+                                   ((String) tc.get("purpose")), tc));
         }
         return cases;
     }
@@ -30,43 +32,51 @@ public class TestSuite {
         return testCaseProvider("compact-manifest.jsonld");
     }
 
-    @ParameterizedTest(name = "Expand {0}")
+    @ParameterizedTest(name = "Expand {0} - {1}")
     @MethodSource("expandTestCases")
-    void expandTestSuite(String id, Map tc) {
+    void expandTestSuite(String id, String purpose, Map tc) {
         if (!((List) tc.get("@type")).contains("jld:PositiveEvaluationTest"))
             return;
 
-        String name = id.replace("#t", "");
-        String src = TESTSUITE_DIR + "/expand/" + name + "-in.jsonld";
-        Object sourceData = Common.loadJson(src);
-        Object resultData = Expansion.expand(sourceData, src);
+        String src = TESTSUITE_DIR + (String) tc.get("input");
+        Map<String, Object> options = (Map) tc.getOrDefault("option", new HashMap<>());
+        String baseUri = (String) options.getOrDefault("base", src);
 
-        String expectedSrc = TESTSUITE_DIR + "/expand/" + name + "-out.jsonld";
+        Object sourceData = Common.loadJson(src);
+
+        String expectedSrc = TESTSUITE_DIR + (String) tc.get("expect");
         Object expectedData = Common.loadJson(expectedSrc);
+
+        Object resultData = Expansion.expand(sourceData, baseUri);
 
         assertEquals(expectedData, resultData);
     }
 
-    @ParameterizedTest(name = "Compact {0}")
+    @ParameterizedTest(name = "Compact {0} - {1}")
     @MethodSource("compactTestCases")
-    void compactTestSuite(String id, Map tc) {
+    void compactTestSuite(String id, String purpose, Map tc) {
         if (!((List) tc.get("@type")).contains("jld:PositiveEvaluationTest"))
             return;
 
-        String name = id.replace("#t", "");
-        String src = TESTSUITE_DIR + "/compact/" + name + "-in.jsonld";
+        String src = TESTSUITE_DIR + (String) tc.get("input");
+        String url = TESTSUITE_BASE_URL + (String) tc.get("input");
+        Map<String, Object> options = (Map) tc.getOrDefault("option", new HashMap<>());
+        String baseUri = (String) options.getOrDefault("base", url);
+        boolean compactArrays = (Boolean) options.getOrDefault("compactArrays", true);
+        boolean ordered = true;
+
         Object sourceData = Common.loadJson(src);
-        Object resultData = Expansion.expand(sourceData, src);
-
-        String contextSrc = TESTSUITE_DIR + "/compact/" + name + "-context.jsonld";
+        sourceData = Expansion.expand(sourceData, baseUri);
+        String contextSrc = TESTSUITE_DIR + (String) tc.get("context");
         Object contextData = Common.loadJson(contextSrc);
-        resultData = Compaction.compact(contextData, resultData, src);
 
-        String expectedSrc = TESTSUITE_DIR + "/compact/" + name + "-out.jsonld";
+        String expectedSrc = TESTSUITE_DIR + (String) tc.get("expect");
         Object expectedData = Common.loadJson(expectedSrc);
         if (expectedData instanceof Map) {
             ((Map) expectedData).remove(CONTEXT);
         }
+
+        Object resultData = Compaction.compact(contextData, sourceData, baseUri, compactArrays, ordered);
 
         assertNotNull(expectedData);
         assertEquals(expectedData, resultData);
