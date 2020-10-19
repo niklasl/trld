@@ -806,7 +806,7 @@ class Term:
             # 27.2)
             self.is_protected = prev_dfn.is_protected
             # 27.1)
-            if self != prev_dfn:
+            if not self.matches(prev_dfn):
                 raise ProtectedTermRedefinitionError 
 
         # 28)
@@ -831,7 +831,7 @@ class Term:
 
         return cached
 
-    def __eq__(self, other: object) -> bool:
+    def matches(self, other: object) -> bool:
         if not isinstance(other, Term):
             return False
 
