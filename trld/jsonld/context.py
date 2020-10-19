@@ -394,7 +394,7 @@ class Context:
             return None
 
         # 3)
-        if local_context is not None and value in local_context and defined and defined.get(value) is not True:
+        if local_context is not None and value in local_context and defined and (value not in defined or defined[value] is not True):
             Term(self, local_context, value, local_context[value], defined)
 
         iri_term: Optional[Term] = self.terms.get(value)
