@@ -107,7 +107,7 @@ def compaction(
 
     # 11)
     # TODO: [5f594ac8] spec improvement; keep this and reuse in step 12.2)
-    compacted_types: List[Optional[str]] = []
+    compacted_types: List[str] = []
     current_active_context: Context = active_context
     if TYPE in element:
         for expanded_type in as_list(element[TYPE]):
