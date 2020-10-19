@@ -30,12 +30,12 @@ def create_inverse_context(active_context: Context) -> JsonMap:
         if len(term_dfn.container) > 0:
             container = ''.join(sorted(term_dfn.container))
         # 3.3)
-        var: str = term_dfn.iri
+        iri: str = term_dfn.iri
         # 3.4)
-        if var not in result:
-            result[var] = {}
+        if iri not in result:
+            result[iri] = {}
         # 3.5)
-        container_map: JsonMap = cast(JsonMap, result[var])
+        container_map: JsonMap = cast(JsonMap, result[iri])
         # 3.6)
         if container not in container_map:
             container_map[container] = {LANGUAGE: {}, TYPE: {}, ANY: {NONE: term_key}}

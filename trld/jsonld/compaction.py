@@ -436,18 +436,18 @@ def _get_nest_result(active_context: Context,
 
 
 def maybe_iri_compaction(active_context: Context,
-        var: Optional[str],
+        iri: Optional[str],
         value: Optional[JsonObject] = None,
         vocab = True,
         reverse = False
         ) -> Optional[str]:
     # 1)
-    if var is None:
+    if iri is None:
         return None
-    return iri_compaction(active_context, var, value, vocab, reverse)
+    return iri_compaction(active_context, iri, value, vocab, reverse)
 
 
-def iri_compaction(active_context: Context, var: str,
+def iri_compaction(active_context: Context, iri: str,
         value: Optional[JsonObject] = None,
         vocab = True,
         reverse = False
@@ -456,7 +456,7 @@ def iri_compaction(active_context: Context, var: str,
     inverse_context: Dict = get_inverse_context(active_context)
 
     # 4)
-    if vocab and var in inverse_context:
+    if vocab and iri in inverse_context:
         # 4.1 + 4.1.2))
         default_language: str = active_context.default_language if active_context.default_language else NONE
         if active_context.default_base_direction is not None:
@@ -655,7 +655,7 @@ def iri_compaction(active_context: Context, var: str,
             if idx > -1:
                 preferred_values.append(pv[idx:])
         # 4.20)
-        term_key: Optional[str] = term_selection(active_context, var, containers, type_or_language, preferred_values)
+        term_key: Optional[str] = term_selection(active_context, iri, containers, type_or_language, preferred_values)
         # 4.21)
         if term_key is not None:
             return term_key
@@ -663,8 +663,8 @@ def iri_compaction(active_context: Context, var: str,
     # 5)
     if vocab and active_context.vocabulary_mapping is not None:
         # 5.1)
-        if var.startswith(active_context.vocabulary_mapping):
-            suffix: str = var[len(active_context.vocabulary_mapping):]
+        if iri.startswith(active_context.vocabulary_mapping):
+            suffix: str = iri[len(active_context.vocabulary_mapping):]
             if len(suffix) > 0 and suffix not in active_context.terms:
                 return suffix
 
@@ -674,13 +674,13 @@ def iri_compaction(active_context: Context, var: str,
     # 7)
     for key, term_dfn in active_context.terms.items():
         # 7.1)
-        if term_dfn.iri is None or term_dfn.iri == var or not var.startswith(term_dfn.iri) or not term_dfn.is_prefix:
+        if term_dfn.iri is None or term_dfn.iri == iri or not iri.startswith(term_dfn.iri) or not term_dfn.is_prefix:
             continue
         # 7.2)
-        candidate: str = f'{key}:{var[len(term_dfn.iri):]}'
+        candidate: str = f'{key}:{iri[len(term_dfn.iri):]}'
         # 7.3)
         if compact_iri is None or len(candidate) <= len(compact_iri) and candidate < compact_iri:
-            if candidate not in active_context.terms or active_context.terms[candidate].iri == var and value is None:
+            if candidate not in active_context.terms or active_context.terms[candidate].iri == iri and value is None:
                 compact_iri = candidate
 
     # 8)
@@ -688,22 +688,22 @@ def iri_compaction(active_context: Context, var: str,
         return compact_iri
 
     # 9)
-    colonx: int = var.find(':')
-    if colonx > -1 and '//' not in var:
-        term: Optional[Term] = active_context.terms.get(var[0:colonx])
+    colonx: int = iri.find(':')
+    if colonx > -1 and '//' not in iri:
+        term: Optional[Term] = active_context.terms.get(iri[0:colonx])
         if term and term.is_prefix:
-            raise IRIConfusedWithPrefixError(str(var))
+            raise IRIConfusedWithPrefixError(str(iri))
 
     # 10)
     if not vocab:
-        var = relativise_iri(active_context.base_iri, var)
+        iri = relativise_iri(active_context.base_iri, iri)
 
     # 11)
-    return var
+    return iri
 
 
 def term_selection(active_context: Context,
-        var: str,
+        keyword_or_iri: str,
         containers: List[str],
         type_or_language: str,
         preferred_values: List[str]) -> Optional[str]:
@@ -711,7 +711,7 @@ def term_selection(active_context: Context,
     # 2)
     inverse_context: Dict = get_inverse_context(active_context)
     # 3)
-    container_map: JsonMap = cast(JsonMap, inverse_context[var])
+    container_map: JsonMap = cast(JsonMap, inverse_context[keyword_or_iri])
     # 4)
     for container in containers:
         # 4.1)
