@@ -4,6 +4,11 @@ python:
 
 java:
 	mkdir -p build/java
+	python3 -m transpile.java trld/jsonld/expansion.py trld/jsonld/compaction.py -o build/java/src/main/java
 	cp -R transpile/templates/java build
-	python3 -m transpile.java trld/jsonld/base.py trld/jsonld/context.py trld/jsonld/expansion.py trld/jsonld/invcontext.py trld/jsonld/compaction.py -o build/java/src/main/java
 	(cd build/java && ./gradlew -q clean uberjar test)
+
+js:
+	python3 -m transpile.js trld/jsonld/expansion.py trld/jsonld/compaction.py -o build/js/lib
+	cp -R transpile/templates/js build
+	(cd build/js && npm test)

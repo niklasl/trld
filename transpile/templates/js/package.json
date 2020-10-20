@@ -1,0 +1,30 @@
+{
+  "name": "trld",
+  "description": "TRanspiler for Linked Data",
+  "keywords": [
+    "Linked Data",
+    "LD",
+    "RDF",
+    "JSON-LD",
+    "JSONLD",
+    "JSON"
+  ],
+  "version": "0.1.0-snapshot",
+  "dependencies": {
+    "esm": "^3.2.25"
+  },
+  "browser": {
+    "esm": false
+  },
+  "devDependencies": {
+    "tape": "^5.0.1"
+  },
+  "files": [
+    "lib"
+  ],
+  "main": "lib/index.js",
+  "module": "lib/main.js",
+  "scripts": {
+    "test": "tape -r esm 'test/test_*.js'"
+  }
+}

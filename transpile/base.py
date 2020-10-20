@@ -1,8 +1,6 @@
 # TODO:
-# * [5f54c8e1] Factor out _visitor from Transpiler and use two-pass (follow
-#   imports):
-#   - one shallow for type/attr/method data,
-#   - one for full visit.
+# * [5f54c8e1] Use module data from TypeScanner, remove duplicate
+#   logic and factor out remaining _visitor from Transpiler.
 # * [5f76eae2] Improve isinstance checking (top-level bool, reset at or?).
 # * [5f831dc1] Clear out java-specific code.
 from typing import NamedTuple, Dict, List, Tuple, Union, Optional
@@ -12,9 +10,10 @@ from pathlib import Path
 import ast
 import sys
 
+from .typescanner import TypeScanner
+
 
 __all__ = 'Transpiler', 'Casing'
-
 
 
 def camelize(s: str) -> str:
@@ -72,13 +71,14 @@ class Transpiler(ast.NodeVisitor):
 
     def __init__(self, outdir: str = None):
         super().__init__()
-        self.within: List[Scope] = []
-        self._level = 0
-        self.top: Dict[str, Tuple] = {}
         self.in_static = False
         self.staticname = 'Statics'
         self.statics: List[Tuple] = []
+        self._modules = None
         self.classes: Dict[str, Dict[str, str]] = {}
+        self._top: Dict[str, Tuple] = {}
+        self._within: List[Scope] = []
+        self._level = 0
         self._typing_names: Dict[str, str] = {}
         self._type_alias: Dict[str, str] = {}
         self._pre_stmts: Optional[List[str]] = None
@@ -95,16 +95,25 @@ class Transpiler(ast.NodeVisitor):
         else:
             self.outdir = outdir
 
-    def main(self):
-        args = self.argparser.parse_args()
-        self.outdir = args.output_dir
-        for src in args.source:
+    def main(self, sources=None):
+        if not sources and self.argparser:
+            args = self.argparser.parse_args()
+            self.outdir = args.output_dir
+            sources = args.source
+
+        typescanner = TypeScanner(self)
+        for src in sources:
+            typescanner.read(src)
+
+        self._modules = typescanner.modules
+
+        for src, mod in typescanner.modules.items():
             with open(src) as f:
                 code = f.read()
             tree = ast.parse(code)
-            self.run(tree, src)
+            self._transpile(tree, src)
 
-    def run(self, tree: ast.Module, src: str):
+    def _transpile(self, tree: ast.Module, src: str):
         srcpath = Path(src)
         with self.on_file(srcpath):
             self.visit(tree)
@@ -173,7 +182,7 @@ class Transpiler(ast.NodeVisitor):
 
     def new_scope(self, node):
         scope = Scope(node, {})
-        self.within.append(scope)
+        self._within.append(scope)
         return scope
 
     def enter_block(self, scope, *parts, end=None, continued=False, stmts=[], nametypes=[]):
@@ -202,24 +211,24 @@ class Transpiler(ast.NodeVisitor):
         elif scope.node:
             self.generic_visit(scope.node)
 
-        self.within.pop()
+        self._within.pop()
         self._level -= 1
         self.outln(self.end_block, end=end)
 
     def addtype(self, name: str, typename: str, narrowed=False):
         # TODO: 5f831dc1 (java-specific)
         typename = typename.replace('/*@Nullable*/ ', '')
-        if self.within:
-            scope = self.within[-1]
+        if self._within:
+            scope = self._within[-1]
             known = scope.typed.get(name)
             if known and known[0] != typename:
                 narrowed = True
             scope.typed[name] = typename, narrowed
         else:
-            self.top[name] = typename, narrowed
+            self._top[name] = typename, narrowed
 
     def gettype(self, name):
-        for scope in self.within[::-1]:
+        for scope in self._within[::-1]:
             if isinstance(scope.node, ast.ClassDef):
                 break
             if name in scope.typed:
@@ -229,7 +238,7 @@ class Transpiler(ast.NodeVisitor):
             inclass = None
             owner, attr = name.split('.', 1)
             if owner == self.this:
-                for scope in self.within[::-1]:
+                for scope in self._within[::-1]:
                     if isinstance(scope.node, ast.ClassDef):
                         inclass = scope.node.name
             else:
@@ -241,7 +250,7 @@ class Transpiler(ast.NodeVisitor):
             if classinfo:
                 return classinfo.get(attr)
 
-        return self.top.get(name)
+        return self._top.get(name)
 
     def visit_Assert(self, node):
         # TODO: 5f831dc1 (java-specific)
@@ -256,19 +265,26 @@ class Transpiler(ast.NodeVisitor):
             self.stmt(self.map_setitem(owner, key, rval), node=node)
             return
 
-        ownerrefs = [self.repr_expr(target) for target in node.targets
-                     if not isinstance(target, ast.Subscript)]
-        assert len(ownerrefs) == len(node.targets)
+        if not self._handle_type_alias(node):
+            ownerrefs = [self.repr_expr(target) for target in node.targets
+                        if not isinstance(target, ast.Subscript)]
+            assert len(ownerrefs) == len(node.targets)
+            self._handle_Assign(node, ownerrefs)
 
-        basename = node.value.value.id if isinstance(node.value, ast.Subscript) else None
+    def _handle_type_alias(self, node) -> bool:
+        if not isinstance(node.value, ast.Subscript) or not isinstance(node.value.value, ast.Name):
+            return False
+        basename = node.value.value.id
         type_alias = self._typing_names.get(basename)
         if type_alias:
-            rval = self.repr_expr(node.value, annot=True) if node.value else None
+            rval = self.repr_annot(node.value) if node.value else None
             if self.typing and self.union_surrogate and type_alias == 'Union':
                 rval = self.union_surrogate
-            self._type_alias[ownerrefs[0]] = rval
-        else:
-            self._handle_Assign(node, ownerrefs)
+            alias = self.repr_expr(node.targets[0])
+            if rval:
+                self._type_alias[alias] = rval
+            return True
+        return False
 
     def visit_AugAssign(self, node: ast.AugAssign):
         rval = self._cast(self.repr_expr(node.value))
@@ -299,7 +315,7 @@ class Transpiler(ast.NodeVisitor):
         else:
             ownerrefs = [ownerref]
 
-        if not self.within:
+        if not self._within:
             self.in_static = self.has_static
             prefix = 'static ' if self.has_static else ''
         else:
@@ -326,13 +342,13 @@ class Transpiler(ast.NodeVisitor):
 
         if rval:
             self.stmt(prefix, ' = '.join(ownerrefs + [rval]), node=node)
-        elif self.typing or self.within and not isinstance(self.within[-1].node, ast.ClassDef):
+        elif self.typing or self._within and not isinstance(self._within[-1].node, ast.ClassDef):
             self.stmt(prefix, ownerref, node=node)
 
         if typename:
             self.addtype(ownerref, typename)
 
-        if not self.within:
+        if not self._within:
             self.in_static = False
 
         self.generic_visit(node)
@@ -368,8 +384,6 @@ class Transpiler(ast.NodeVisitor):
                 for name in node.names
             }
         else:
-            # TODO: also node.level 2 (e.g. `from ..base import *`)
-            # TODO: [5f54c8e1] immediately call self.run(module_file_path)
             self.handle_import(node)
 
     def visit_For(self, node):
@@ -403,7 +417,7 @@ class Transpiler(ast.NodeVisitor):
 
     def visit_FunctionDef(self, node):
         prefix = ''
-        if self.typing or len(self.within) < 1:
+        if self.typing or len(self._within) < 1:
             prefix = self.public
 
         if node.name.startswith('_') and not node.name.endswith('__'):
@@ -412,7 +426,7 @@ class Transpiler(ast.NodeVisitor):
             else:
                 prefix = ''
 
-        if not self.within or not isinstance(self.within[0].node, ast.ClassDef):
+        if not self._within or not isinstance(self._within[0].node, ast.ClassDef):
             self.in_static = self.has_static
             if self.has_static:
                 prefix += 'static '
@@ -466,7 +480,7 @@ class Transpiler(ast.NodeVisitor):
 
         in_ctor = False
         if node.name == '__init__':
-            name = self.ctor or self.within[-2].node.name
+            name = self.ctor or self._within[-2].node.name
             ret = ''
             in_ctor = True
         elif node.name == '__repr__':
@@ -485,7 +499,7 @@ class Transpiler(ast.NodeVisitor):
 
         # FIXME: js-specific; factor out and improve
         if not self.typing:
-            ret = 'function ' if len(self.within) < 2 else ''
+            ret = 'function ' if len(self._within) < 2 else ''
 
         if self.in_static:
             method = name
@@ -508,7 +522,7 @@ class Transpiler(ast.NodeVisitor):
     #    pass
 
     def visit_Return(self, node):
-        for scope in self.within[-1::-1]:
+        for scope in self._within[-1::-1]:
             if isinstance(scope.node, ast.FunctionDef) and not scope.node.returns:
                 self.stmt('return', node=node)
                 break
@@ -558,7 +572,7 @@ class Transpiler(ast.NodeVisitor):
                 stmts.append(f'{ctor}() {{ }}')
                 stmts.append(f'{ctor}({mtype}msg) {{ super(msg); }}')
 
-        if node.name == self.filename.with_suffix('').name:
+        if node.name == self.filename.with_suffix('').name or not self.has_static:
             classdecl = f'{self.public}class '
         else:
             classdecl = 'class '
@@ -677,7 +691,7 @@ class Transpiler(ast.NodeVisitor):
             if isinstance(expr.op, ast.Add):
                 lexpr = self.repr_expr(expr.left)
                 ltype = self.gettype(lexpr)
-                # TODO: the `or` is a hack since type inference is still too shallow (use "in_boolop (5f76eae2) to control better?)
+                # TODO: the `or` is a hack since type inference is still too shallow (use "in_boolop (5f54c8e1, 5f76eae2) to control better?)
                 if self.list_concat and (ltype and 'List' in ltype[0] or 'List' in lexpr):
                     return self.list_concat.format(left=lexpr, right=self.repr_expr(expr.right))
                 bop = '+'
