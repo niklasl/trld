@@ -132,7 +132,7 @@ def compaction(
         if expanded_property == ID:
             # 12.1.1)
             if isinstance(expanded_value, str):
-                compacted_value = iri_compaction(active_context, expanded_value, None, vocab=False)
+                compacted_value = shorten_iri(active_context, expanded_value)
             # 12.1.2)
             # (see 5f594ad1)
             # 12.1.3)
@@ -316,7 +316,7 @@ def compaction(
                     assert isinstance(compacted_item, Dict)
                     # 12.8.8.4.2)
                     if ID in expanded_item:
-                        compacted_item[iri_compaction(active_context, ID)] = iri_compaction(active_context, cast(str, expanded_item[ID]), None, vocab=False)
+                        compacted_item[iri_compaction(active_context, ID)] = shorten_iri(active_context, cast(str, expanded_item[ID]))
                     # 12.8.8.4.3)
                     if INDEX in expanded_item:
                         compacted_item[iri_compaction(active_context, INDEX)] = iri_compaction(active_context, cast(str, expanded_item[INDEX]))
@@ -445,6 +445,12 @@ def maybe_iri_compaction(active_context: Context,
     if iri is None:
         return None
     return iri_compaction(active_context, iri, value, vocab, reverse)
+
+
+# TODO: spec improvement: allow this to keep IRI:s as is with a flag (also much simpler)!
+# Case: To make convenient JSON with preserved input IRIs (or even expanded full IRIs!).
+def shorten_iri(active_context: Context, iri: str) -> str:
+    return iri_compaction(active_context, iri, None, vocab=False)
 
 
 def iri_compaction(active_context: Context, iri: str,
@@ -754,7 +760,7 @@ def value_compaction(
     if ID in value and len(value) == 1 or len(value) == 2 and INDEX in value:
         # 6.1)
         if active_term and active_term.type_mapping == ID:
-            result = iri_compaction(active_context, cast(str, value[ID]), None, vocab=False)
+            result = shorten_iri(active_context, cast(str, value[ID]))
         # 6.2)
         elif active_term and active_term.type_mapping == VOCAB:
             result = iri_compaction(active_context, cast(str, value[ID]))
