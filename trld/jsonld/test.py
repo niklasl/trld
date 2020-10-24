@@ -46,6 +46,11 @@ def run_testsuite(suitefilepath):
 
     for tc in testsuite['sequence']:
         testid = tc[ID].replace('#t', '')
+
+        options = tc.get(u'option') or {}
+        if options.get('specVersion') == JSONLD10:
+            continue
+
         runs += 1
 
         print(f"Running TC {testid} - {tc['name']}:", end=' ')
@@ -74,7 +79,6 @@ def run_testsuite(suitefilepath):
             with context_path.open() as f:
                 context_data = json.load(f)
 
-        options = tc.get(u'option') or {}
         context.DEFAULT_PROCESSING_MODE = options.get('processingMode', JSONLD11)
 
         base_uri = str(indoc_path).replace(str(suitedir), TESTS_URL)
@@ -99,7 +103,7 @@ def run_testsuite(suitefilepath):
             if 'jld:ExpandTest' in tc[TYPE]:
                 expand_context = options.get('expandContext')
                 if expand_context:
-                    expand_context = str(indoc_path.parent / expand_context)
+                    expand_context = str(suitedir / expand_context)
 
                 out_data = expand(in_data,
                         base_uri,
@@ -125,19 +129,19 @@ def run_testsuite(suitefilepath):
                 print('OK')
         except Exception as e:
             if expected_error:
-                if expected_error.replace(' ', '').replace('@', '').lower() + 'error' == type(e).__name__.lower():
+                if expected_error.translate({ord(c): None for c in ' -@'}).lower() + 'error' == type(e).__name__.lower():
                     oks += 1
                     print(f'(Got expected error: {expected_error}): OK')
                 else:
                     handle_fail()
                     print('>', end=' ')
-                    traceback.print_exc(-2)
+                    traceback.print_exc(-3)
                     print()
             else:
                 errors += 1
                 print(f"ERROR in file '{indoc_path}'")
                 print('>', end=' ')
-                traceback.print_exc(-2)
+                traceback.print_exc(-3)
                 print()
 
     print()
