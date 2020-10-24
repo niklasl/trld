@@ -29,6 +29,8 @@ class InvalidIncludedValueError(JsonLdError): pass
 
 class InvalidValueObjectError(JsonLdError): pass
 
+class InvalidValueObjectValueError(JsonLdError): pass
+
 class InvalidTypedValueError(JsonLdError): pass
 
 class InvalidSetOrListObjectError(JsonLdError): pass
@@ -49,12 +51,12 @@ class InvalidLanguageMapValueError(JsonLdError): pass
 def expand(doc_data: JsonObject,
            base_iri: str,
            expand_context: str = None,
-           **kwargs) -> List:
+           ordered = False) -> List:
     ctx: Context = Context(base_iri)
     if expand_context is not None:
         ctx = ctx.get_context(expand_context, expand_context)
     result: Optional[JsonObject] = expansion(ctx, None, doc_data, base_iri,
-                                             **kwargs)
+                                             False, ordered)
     if result is None:
         return []
     if isinstance(result, Dict) and GRAPH in result and len(result) == 1:
@@ -165,7 +167,7 @@ def expansion(active_context: Context,
     result: Dict = {}
     nests: Dict = {}
     input_type: Optional[str] = values[-1] if values else None
-    if input_type is not None:
+    if input_type is not None and isinstance(input_type, str):
         # TODO: or expand immediately above?
         input_type = active_context.expand_iri(input_type)
 
@@ -180,7 +182,8 @@ def expansion(active_context: Context,
     if VALUE in result:
         resultval: JsonObject = result[VALUE]
         # 15.1)
-        if any(k not in VALUE_KEYWORDS for k in result.keys()):
+        if any(k not in VALUE_KEYWORDS for k in result.keys()) \
+           or TYPE in result and (LANGUAGE in result or DIRECTION in result):
             raise InvalidValueObjectError
         # 15.2)
         if TYPE in result and result[TYPE] == JSON:
@@ -354,14 +357,14 @@ def _expand_element(active_context: Context,
                 # 13.4.7.1)
                 if input_type == JSON:
                     if active_context._processing_mode == JSONLD10:
-                        raise InvalidValueObjectError
+                        raise InvalidValueObjectValueError
                     expanded_value = value
                 # 13.4.7.2)
                 elif (not is_scalar(value) and value is not None) and not \
                     (frame_expansion and (value == {} or
                         (isinstance(value, List) and
                          all(is_scalar(v) for v in value)))):
-                    raise InvalidValueObjectError(f'Unexpected value {value}')
+                    raise InvalidValueObjectValueError(f'Unexpected value {value}')
                 # 13.4.7.3)
                 else:
                     expanded_value = cast(JsonObject, value)
