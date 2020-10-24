@@ -24,6 +24,8 @@ class InvalidBaseDirectionError(JsonLdError): pass
 
 class InvalidContextEntryError(JsonLdError): pass
 
+class InvalidPropagateValueError(JsonLdError): pass
+
 class InvalidImportValueError(JsonLdError): pass
 
 class InvalidContextNullificationError(JsonLdError): pass
@@ -41,6 +43,8 @@ class CyclicIriMappingError(JsonLdError): pass
 class KeywordRedefinitionError(JsonLdError): pass
 
 class InvalidTermDefinitionError(JsonLdError): pass
+
+class InvalidScopedContextError(JsonLdError): pass
 
 class InvalidProtectedValueError(JsonLdError): pass
 
@@ -257,14 +261,14 @@ class Context:
             # 5.7.1)
             base: object = context[BASE]
             # 5.7.2)
-            # TODO: spec problem; specify base must be a string
-            if base is None or not isinstance(base, str):
+            if base is None:
+                # TODO: spec problem; specify whether base_iri can be null
                 self.base_iri = "" # None
             # 5.7.3)
             # 5.7.4)
-            elif self.base_iri is not None:
+            elif self.base_iri is not None and isinstance(base, str):
                 self.base_iri = resolve_iri(self.base_iri, base)
-            elif is_iri(base):
+            elif isinstance(base, str) and is_iri(base):
                 self.base_iri = base
             # 5.7.5)
             else:
@@ -279,7 +283,6 @@ class Context:
                 self.vocabulary_mapping = None
             # 5.8.3)
             elif isinstance(vocab, str) and (is_iri(vocab) or is_blank(vocab)):
-                # TODO: this is run twice, which makes TC 0110 fail
                 self.vocabulary_mapping = self.expand_doc_relative_vocab_iri(vocab)
                 # NOTE: The use of blank node identifiers to value for @vocab is
                 # obsolete, and may be removed in a future version of JSON-LD.
@@ -309,11 +312,14 @@ class Context:
         # 5.11)
         if PROPAGATE in context:
             propagate: object = context[PROPAGATE]
-            if propagate is not None:
-                if self._processing_mode == JSONLD10:
-                    raise InvalidContextEntryError
-                # NOTE: propagate is set above on the condition of local_context
-                # not being an array
+            # 5.11.1)
+            if self._processing_mode == JSONLD10:
+                raise InvalidContextEntryError
+            # 5.11.2)
+            if not isinstance(propagate, bool):
+                raise InvalidPropagateValueError(str(propagate))
+            # NOTE: propagate is set above on the condition that local_context
+            # is not an array
 
         # 5.12)
         defined: Dict[str, bool] = {}
@@ -331,7 +337,8 @@ class Context:
             # override protected,
             # and a copy of remote contexts.
             #self.terms[key] = # TODO: set in Term (move that up here if obscure...)
-            Term(self, context, key, value, defined, base_url)
+            isprotected: bool = False # FIXME: pass from where?
+            Term(self, context, key, value, defined, base_url, isprotected, override_protected)
 
     def _handle_import(self, context: Dict[str, Union[str, Dict]], base_url: str) -> Dict:
         import_value: object = context[IMPORT]
@@ -692,13 +699,14 @@ class Term:
             container_terms: Optional[Set] = None
             if isinstance(container, List):
                 container_terms = set(container) # TODO: just - {SET} ?
-                if SET in container_terms:
+                if SET in container_terms and LIST not in container_terms:
                     container_terms.remove(SET)
             if not (isinstance(container, str) and
                 container in CONTAINER_KEYWORDS
                 ) and not (
                     container_terms is not None and (
-                        all(t in CONTAINER_KEYWORDS for t in container_terms)
+                        len(container_terms) == 0
+                        or len(container_terms) == 1 and all(t in CONTAINER_KEYWORDS for t in container_terms)
                         or container_terms == {GRAPH, ID}
                         or container_terms == {GRAPH, INDEX}
                         or list(container_terms)[0] in {INDEX, GRAPH, ID, TYPE, LANGUAGE}
@@ -745,6 +753,11 @@ class Term:
                 raise InvalidTermDefinitionError(str(dfn))
             # 21.2)
             # 21.3)
+            # TODO: doesn't produce the expected effects (see c032, c033)
+            #try:
+            #    self.get_local_context(active_context)
+            #except JsonLdError as e:
+            #    raise InvalidScopedContextError(term)
             # 21.4)
             # TODO: different from spec; since propagate behaviour may be based
             # on usage as @type (see 5f496df9) we use a memoized approach.
@@ -761,7 +774,7 @@ class Term:
                 warning(f'Language tag {lang} in term {term} is not well-formed')
             # 22.2)
             # TODO: [5f6117d4] spec uses maps with key missing != null; note this difference
-            self.language = NULL if lang is None else lang
+            self.language = NULL if lang is None else lang.lower()
 
         # 23)
         if DIRECTION in dfn and TYPE not in dfn:
@@ -817,11 +830,15 @@ class Term:
         cache_key: str = f'{id(active_context)}:{str(propagate)}'
         cached: Optional[Context] = self._cached_contexts.get(cache_key)
 
+        # TODO: should be passed explicitly, but seems to correlate
+        # (might even be named "type-scoped"?)
+        override_protected: bool = propagate
+
         if cached is None:
             cached = active_context.get_context(self._local_context,
                         self.base_url,
                         set(self._remote_contexts),
-                        override_protected=True,
+                        override_protected=override_protected,
                         validate_scoped=False)
             self._cached_contexts[cache_key] = cached
 
