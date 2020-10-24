@@ -191,6 +191,8 @@ class JavaTranspiler(Transpiler):
         return f'{self._cast(owner, parens=True)}.get({key})'
 
     def map_getslice(self, owner, lower, upper=None):
+        if lower == 'null':
+            lower = '0'
         if upper:
             if upper != '-1':
                 return f'{owner}.substring({lower}, {upper})'
