@@ -174,9 +174,22 @@ def as_list(obj: object) -> List:
 def relativise_iri(base: str, iri: str) -> str:
     if iri.startswith(base + '#'):
         return iri[len(base):]
+    if '?' in iri and iri.startswith(base):
+        return iri[len(base):]
     if not base.endswith('/'):
         last: int = base.rfind('/')
         base = base[0:last + 1]
     if iri.startswith(base):
         return iri[len(base):]
+
+    parentbase: str = base[:base.rfind('/')]
+    leaf: str = iri[iri.rfind('/') + 1:]
+    relativeto: List[str] = []
+    while '/' in parentbase and not parentbase.endswith(':/'):
+        if iri.startswith(parentbase):
+            relativeto.append(leaf)
+            return '/'.join(relativeto)
+        relativeto.append('..')
+        parentbase = parentbase[:parentbase.rfind('/')]
+
     return iri
