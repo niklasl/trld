@@ -68,10 +68,8 @@ class JsTranspiler(Transpiler):
     operators =  {
         ast.And: '&&',
         ast.Or: '||',
-        #ast.Is: '===',
-        ast.Is: '==', # TODO: just for null or undefined
-        #ast.IsNot: '!==',
-        ast.IsNot: '!=', # TODO: just for null or undefined
+        ast.Is: '===',
+        ast.IsNot: '!==',
         ast.Eq: '==',
         ast.NotEq: '!=',
         ast.Lt: '<',
@@ -192,7 +190,7 @@ class JsTranspiler(Transpiler):
         elif attr == 'values' and 'Map' in ownertype[0]:
             return f'Object.values({castowner})'
         elif attr == 'update' and 'Map' in ownertype[0]:
-            member = 'putAll'
+            return f'Object.assign({castowner}, {callargs[0]})'
         elif attr == 'append':
             member = 'push'
         elif attr == 'pop':
@@ -225,6 +223,22 @@ class JsTranspiler(Transpiler):
 
         return obj
 
+    def map_compare(self, left, op, right):
+        if right == '[]':
+            return f'Array.isArray({left}) && {left}.length === 0'
+
+        if right == 'null': # for null or undefined
+            if isinstance(op, ast.Is):
+                op = ast.Eq()
+            elif isinstance(op, ast.IsNot):
+                op = ast.NotEq()
+
+        if isinstance(op, ast.Eq):
+            ltypeinfo = self.gettype(left)
+            if ltypeinfo and ltypeinfo[0].startswith('Set'):
+                return f'((l, r) => l === r || l !== null && r !== null && l.size === r.size && !Array.from(l).find(it => !r.has(it)))({left}, {right})'
+        return super().map_compare(left, op, right)
+
     def map_getitem(self, owner, key):
         ownertype = self.gettype(owner)
         if ownertype:
@@ -236,6 +250,8 @@ class JsTranspiler(Transpiler):
         return f'{owner}[{key}]'
 
     def map_getslice(self, owner, lower, upper=None):
+        if lower == 'null':
+            lower = '0'
         if upper:
             if upper != '-1':
                 return f'{owner}.substring({lower}, {upper})'
@@ -321,7 +337,9 @@ class JsTranspiler(Transpiler):
     def map_len(self, item: str) -> str:
         itype_narrowed = self.gettype(item)
         if itype_narrowed:
-            if itype_narrowed[0].startswith('Map'):
+            if itype_narrowed[0].startswith('Set'):
+                return f'{item}.size'
+            elif itype_narrowed[0].startswith('Map'):
                 return f'Object.keys({item}).length'
         return f'{item}.length'
 

@@ -615,30 +615,7 @@ class Transpiler(ast.NodeVisitor):
             left = self.repr_expr(expr.left)
             op = expr.ops[0]
             right = ', '.join(self.repr_expr(c) for c in expr.comparators)
-            right_isconstant = right.isupper() or right.startswith('"')
-            if isinstance(op, ast.In):
-                return self.map_in(right, left)
-            elif isinstance(op, ast.NotIn):
-                return self.map_in(right, left, negated=True)
-            elif isinstance(op, ast.Eq):
-                if right.isnumeric():
-                    return self._fmt_op(ast.Is, left, right)
-                if right_isconstant:
-                    return self._fmt_op(ast.Eq, right, left)
-                return self._fmt_op(ast.Eq, left, right)
-            elif isinstance(op, ast.NotEq):
-                if right.isnumeric():
-                    return self._fmt_op(ast.IsNot, left, right)
-                if right_isconstant:
-                    return self._fmt_op(ast.NotEq, right, left)
-                return self._fmt_op(ast.NotEq, left, right)
-            else:
-                ltype_narrowed = self.gettype(left)
-                mop = self.operators[type(op)]
-                if self.strcmp and ('>' in mop or '<' in mop) and ltype_narrowed and ltype_narrowed[0] == 'String':
-                    compare = self.strcmp.format(left, right)
-                    return f'{compare} {mop} 0'
-                return f'{left} {mop} {right}'
+            return self.map_compare(left, op, right)
 
         elif isinstance(expr, ast.IfExp):
             test = self._thruthy(self.repr_expr(expr.test))
@@ -704,6 +681,32 @@ class Transpiler(ast.NodeVisitor):
             return f'{self.repr_expr(expr.left)} {bop} {self.repr_expr(expr.right)}'
 
         raise NotImplementedError(f'unhandled: {(expr)}')
+
+    def map_compare(self, left: str, op: ast.operator, right: str) -> str:
+        right_isconstant = right.isupper() or right.startswith('"')
+        if isinstance(op, ast.In):
+            return self.map_in(right, left)
+        elif isinstance(op, ast.NotIn):
+            return self.map_in(right, left, negated=True)
+        elif isinstance(op, ast.Eq):
+            if right.isnumeric():
+                return self._fmt_op(ast.Is, left, right)
+            if right_isconstant:
+                return self._fmt_op(ast.Eq, right, left)
+            return self._fmt_op(ast.Eq, left, right)
+        elif isinstance(op, ast.NotEq):
+            if right.isnumeric():
+                return self._fmt_op(ast.IsNot, left, right)
+            if right_isconstant:
+                return self._fmt_op(ast.NotEq, right, left)
+            return self._fmt_op(ast.NotEq, left, right)
+        else:
+            ltype_narrowed = self.gettype(left)
+            mop = self.operators[type(op)]
+            if self.strcmp and ('>' in mop or '<' in mop) and ltype_narrowed and ltype_narrowed[0] == 'String':
+                compare = self.strcmp.format(left, right)
+                return f'{compare} {mop} 0'
+            return f'{left} {mop} {right}'
 
     def _fmt_op(self, op: type, *args):
         oper = self.operators[op]
