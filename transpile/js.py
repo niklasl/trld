@@ -235,6 +235,10 @@ class JsTranspiler(Transpiler):
 
         if isinstance(op, ast.Eq):
             ltypeinfo = self.gettype(left)
+            if ltypeinfo and ltypeinfo[0].startswith('Object'):
+                return f'global.JSON.stringify({left}) === global.JSON.stringify({right})'
+            if ltypeinfo and ltypeinfo[0].startswith('Array'):
+                return f'Array.isArray({right}) && {left}.toString() === {right}.toString()'
             if ltypeinfo and ltypeinfo[0].startswith('Set'):
                 return f'((l, r) => l === r || l !== null && r !== null && l.size === r.size && !Array.from(l).find(it => !r.has(it)))({left}, {right})'
         return super().map_compare(left, op, right)

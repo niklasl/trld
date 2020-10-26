@@ -683,7 +683,6 @@ class Transpiler(ast.NodeVisitor):
         raise NotImplementedError(f'unhandled: {(expr)}')
 
     def map_compare(self, left: str, op: ast.operator, right: str) -> str:
-        right_isconstant = right.isupper() or right.startswith('"')
         if isinstance(op, ast.In):
             return self.map_in(right, left)
         elif isinstance(op, ast.NotIn):
@@ -691,14 +690,10 @@ class Transpiler(ast.NodeVisitor):
         elif isinstance(op, ast.Eq):
             if right.isnumeric():
                 return self._fmt_op(ast.Is, left, right)
-            if right_isconstant:
-                return self._fmt_op(ast.Eq, right, left)
             return self._fmt_op(ast.Eq, left, right)
         elif isinstance(op, ast.NotEq):
             if right.isnumeric():
                 return self._fmt_op(ast.IsNot, left, right)
-            if right_isconstant:
-                return self._fmt_op(ast.NotEq, right, left)
             return self._fmt_op(ast.NotEq, left, right)
         else:
             ltype_narrowed = self.gettype(left)

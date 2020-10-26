@@ -337,7 +337,7 @@ class Context:
             # override protected,
             # and a copy of remote contexts.
             #self.terms[key] = # TODO: set in Term (move that up here if obscure...)
-            isprotected: bool = False # FIXME: pass from where?
+            isprotected: bool = cast(bool, context.get(PROTECTED))
             Term(self, context, key, value, defined, base_url, isprotected, override_protected)
 
     def _handle_import(self, context: Dict[str, Union[str, Dict]], base_url: str) -> Dict:
@@ -486,7 +486,7 @@ class Term:
         ):
         # TODO: check redundancies of these and conditional initialization below
         self.is_prefix = False
-        self.is_protected = False
+        self.is_protected = isprotected if isinstance(isprotected, bool) else False
         self.is_reverse_property = False
         self.container = []
         self.direction = None
@@ -560,7 +560,6 @@ class Term:
         # TODO: we're doing everything *inside* of Term; move out to function + call Term?
 
         # 11)
-        self.is_protected = False
         if PROTECTED in dfn:
             if active_context._processing_mode == JSONLD10:
                 raise InvalidTermDefinitionError(str(dfn))
@@ -854,7 +853,6 @@ class Term:
 
         return self.iri == other.iri and \
                 self.is_prefix == other.is_prefix and \
-                self.is_protected == other.is_protected and \
                 self.is_reverse_property == other.is_reverse_property and \
                 self.base_url == other.base_url and \
                 self.has_local_context == other.has_local_context and \

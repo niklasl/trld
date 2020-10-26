@@ -49,7 +49,7 @@ class JavaTranspiler(Transpiler):
         ast.Or: '||',
         ast.Is: '==',
         ast.IsNot: '!=',
-        ast.Eq: '{0}.equals({1})',
+        ast.Eq: '({0} == null && ((Object) {1}) == null || {0} != null && {0}.equals({1}))',
         ast.NotEq: '!{0}.equals({1})',
         ast.Lt: '<',
         ast.LtE: '<=',
