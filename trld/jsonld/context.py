@@ -282,7 +282,7 @@ class Context:
             if vocab is None:
                 self.vocabulary_mapping = None
             # 5.8.3)
-            elif isinstance(vocab, str) and (is_iri(vocab) or is_blank(vocab)):
+            elif isinstance(vocab, str) and (is_iri_ref(vocab) or is_blank(vocab)):
                 self.vocabulary_mapping = self.expand_doc_relative_vocab_iri(vocab)
                 # NOTE: The use of blank node identifiers to value for @vocab is
                 # obsolete, and may be removed in a future version of JSON-LD.
@@ -740,7 +740,7 @@ class Term:
             index: object = dfn[INDEX]
             if not isinstance(index, str):
                 raise InvalidTermDefinitionError(str(value))
-            if not is_iri(active_context.expand_iri(index)):
+            if not is_iri(active_context.expand_vocab_iri(index)):
                 raise InvalidTermDefinitionError(str(value))
             # 20.3)
             self.index = index

@@ -98,8 +98,12 @@ class JsonLdError(Exception):
 
 
 def is_iri(value: Optional[str]) -> bool:
-    ... # TODO
-    return value is not None and ' ' not in value
+    return value is not None and ':' in value and is_iri_ref(value)
+
+
+def is_iri_ref(value: Optional[str]) -> bool:
+    ... # TODO: check legal chars
+    return value is not None and ' ' not in value and not is_blank(value)
 
 
 def is_blank(value: str) -> bool:
