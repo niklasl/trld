@@ -195,9 +195,7 @@ def expansion(active_context: Context,
         elif not isinstance(resultval, str) and LANGUAGE in result:
             raise InvalidLanguageTaggedValueError
         # 15.5)
-        # TODO: simpler but doesn't transpile.java
-        #elif TYPE in result and not all(is_iri(t) for t in result[TYPE]):
-        elif TYPE in result and not all(is_iri(cast(str, t)) for t in as_list(result[TYPE])):
+        elif TYPE in result and not (isinstance(result[TYPE], str) and is_iri(cast(str, result[TYPE]))):
             raise InvalidTypedValueError(str(result[TYPE]))
 
     # 16)
