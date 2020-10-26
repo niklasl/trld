@@ -587,7 +587,7 @@ def _expand_element(active_context: Context,
                         # 13.8.3.7.2.4)
                         item[expanded_index_key] = index_property_values
                         # 13.8.3.7.2.5)
-                        if isinstance(value, Dict) and VALUE in value and len(value) > 1:
+                        if isinstance(item, Dict) and VALUE in item and len(item) > 1:
                             raise InvalidValueObjectError
                     # 13.8.3.7.3)
                     elif INDEX in container_mapping and INDEX not in item and expanded_index != NONE:
