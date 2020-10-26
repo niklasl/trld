@@ -27,7 +27,7 @@ For Python, this runs mypy and the test suite:
 
     $ make python
     ...
-    Ran 369 test cases. Passed: 343. Failed: 26. Errors: 0.
+    Ran 369 test cases. Passed: 362. Failed: 7. Errors: 0.
     Ran 239 test cases. Passed: 238. Failed: 1. Errors: 0.
 
 For the other languages, this will generate packages for each language in the
