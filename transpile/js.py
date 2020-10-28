@@ -84,6 +84,7 @@ class JsTranspiler(Transpiler):
 
     function_map = {
         'str': '{0}.toString()',
+        'type': 'typeof {0}',
         'id': '{0}',
         'print': 'console.log({0})',
     }
@@ -263,6 +264,9 @@ class JsTranspiler(Transpiler):
 
     def map_op_assign(self, owner, op, value):
         if isinstance(op, ast.Add):
+            ownertype = self.gettype(owner)
+            if ownertype[0] == 'Number':
+                return f'{owner} += {value}'
             return f'Array.prototype.push.apply({owner}, {value})'
         return None
 
@@ -296,7 +300,7 @@ class JsTranspiler(Transpiler):
 
         if containertype:
             if containertype.startswith('Map'):
-                result = f'{contained} in {container}'
+                result = f'Object.hasOwnProperty.call({container}, {contained})'
             elif containertype.startswith('Set'):
                 result = f'{container}.has({contained})'
         if negated:

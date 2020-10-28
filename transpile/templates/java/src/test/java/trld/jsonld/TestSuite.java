@@ -7,6 +7,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import static org.junit.jupiter.api.Assertions.*;
 
 import static trld.jsonld.Base.CONTEXT;
+import static trld.jsonld.Base.JSONLD10;
 
 
 public class TestSuite {
@@ -18,8 +19,12 @@ public class TestSuite {
         List<Arguments> cases = new ArrayList<>();
         Map manifest = (Map) Common.loadJson(TESTSUITE_DIR + manifestFile);
         for (Map tc : (List<Map>) manifest.get("sequence")) {
-            if (!((List) tc.get("@type")).contains("jld:PositiveEvaluationTest"))
+            if (!((List) tc.get("@type")).contains("jld:PositiveEvaluationTest")) {
                 continue; // TODO: add handling of negative tests!
+            }
+            if (tc.containsKey("option") && JSONLD10.equals((((Map) tc.get("option")).get("specVersion")))) {
+                continue;
+            }
 
             cases.add(Arguments.of(((String) tc.get("@id")),
                                    ((String) tc.get("purpose")), tc));
@@ -33,6 +38,10 @@ public class TestSuite {
 
     static List<Arguments> compactTestCases() {
         return testCaseProvider("compact-manifest.jsonld");
+    }
+
+    static List<Arguments> flattenTestCases() {
+        return testCaseProvider("flatten-manifest.jsonld");
     }
 
     @ParameterizedTest(name = "Expand {0} - {1}")
@@ -80,6 +89,39 @@ public class TestSuite {
         }
 
         Object resultData = Compaction.compact(contextData, sourceData, baseUri, compactArrays, ordered);
+
+        assertNotNull(expectedData);
+        assertEquals(expectedData, resultData);
+    }
+
+    @ParameterizedTest(name = "Flatten {0} - {1}")
+    @MethodSource("flattenTestCases")
+    void flattenTestSuite(String id, String purpose, Map tc) {
+        String src = TESTSUITE_DIR + (String) tc.get("input");
+        String url = TESTSUITE_BASE_URL + (String) tc.get("input");
+        Map<String, Object> options = (Map) tc.getOrDefault("option", new HashMap<>());
+        String baseUri = (String) options.getOrDefault("base", url);
+        boolean compactArrays = (Boolean) options.getOrDefault("compactArrays", true);
+        boolean ordered = true;
+
+        Object sourceData = Common.loadJson(src);
+        sourceData = Expansion.expand(sourceData, baseUri, null, ordered);
+        Object contextData = null;
+        if (tc.containsKey("context")) {
+            String contextSrc = TESTSUITE_DIR + (String) tc.get("context");
+            contextData = Common.loadJson(contextSrc);
+        }
+
+        String expectedSrc = TESTSUITE_DIR + (String) tc.get("expect");
+        Object expectedData = Common.loadJson(expectedSrc);
+        if (expectedData instanceof Map) {
+            ((Map) expectedData).remove(CONTEXT);
+        }
+
+        Object resultData = Flattening.flatten(sourceData, ordered);
+        if (contextData != null) {
+            resultData = Compaction.compact(contextData, resultData, baseUri, compactArrays, ordered);
+        }
 
         assertNotNull(expectedData);
         assertEquals(expectedData, resultData);

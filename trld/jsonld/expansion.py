@@ -1,6 +1,6 @@
 # TODO: Improve transpile to remove redundant redundancies:
 # - Most cast calls (especially "upcasts" to JsonObject)
-# - Some `if ...: if ....:` could be just `and` with paren grouping
+# - Some `if ...: if ....:` could be just `and`
 
 from typing import Optional, Dict, List, Set, Union, cast
 from .base import *
@@ -9,7 +9,6 @@ from .context import Context, Term, InvalidBaseDirectionError, InvalidNestValueE
 
 
 # framing keywords
-DEFAULT: str = '@default'
 EMBED: str = '@embed'
 EXPLICIT: str = '@explicit'
 OMIT_DEFAULT: str = '@omit_default'

@@ -39,6 +39,7 @@ VOCAB: str = '@vocab'
 # TODO: not "really" (public) keywords...?
 ANY: str = '@any'
 NULL: str = '@null'
+DEFAULT: str = '@default'
 
 # TODO: see 5f6117d4
 NULLS: Set[Optional[str]] = {None, NULL}
@@ -197,3 +198,25 @@ def relativise_iri(base: str, iri: str) -> str:
         parentbase = parentbase[:parentbase.rfind('/')]
 
     return iri
+
+
+def node_equals(a: JsonObject, b: JsonObject) -> bool:
+    if is_scalar(a):
+        return type(a) == type(b) and a == b
+    if isinstance(a, List):
+        if not isinstance(b, List):
+            return False
+        # TODO: transpile or live with C-style code...
+        #return all(node_equals(it, b[i]) for i, it in enumerate(a))
+        i: int = 0
+        for ai in a:
+            if not node_equals(ai, b[i]):
+                return False
+            i += 1
+        return True
+    elif isinstance(a, Dict):
+        if not isinstance(b, Dict):
+            return False
+        return all(k in b and node_equals(a[k], b[k]) for k in a.keys())
+    else:
+        return False

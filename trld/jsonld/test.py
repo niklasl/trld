@@ -17,6 +17,7 @@ from .base import *
 from . import context
 from .expansion import expand
 from .compaction import compact
+from .flattening import flatten
 
 
 TESTS_URL = 'https://w3c.github.io/json-ld-api/tests'
@@ -100,7 +101,9 @@ def run_testsuite(suitefilepath):
                 print(f'Expected error: {expected_error}')
 
         try:
-            if 'jld:ExpandTest' in tc[TYPE]:
+            compact_arrays = options.get('compactArrays', True)
+
+            if 'jld:ExpandTest' in tc[TYPE] or 'jld:FlattenTest' in tc[TYPE]:
                 expand_context = options.get('expandContext')
                 if expand_context:
                     expand_context = str(suitedir / expand_context)
@@ -109,11 +112,14 @@ def run_testsuite(suitefilepath):
                         base_uri,
                         expand_context=expand_context,
                         ordered=True)
-
             elif 'jld:CompactTest' in tc[TYPE]:
-                compact_arrays = options.get('compactArrays', True)
-                expanded_data = expand(in_data, base_uri, ordered=True)
-                out_data = compact(context_data, expanded_data, base_uri,
+                out_data = expand(in_data, base_uri, ordered=True)
+
+            if 'jld:FlattenTest' in tc[TYPE]:
+                out_data = flatten(out_data, ordered=True)
+
+            if context_data:
+                out_data = compact(context_data, out_data, base_uri,
                         compact_arrays=compact_arrays, ordered=True)
 
                 if isinstance(expect_data, dict):

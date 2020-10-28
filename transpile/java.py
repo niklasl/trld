@@ -64,6 +64,7 @@ class JavaTranspiler(Transpiler):
 
     function_map = {
         'str': '{0}.toString()',
+        'type': '{0}.getClass()',
         'id': '{0}.hashCode()',
         'print': 'System.out.println({0})',
     }
@@ -87,6 +88,7 @@ class JavaTranspiler(Transpiler):
         yield
 
     def handle_import(self, node: ast.ImportFrom):
+        # TODO: also node.level >= 2 (e.g. `from ..base import *`)
         if node.level == 1:
             for name in node.names:
                 if node.module is None:
@@ -102,11 +104,11 @@ class JavaTranspiler(Transpiler):
         return f'{vrepr} instanceof {classname}'
 
     def map_for(self, container, ctype, part, parttype):
-        if 'Map' in ctype:
+        if self._is_map(ctype):
             entry = part.replace(", ", "_")
             typedentry = f'Map.Entry<{parttype}> {entry}'
-            parttypes = parttype.split(', ')
-            parts = part.split(', ')
+            parttypes = parttype.split(', ', 1)
+            parts = part.split(', ', 1)
             stmts = [f'{parttypes[0]} {parts[0]} = {entry}.getKey()',
                      f'{parttypes[1]} {parts[1]} = {entry}.getValue()']
             nametypes = [(parts[0], parttypes[0]), (parts[1], parttypes[1])]
@@ -117,6 +119,9 @@ class JavaTranspiler(Transpiler):
 
         return f'for ({typedentry} : {self._cast(container)})', stmts, nametypes
 
+    # TODO:
+    #def map_name(self, name, callargs=None): ...
+
     def map_attr(self, owner, attr, callargs=None):
         ownertype = self.gettype(owner) or ('Object', False)
 
@@ -125,27 +130,27 @@ class JavaTranspiler(Transpiler):
         if attr == 'join':# and ownertype[0] == 'String':
             return f'String.join({owner}, {callargs[0]})'
 
-        elif attr == 'get' and 'Map' in ownertype[0] and len(callargs) == 2:
+        elif attr == 'get' and self._is_map(ownertype[0]) and len(callargs) == 2:
             return f'{self._cast(owner, parens=True)}.getOrDefault({callargs[0]}, {callargs[1]})'
 
         elif not callargs:
-            if attr == 'sort' and 'List' in ownertype[0]:
+            if attr == 'sort' and self._is_list(ownertype[0]):
                     return f'Collections.sort({owner})'
 
-            if attr == 'copy' and 'Map' in ownertype[0]:
+            if attr == 'copy' and self._is_map(ownertype[0]):
                     return f'new HashMap({owner})'
 
-        if attr == 'items':# and 'Map' in ownertype[0]:
+        if attr == 'items':# and self._is_map(ownertype[0]):
             member = 'entrySet'
-        elif attr == 'keys':# and 'Map' in ownertype[0]:
+        elif attr == 'keys':# and self._is_map(ownertype[0]):
             member = 'keySet'
-        elif attr == 'update' and 'Map' in ownertype[0]:
+        elif attr == 'update' and self._is_map(ownertype[0]):
             member = 'putAll'
         elif attr == 'pop':
-            if 'Map' in ownertype[0] and len(callargs) == 2 and callargs[1] == 'null':
+            if self._is_map(ownertype[0]) and len(callargs) == 2 and callargs[1] == 'null':
                 callargs.pop(1)
             member = 'remove'
-        elif attr == 'setdefault' and 'Map' in ownertype[0]:
+        elif attr == 'setdefault' and self._is_map(ownertype[0]):
             self._pre_stmts = [
                 f'if (!{castowner}.containsKey({callargs[0]})) '
                 f'{castowner}.put({callargs[0]}, {callargs.pop(1)})'
@@ -183,7 +188,7 @@ class JavaTranspiler(Transpiler):
         ownertype = self.gettype(owner)
         if ownertype:
             if key.startswith('-'):
-                sizelength = 'size' if 'List' in ownertype[0] else 'length'
+                sizelength = 'size' if self._is_list(ownertype[0]) else 'length'
                 key = f"{owner}.{sizelength}() {key.replace('-', '- ')}"
             if ownertype[0] == 'String':
                 return f'{owner}.substring({key}, {key} + 1)'
@@ -201,6 +206,9 @@ class JavaTranspiler(Transpiler):
     def map_op_assign(self, owner, op, value):
         value = self._cast(value)
         if isinstance(op, ast.Add):
+            ownertype = self.gettype(owner)
+            if ownertype[0] == 'Integer':
+                return f'{owner} += {value}'
             return f'{owner}.addAll({value})'
         return None
 
@@ -276,7 +284,7 @@ class JavaTranspiler(Transpiler):
 
         view = ''
         ntype_narrowed = self.gettype(iter)
-        if ntype_narrowed and 'Map' in ntype_narrowed[0]:
+        if ntype_narrowed and self._is_map(ntype_narrowed[0]):
             view = '.keySet()'
 
         iter = self._cast(iter, parens=True)
@@ -288,6 +296,12 @@ class JavaTranspiler(Transpiler):
         itemtypeinfo = self.gettype(item)
         itemtype = itemtypeinfo[0] if itemtypeinfo else None
         return f"{itemcast}.{'length' if itemtype == 'String' else 'size'}()"
+
+    def _is_map(self, typerepr: str) -> bool:
+        return typerepr.split('<', 1)[0] in {'Map', 'HashMap'}
+
+    def _is_list(self, typerepr: str) -> bool:
+        return typerepr.split('<', 1)[0] in {'List', 'ArrayList'}
 
 
 if __name__ == '__main__':
