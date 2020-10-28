@@ -217,6 +217,10 @@ class JavaTranspiler(Transpiler):
                 return f'((List) {owner}.get({key})).addAll({value})'
         return None
 
+    def map_delitem(self, owner, key):
+        assert self.gettype(owner)[0].startswith('Map')
+        return f'{self._cast(owner, parens=True)}.remove({key})'
+
     def map_in(self, container, contained, negated=False):
         contains = 'containsKey' if self.gettype(container) and self.gettype(container)[0].startswith('Map') else 'contains'
         castcontainer = self._cast(container, parens=True)

@@ -275,6 +275,10 @@ class JsTranspiler(Transpiler):
                 return f'Array.prototype.push.apply({owner}[{key}], {value})'
         return None
 
+    def map_delitem(self, owner, key):
+        assert self.gettype(owner)[0].startswith('Map')
+        return f'delete {owner}[{key}]'
+
     def map_in(self, container, contained, negated=False):
         containertypeinfo = self.gettype(container)
         # String or List

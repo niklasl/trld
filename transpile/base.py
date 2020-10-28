@@ -353,6 +353,17 @@ class Transpiler(ast.NodeVisitor):
 
         self.generic_visit(node)
 
+    def visit_Delete(self, node):
+        target = node.targets[0]
+
+        if not isinstance(target, ast.Subscript) \
+           or not isinstance(target.slice, ast.Index):
+            raise NotImplementedError(f'unhandled: {(ast.dump(node))}')
+
+        owner = self.repr_expr(target.value)
+        key = self.repr_expr(target.slice.value)
+        self.stmt(self.map_delitem(owner, key), node=node)
+
     def visit_Expr(self, node):
         self.stmt(self.repr_expr(node.value), node=node)
 
@@ -868,6 +879,9 @@ class Transpiler(ast.NodeVisitor):
         raise NotImplementedError
 
     def map_op_setitem(self, owner: str, key: str, op: ast.operator, value: str) -> str:
+        raise NotImplementedError
+
+    def map_delitem(self, owner: str, key: str) -> str:
         raise NotImplementedError
 
     def map_in(self, container, contained, negated=False):
