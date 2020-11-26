@@ -21,8 +21,18 @@ def load_json(url: str) -> object:
     return None
 
 
+def parse_json(s: str) -> object:
+    return json.loads(s)
+
+
 def dump_json(o: object, pretty=False) -> str:
-    return json.dumps(o, indent=2 if pretty else None)
+    return json.dumps(o,
+            indent=2 if pretty else None,
+            ensure_ascii=not pretty)
+
+
+def dump_canonical_json(o: object, pretty=False) -> str:
+    return json.dumps(o, indent=None, separators=(',', ':'), sort_keys=True)
 
 
 def resolve_iri(base: str, relative: str) -> str:

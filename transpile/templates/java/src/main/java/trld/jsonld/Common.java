@@ -38,8 +38,12 @@ public class Common {
             }
         }
 
+        return parseJson(src);
+    }
+
+    public static Object parseJson(String s) {
         try {
-            return JSON.std.anyFrom(src);
+            return JSON.std.anyFrom(s);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -61,6 +65,10 @@ public class Common {
         }
     }
 
+    public static String dumpCanonicalJson(Object o) {
+        return dumpJson(o); // FIXME: no space separators, do sort keys
+    }
+
     public static String resolveIri(String base, String relative) {
         try {
             return new URI(base).resolve(relative).toString();
@@ -73,9 +81,9 @@ public class Common {
         System.err.println(msg);
     }
 
-    public static List sorted(List list) {
-        List result = new ArrayList(list.size());
-        result.addAll(list);
+    public static List sorted(Collection items) {
+        List result = new ArrayList(items.size());
+        result.addAll(items);
         Collections.sort(result);
         return result;
     }
