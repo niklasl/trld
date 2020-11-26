@@ -36,6 +36,7 @@ class JavaTranspiler(Transpiler):
         'Dict': 'Map',
         'set': 'HashSet',
         'Set': 'Set',
+        'Iterable': 'Iterable',
     }
 
     constants = {
@@ -64,6 +65,7 @@ class JavaTranspiler(Transpiler):
 
     function_map = {
         'str': '{0}.toString()',
+        'pow': 'Math.pow({0}, {1})',
         'type': '{0}.getClass()',
         'id': '{0}.hashCode()',
         'print': 'System.out.println({0})',
@@ -90,11 +92,14 @@ class JavaTranspiler(Transpiler):
     def handle_import(self, node: ast.ImportFrom):
         # TODO: also node.level >= 2 (e.g. `from ..base import *`)
         if node.level == 1:
-            for name in node.names:
+            for impname in node.names:
                 if node.module is None:
                     continue
-                assert name.asname is None
-                name = Casing.camelize(name.name)
+                assert impname.asname is None
+                name = Casing.camelize(impname.name)
+                if name[0].isupper():
+                    continue # FIXME: just assumes class in same package;
+                    # we need to write public classes as separate files.
                 if name == '*' or name[0].islower():
                     self.outln('import static ', self.package, '.', Casing.upper_camelize(node.module), '.', name, self.end_stmt)
                 else:
@@ -137,6 +142,9 @@ class JavaTranspiler(Transpiler):
             if attr == 'sort' and self._is_list(ownertype[0]):
                     return f'Collections.sort({owner})'
 
+            if attr == 'reverse' and self._is_list(ownertype[0]):
+                    return f'Collections.reverse({owner})'
+
             if attr == 'copy' and self._is_map(ownertype[0]):
                     return f'new HashMap({owner})'
 
@@ -163,6 +171,9 @@ class JavaTranspiler(Transpiler):
         elif attr == 'isalpha':# and ownertype[0] == 'String':
             member = 'matches'
             callargs.append(r'"^\\w+$"')
+        elif attr == 'isnumeric':# and ownertype[0] == 'String':
+            member = 'matches'
+            callargs.append(r'"^\\d+$"')
         elif ownertype and ownertype[0] == 'String':
             member = {
                 'startswith': 'startsWith',
@@ -191,7 +202,7 @@ class JavaTranspiler(Transpiler):
                 sizelength = 'size' if self._is_list(ownertype[0]) else 'length'
                 key = f"{owner}.{sizelength}() {key.replace('-', '- ')}"
             if ownertype[0] == 'String':
-                return f'{owner}.substring({key}, {key} + 1)'
+                return f'{self._cast(owner, parens=True)}.substring({key}, {key} + 1)'
 
         return f'{self._cast(owner, parens=True)}.get({key})'
 
@@ -215,6 +226,7 @@ class JavaTranspiler(Transpiler):
     def map_setitem(self, owner, key, value):
         assert self.gettype(owner)[0].startswith('Map')
         method = 'put' # if ismap else 'add'
+        key = self._cast(key)
         value = self._cast(value)
         return f'{self._cast(owner, parens=True)}.{method}({key}, {value})'
 
@@ -278,16 +290,25 @@ class JavaTranspiler(Transpiler):
 
     def _map_generator(self, gen, method):
         g = gen.generators[0]
-        elt = self.repr_expr(gen.elt)
         item = self.repr_expr(g.target)
         iter = self.repr_expr(g.iter)
 
         view = ''
-        ntype_narrowed = self.gettype(iter)
-        if ntype_narrowed and self._is_map(ntype_narrowed[0]):
+        ntypeinfo = self.gettype(iter)
+        if ntypeinfo and self._is_map(ntypeinfo[0]):
             view = '.keySet()'
 
-        iter = self._cast(iter, parens=True)
+        itemtype = None
+        if ntypeinfo and ntypeinfo[0].endswith('>'):
+            itemtype = ntypeinfo[0].split('<', 1)[-1][:-1].split(',')[0]
+
+        self.new_scope()
+        if itemtype:
+            self.addtype(item, itemtype)
+        elt = self.repr_expr(gen.elt)
+        self.exit_scope()
+
+        iter = self._cast(iter, parens=True )
 
         return f'{iter}{view}.stream().{method}({item} -> {elt})'
 
@@ -302,6 +323,22 @@ class JavaTranspiler(Transpiler):
 
     def _is_list(self, typerepr: str) -> bool:
         return typerepr.split('<', 1)[0] in {'List', 'ArrayList'}
+
+    def declare_iterator(self, iter_type):
+        iter_name = 'iter'
+        self._in_iterator = (iter_name, iter_type)
+        return 'iterator', [
+            f'List<{iter_type}> {iter_name} = new ArrayList()'
+        ]
+
+    def add_to_iterator(self, expr) -> str:
+        return f'{self._in_iterator[0]}.add({self.repr_expr(expr)})'
+
+    def add_all_to_iterator(self, expr) -> str:
+        return f'{self._in_iterator[0]}.addAll({self.repr_expr(expr)})'
+
+    def exit_iterator(self, node):
+        self.stmt(f'return {self._in_iterator[0]}.iterator()')
 
 
 if __name__ == '__main__':

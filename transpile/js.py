@@ -355,6 +355,18 @@ class JsTranspiler(Transpiler):
                 return f'Object.keys({item}).length'
         return f'{item}.length'
 
+    def declare_iterator(self, iter_type):
+        return '*[Symbol.iterator]', []
+
+    def add_to_iterator(self, expr) -> str:
+        return f'yield {self.repr_expr(expr)}'
+
+    def add_all_to_iterator(self, expr) -> str:
+        return f'yield* {self.repr_expr(expr)}'
+
+    def exit_iterator(self, node):
+        pass
+
 
 if __name__ == '__main__':
     JsTranspiler().main()

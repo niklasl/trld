@@ -3,11 +3,13 @@
 #   logic and factor out remaining _visitor from Transpiler.
 # * [5f76eae2] Improve isinstance checking (top-level bool, reset at or?).
 # * [5f831dc1] Clear out java-specific code.
-from typing import NamedTuple, Dict, List, Tuple, Union, Optional
+from typing import NamedTuple, Dict, List, Tuple, Union, Optional, Callable, Iterator
 from enum import Enum, auto
 from contextlib import contextmanager
+from collections import OrderedDict
 from pathlib import Path
 import ast
+import re
 import sys
 
 from .typescanner import TypeScanner
@@ -19,6 +21,9 @@ __all__ = 'Transpiler', 'Casing'
 def camelize(s: str) -> str:
     if s[0] == '_':
         s = s[1:]
+    uscore_i = s.find('_')
+    if uscore_i > -1 and all(c.isupper() for c in s[:uscore_i - 1]):
+        return s
     if not any(c.islower() for c in s):
         return s
     return ''.join(w.title() if i else w for i, w in enumerate(s.split('_')))
@@ -52,10 +57,13 @@ class Scope(NamedTuple):
 
 class Transpiler(ast.NodeVisitor):
     #_visitor: ast.NodeVisitor
-    typing: bool
+    typing: bool # or typecheck_implies_casts...
     union_surrogate: Optional[str] = None
     optional_type_form: Optional[str] = None
+    begin_block: str
+    end_block: str
     ctor: Optional[str] = None
+    #call_keywords = AsDict
     func_defaults: Optional[str] = None
     this: str
     protected = ''
@@ -74,8 +82,11 @@ class Transpiler(ast.NodeVisitor):
         self.in_static = False
         self.staticname = 'Statics'
         self.statics: List[Tuple] = []
+
         self._modules = None
         self.classes: Dict[str, Dict[str, str]] = {}
+        self._iterables: Dict[str, str] = {}
+
         self._top: Dict[str, Tuple] = {}
         self._within: List[Scope] = []
         self._level = 0
@@ -180,12 +191,15 @@ class Transpiler(ast.NodeVisitor):
         # TODO: 5f831dc1 (java-specific)
         return f' // {note}' if eol else f'/* {note} */'
 
-    def new_scope(self, node):
-        scope = Scope(node, {})
+    def new_scope(self, node=None):
+        scope = Scope(node, OrderedDict())
         self._within.append(scope)
         return scope
 
-    def enter_block(self, scope, *parts, end=None, continued=False, stmts=[], nametypes=[]):
+    def exit_scope(self):
+        self._within.pop()
+
+    def enter_block(self, scope, *parts, end=None, continued=False, stmts=[], nametypes=[], on_exit: Optional[Callable] = None):
         if not isinstance(scope, Scope):
             scope = self.new_scope(scope)
 
@@ -196,7 +210,7 @@ class Transpiler(ast.NodeVisitor):
             self.outln(self.begin_block[1:])
         self._level += 1
         if 'class ' in parts[0]:
-            self.classes[scope.node.name] = scope.typed
+            self.classes[parts[1]] = scope.typed
             self._staticout(inclass=parts[1])
 
         for argtype in nametypes:
@@ -211,7 +225,10 @@ class Transpiler(ast.NodeVisitor):
         elif scope.node:
             self.generic_visit(scope.node)
 
-        self._within.pop()
+        if on_exit:
+            on_exit()
+
+        self.exit_scope()
         self._level -= 1
         self.outln(self.end_block, end=end)
 
@@ -330,15 +347,23 @@ class Transpiler(ast.NodeVisitor):
             prefix += f'{typename} '
 
         if rval:
+            # TODO: 5f831dc1 (java-centric cast logic)
+            # This involved maneuvre may be reundant in some cases (then again,
+            # we might be able to remove a bunch of noise cast calls in the
+            # source...)
             rvalowner = rval.split('.', 1)[0]
             cast_rvalowner = self._cast(rvalowner, parens='.' in rval)
             if cast_rvalowner != rvalowner:
                 rval = rval.replace(rvalowner, cast_rvalowner, 1)
-            # TODO: judiciously apply casts for obvious types (only unless inferable!)
-            #else:
-            #    ownertype = self.gettype(ownerref) if isinstance(ownerref, str) else None
-            #    if ownertype and prefix.startswith(ownertype[0]) and not rval.startswith('('):
-            #        rval = f'({ownertype[0]}) {rval}'
+            elif not rval.startswith(('(', 'new ')) and ' ' not in rval \
+                    or re.search(r'\(\([A-Z]\w+\)', rval):
+                rvaltype = typename
+                if not rvaltype and not rval.startswith('('):
+                    ownertype = self.gettype(ownerref)
+                    if ownertype:
+                        rvaltype = ownertype[0]
+                if self.typing and rvaltype:
+                    rval = f'({rvaltype}) {rval}'
 
         if rval:
             self.stmt(prefix, ' = '.join(ownerrefs + [rval]), node=node)
@@ -404,7 +429,7 @@ class Transpiler(ast.NodeVisitor):
 
         # TODO: 5f831dc1 (java-specific)
         ctype, parttype = 'Object', 'Object'
-        ctype_narrowed = self.gettype(container.rsplit('.', 1)[0])
+        ctype_narrowed = self.gettype(container.rsplit('.', 1)[0]) if container.endswith(')') else self.gettype(container)
         if (not ctype_narrowed or not ctype_narrowed[0].endswith('>')) and self._last_cast:
             ctype_narrowed = self._last_cast, None
         if ctype_narrowed:
@@ -412,6 +437,10 @@ class Transpiler(ast.NodeVisitor):
             if ctype.endswith('>'):
                 ctype = ctype[:-1]
                 ctype, parttype = ctype.split('<', 1)
+
+        if ctype in self._iterables:
+            parttype = self._iterables[ctype]
+            ctype = self.types.get('Iterable', 'Iterable')
 
         part = self.repr_expr(node.target)
 
@@ -486,6 +515,17 @@ class Transpiler(ast.NodeVisitor):
         if ret == 'Boolean':
             ret = 'boolean'
 
+        name = None
+        on_exit: Callable = None
+        stmts = []
+        if isinstance(node.returns, ast.Subscript) and \
+                isinstance(node.returns.value, ast.Name) and \
+                node.returns.value.id == 'Iterator':
+            iterated_type = self.repr_expr(node.returns.slice.value)
+            name, stmts = self.declare_iterator(iterated_type)
+            def on_exit():
+                self.exit_iterator(node)
+
         if ret:
             ret += ' '
 
@@ -501,7 +541,7 @@ class Transpiler(ast.NodeVisitor):
             name = 'toString'
         elif node.name == '__eq__':
             name = 'equals'
-        else:
+        elif not name:
             name = under_camelize(node.name, self.protected == '_')
 
         #for decorator in node.decorator_list:
@@ -526,7 +566,7 @@ class Transpiler(ast.NodeVisitor):
 
         argrepr = ', '.join(argdecls)
 
-        self.enter_block(scope, prefix, ret, name, f'({argrepr})', nametypes=nametypes)
+        self.enter_block(scope, prefix, ret, name, f'({argrepr})', nametypes=nametypes, stmts=stmts, on_exit=on_exit)
         self.in_static = False
 
     #def map_function(self, node: ast.AST, method):
@@ -561,20 +601,56 @@ class Transpiler(ast.NodeVisitor):
     def visit_ClassDef(self, node):
         self.outln()
 
+        on_exit: Callable = None
+
+        # TODO: 5f831dc1 (java-specific)
+        classname = self.map_name(node.name)
+        if classname == self.filename.with_suffix('').name or not self.has_static:
+            classdecl = f'{self.public}class '
+        elif classname.startswith('_'):
+            classname = classname[1:]
+            classdecl = 'class ' # module scope
+        else:
+            classdecl = 'class '
+
         # TODO: 5f831dc1 (java-specific)
         base = self.repr_expr(node.bases[0]) if node.bases else ''
         if base == 'NamedTuple':
             base = ''
+            sign = lambda tinfo: f'{tinfo[0]} ' if self.typing else ''
+            def on_exit():
+                if classname in self.classes:
+                    classdfn = self.classes[classname]
+                    signature = ', '.join(f'{sign(atypeinfo)}{aname}'
+                            for aname, atypeinfo in classdfn.items())
+                    assigns = (f'{self.this}.{aname} = {aname}'
+                               for aname in classdfn)
+                    ctor = self.ctor or classname
+                    self.enter_block(None, ctor, f'({signature})', stmts=assigns)
         elif base:
             if base == 'Exception':
                 base = self.types.get(base, base)
+            # TODO: 5f831dc1 (java-specific)
             base = f' extends {base}'
+
+        # TODO:
+        for member in node.body:
+            if not (isinstance(member, ast.FunctionDef) and
+                    member.name == '__iter__'):
+                continue
+            iterated_type = self.repr_expr(member.returns.slice.value)
+            # TODO: 5f831dc1 (java-specific)
+            iterable_type = self.types.get('Iterable', 'Iterable')
+            if self.typing:
+                base += f' implements {iterable_type}<{iterated_type}>'
+            self._iterables[classname] = iterated_type
+            break
 
         stmts = []
         # TODO: if derived from an Exception...
         if node.name.endswith('Error'):
             mtype = 'String ' if self.typing else ''
-            ctor = self.ctor or node.name
+            ctor = self.ctor or classname
             if self.func_defaults:
                 key_val = self.func_defaults.format(key=f'{mtype}msg',
                                                     value=self.none)
@@ -583,12 +659,8 @@ class Transpiler(ast.NodeVisitor):
                 stmts.append(f'{ctor}() {{ }}')
                 stmts.append(f'{ctor}({mtype}msg) {{ super(msg); }}')
 
-        if node.name == self.filename.with_suffix('').name or not self.has_static:
-            classdecl = f'{self.public}class '
-        else:
-            classdecl = 'class '
-
-        self.enter_block(node, classdecl, node.name, base, stmts=stmts)
+        self.enter_block(node, classdecl, classname, base,
+                stmts=stmts, on_exit=on_exit)
 
     def repr_annot(self, expr) -> str:
         return self.repr_expr(expr, annot=True)
@@ -629,7 +701,7 @@ class Transpiler(ast.NodeVisitor):
             return self.map_compare(left, op, right)
 
         elif isinstance(expr, ast.IfExp):
-            test = self._thruthy(self.repr_expr(expr.test))
+            test = self._cast(self._thruthy(self.repr_expr(expr.test)))
             then = self._cast(self.repr_expr(expr.body))
             other = self._cast(self.repr_expr(expr.orelse))
             return f'({test} ? {then} : {other})'
@@ -689,11 +761,19 @@ class Transpiler(ast.NodeVisitor):
                 bop = '+'
             elif isinstance(expr.op, ast.Div):
                 bop = '/'
+            elif isinstance(expr.op, ast.Mod):
+                bop = '%'
             return f'{self.repr_expr(expr.left)} {bop} {self.repr_expr(expr.right)}'
+
+        elif isinstance(expr, ast.Yield):
+            return self.add_to_iterator(expr.value)
+
+        elif isinstance(expr, ast.YieldFrom):
+            return self.add_all_to_iterator(expr.value)
 
         raise NotImplementedError(f'unhandled: {(expr)}')
 
-    def map_compare(self, left: str, op: ast.operator, right: str) -> str:
+    def map_compare(self, left: str, op: ast.cmpop, right: str) -> str:
         if isinstance(op, ast.In):
             return self.map_in(right, left)
         elif isinstance(op, ast.NotIn):
@@ -748,9 +828,9 @@ class Transpiler(ast.NodeVisitor):
                 self._last_cast = arg0typerepr
                 if not self.typing:
                     return arg1repr
-                if isowner:
-                    castvalue = f'({castvalue})'
-                return castvalue
+                #if isowner:
+                #    castvalue = f'({castvalue})'
+                return f'({castvalue})'
 
             elif funcname == 'any':
                 return self.map_any(expr.args[0])
@@ -906,6 +986,18 @@ class Transpiler(ast.NodeVisitor):
         raise NotImplementedError
 
     def map_len(self, item: str) -> str:
+        raise NotImplementedError
+
+    def declare_iterator(self, node) -> Tuple[str, List]:
+        raise NotImplementedError
+
+    def add_to_iterator(self, expr) -> str:
+        raise NotImplementedError
+
+    def add_all_to_iterator(self, expr) -> str:
+        raise NotImplementedError
+
+    def exit_iterator(self, node):
         raise NotImplementedError
 
     def map_joined_str(self, expr: ast.JoinedStr) -> str:
