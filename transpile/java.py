@@ -1,8 +1,8 @@
 import ast
-from typing import Union
+from typing import List, Optional, Union, IO
 from contextlib import contextmanager
 from pathlib import Path
-from .base import Transpiler, Casing, under_camelize
+from .base import Transpiler, camelize, upper_camelize, under_camelize
 
 
 class JavaTranspiler(Transpiler):
@@ -71,14 +71,43 @@ class JavaTranspiler(Transpiler):
         'print': 'System.out.println({0})',
     }
 
+    _current_imports: List[str]
+    _prev_outfile: Optional[IO]
+
     @contextmanager
-    def on_file(self, srcpath: Path):
+    def enter_file(self, srcpath: Path):
         # TODO: Change back to just staticname + 'Common'?
-        self.staticname = Casing.upper_camelize(srcpath.with_suffix('').parts[-1])
+        self.staticname = upper_camelize(srcpath.with_suffix('').parts[-1])
         self.package = str(srcpath.parent.with_suffix('')).replace('/', '.')
         self.filename = (Path(self.outdir) /
                 self.package.replace('.', '/') /
                 self.staticname).with_suffix('.java')
+        self._current_imports = []
+        self._output_prelude()
+        yield
+
+    def visit_ClassDef(self, node):
+        classname = self.map_name(node.name)
+        currclass = self.filename.with_suffix('').name
+        classfilepath = self.filename.parent / f'{classname}.java'
+
+        if classfilepath == self.filename:
+            super().visit_ClassDef(node)
+            return
+
+        self._prev_outfile = self.outfile
+        self.outfile = classfilepath.open('w')
+        print('Class file:', classfilepath)
+        self._output_prelude()
+        for impstr in self._current_imports:
+            self.stmt(impstr)
+        self.stmt(f'import static {self.package}.{currclass}.*')
+        self.outln()
+        super().visit_ClassDef(node)
+        self.outfile.close()
+        self.outfile = self._prev_outfile
+
+    def _output_prelude(self):
         self.outln(f'package {self.package};')
         self.outln()
         self.stmt('//import javax.annotation.Nullable')
@@ -87,23 +116,34 @@ class JavaTranspiler(Transpiler):
         self.stmt('import java.util.stream.Collectors')
         self.stmt('import java.io.*')
         self.outln()
-        yield
 
     def handle_import(self, node: ast.ImportFrom):
-        # TODO: also node.level >= 2 (e.g. `from ..base import *`)
-        if node.level == 1:
-            for impname in node.names:
-                if node.module is None:
-                    continue
-                assert impname.asname is None
-                name = Casing.camelize(impname.name)
-                if name[0].isupper():
-                    continue # FIXME: just assumes class in same package;
-                    # we need to write public classes as separate files.
-                if name == '*' or name[0].islower():
-                    self.outln('import static ', self.package, '.', Casing.upper_camelize(node.module), '.', name, self.end_stmt)
-                else:
-                    self.outln('import ', self.package, '.', name, self.end_stmt)
+        for impname in node.names:
+            if node.module is None:
+                continue
+
+            package = self.package.rsplit('.', node.level - 1)[0:1]
+            modparts = node.module.split('.')
+            package += modparts
+
+            assert impname.asname is None
+            name = camelize(impname.name)
+            if name in self._type_alias:
+                continue
+
+            if name == '*' or name[0].islower() or '_' in name:
+                importing = 'import static'
+                namepath = package + [name]
+                namepath[-2] = upper_camelize(namepath[-2])
+            else:
+                importing = 'import'
+                if len(package) > 1: # collapse namespace a bit
+                    package = package[:-1]
+                namepath = package + [name]
+
+            impstr = f"{importing} {'.'.join(namepath)}"
+            self._current_imports.append(impstr)
+            self.stmt(impstr)
 
     def map_isinstance(self, vrepr: str, classname: str):
         return f'{vrepr} instanceof {classname}'
@@ -174,6 +214,9 @@ class JavaTranspiler(Transpiler):
         elif attr == 'isnumeric':# and ownertype[0] == 'String':
             member = 'matches'
             callargs.append(r'"^\\d+$"')
+        elif attr == 'isspace':# and ownertype[0] == 'String':
+            member = 'matches'
+            callargs.append(r'"^\\s+$"')
         elif ownertype and ownertype[0] == 'String':
             member = {
                 'startswith': 'startsWith',

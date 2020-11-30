@@ -1,4 +1,4 @@
-trld_modules = trld/jsonld/expansion.py trld/jsonld/compaction.py trld/jsonld/flattening.py trld/jsonld/rdf.py
+trld_modules = trld/jsonld/expansion.py trld/jsonld/compaction.py trld/jsonld/flattening.py trld/jsonld/rdf.py trld/nq/parser.py trld/nq/serializer.py
 jsonld_api_dir = ~/repos/github/w3c/json-ld-api
 
 python:

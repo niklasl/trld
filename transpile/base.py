@@ -46,9 +46,6 @@ class Casing(Enum):
     UPPER_SNAKE_CASE = auto()
     lower_snake_case = auto()
 
-    camelize = staticmethod(camelize)
-    upper_camelize = staticmethod(upper_camelize)
-
 
 class Scope(NamedTuple):
     node: object
@@ -126,7 +123,7 @@ class Transpiler(ast.NodeVisitor):
 
     def _transpile(self, tree: ast.Module, src: str):
         srcpath = Path(src)
-        with self.on_file(srcpath):
+        with self.enter_file(srcpath):
             self.visit(tree)
 
         self._staticout()
@@ -134,15 +131,15 @@ class Transpiler(ast.NodeVisitor):
             self.outfile.close()
 
     @property
-    def filename(self):
-        return self._filename
+    def filename(self) -> Path:
+        return Path(self.outfile.name)
 
     @filename.setter
     def filename(self, filename):
-        self._filename = Path(filename)
-        print(f'Writing file: {self.filename}')
-        self._filename.parent.mkdir(parents=True, exist_ok=True)
-        self.outfile = self._filename.open('w')
+        filename = Path(filename)
+        print(f'Writing file: {filename}')
+        filename.parent.mkdir(parents=True, exist_ok=True)
+        self.outfile = filename.open('w')
 
     def _staticout(self, inclass=None):
         if inclass and inclass != self.staticname:
@@ -326,6 +323,8 @@ class Transpiler(ast.NodeVisitor):
         self._handle_Assign(node, name, typename)
 
     def _handle_Assign(self, node, ownerref, typename=None):
+        isclassattr = self._within and isinstance(self._within[-1].node, ast.ClassDef)
+
         rval = self.repr_expr(node.value) if node.value else None
         if isinstance(ownerref, list):
             ownerrefs, ownerref = ownerref, ownerref[0]
@@ -335,11 +334,13 @@ class Transpiler(ast.NodeVisitor):
         if not self._within:
             self.in_static = self.has_static
             prefix = 'static ' if self.has_static else ''
+        elif isclassattr: # TODO: unless ownerref source startswith('_') ...
+            prefix = self.public
         else:
             prefix = ''
 
         if all(c == '_' or c.isupper() or c.isdigit() for c in ownerref):
-            prefix += self.constant
+            prefix = self.public + prefix + self.constant
         elif not self.typing and '.' not in ownerref and self.gettype(ownerref) == None:
             prefix += self.declaring
 
@@ -362,7 +363,10 @@ class Transpiler(ast.NodeVisitor):
                     ownertype = self.gettype(ownerref)
                     if ownertype:
                         rvaltype = ownertype[0]
-                if self.typing and rvaltype:
+
+                v = node.value.operand if isinstance(node.value, ast.UnaryOp) else node.value
+                if self.typing and rvaltype and not isinstance(v, (ast.Constant,
+                        ast.NameConstant, ast.Str, ast.Num, ast.Bytes)):
                     rval = f'({rvaltype}) {rval}'
 
         if rval:
@@ -393,6 +397,9 @@ class Transpiler(ast.NodeVisitor):
         self.stmt(self.repr_expr(node.value), node=node)
 
     def visit_If(self, node, continued=False):
+        if isinstance(node.test, ast.Compare) and isinstance(node.test.left, ast.Name) and node.test.left.id == '__name__' and node.test.comparators[0].s == '__main__':
+            return
+
         scope = self.new_scope(node)
         orelse = node.orelse
         node.orelse = None
@@ -619,14 +626,28 @@ class Transpiler(ast.NodeVisitor):
             base = ''
             sign = lambda tinfo: f'{tinfo[0]} ' if self.typing else ''
             def on_exit():
-                if classname in self.classes:
-                    classdfn = self.classes[classname]
+                classdfn = self.classes[classname]
+                ctor = self.ctor or classname
+                # TODO: use different self.export (for e.g. js!)
+                public = self.public if self.typing else ''
+                ctor = f'{public}{self.ctor or classname}'
+
+                defaults = [self.repr_expr(ann.value) for ann in node.body
+                            if isinstance(ann, ast.AnnAssign) and ann.value]
+                callclass = self.this or self.ctor or classname
+                for at in range(len(defaults)):
+                    i = at + 1
                     signature = ', '.join(f'{sign(atypeinfo)}{aname}'
-                            for aname, atypeinfo in classdfn.items())
-                    assigns = (f'{self.this}.{aname} = {aname}'
-                               for aname in classdfn)
-                    ctor = self.ctor or classname
-                    self.enter_block(None, ctor, f'({signature})', stmts=assigns)
+                                  for aname, atypeinfo in list(classdfn.items())[:i])
+                    args = list(classdfn)[:i] + defaults[at:]
+                    self.enter_block(None, ctor, f'({signature})', stmts=[
+                            f"{callclass}({', '.join(args)})"
+                    ])
+
+                signature = ', '.join(f'{sign(atypeinfo)}{aname}'
+                                for aname, atypeinfo in classdfn.items())
+                assigns = (f'{self.this}.{aname} = {aname}' for aname in classdfn)
+                self.enter_block(None, ctor, f'({signature})', stmts=assigns)
         elif base:
             if base == 'Exception':
                 base = self.types.get(base, base)
@@ -667,7 +688,10 @@ class Transpiler(ast.NodeVisitor):
 
     def repr_expr(self, expr, annot=False, isowner=False, callargs=None) -> str:
         if isinstance(expr, ast.Str):
-            s = expr.s.replace('"', r'\"')
+            # TODO: just use repr(s) with some cleanup?
+            s = expr.s.replace('\\', '\\\\')
+            s = s.replace('"', r'\"')
+            s = s.replace('\n', r'\n')
             return expr.s if annot else f'"{s}"'
 
         elif isinstance(expr, ast.Num):
@@ -919,7 +943,7 @@ class Transpiler(ast.NodeVisitor):
         return o
 
     @contextmanager
-    def on_file(self, srcpath: Path):
+    def enter_file(self, srcpath: Path):
         raise NotImplementedError
 
     def map_for(self, container: str, ctype: str, part: str, parttype: str) -> Tuple[str, List[str], List[Tuple[str, str]]]:
@@ -945,6 +969,9 @@ class Transpiler(ast.NodeVisitor):
                 return f'{obj}({argrepr})'
 
         return obj
+
+    def handle_import(self, node: ast.ImportFrom):
+        raise NotImplementedError
 
     def map_getitem(self, owner: str, key: str) -> str:
         raise NotImplementedError

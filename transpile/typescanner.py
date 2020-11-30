@@ -3,6 +3,7 @@ from typing import NamedTuple, Dict, List, Tuple, Union, Optional
 import ast
 from collections import OrderedDict
 from pathlib import Path
+import os
 
 
 class ClassType(NamedTuple):
@@ -52,7 +53,7 @@ class TypeScanner(ast.NodeVisitor):
         if self._in_src:
             basedir = self._in_src[-1].parent
         if node.module is not None:
-            src = node.module
+            src = node.module.replace('.', os.sep)
             if basedir:
                 for i in range(node.level - 1):
                     basedir = basedir.parent

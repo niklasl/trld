@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Union
 from contextlib import contextmanager
 import ast
-from .base import Transpiler, Casing, under_camelize
+from .base import Transpiler, Casing, camelize, under_camelize
 
 
 class JsTranspiler(Transpiler):
@@ -13,8 +13,8 @@ class JsTranspiler(Transpiler):
     typing = False
     optional_type_form = '{0}'
 
-    public = 'export '
-    constant = 'export const '
+    public = 'export ' # FIXME: top_level_export
+    constant = 'const '
     declaring = 'let '
     protected = '_'
 
@@ -103,7 +103,7 @@ class JsTranspiler(Transpiler):
     }
 
     @contextmanager
-    def on_file(self, srcpath: Path):
+    def enter_file(self, srcpath: Path):
         self._srcpath = srcpath
         fpath = '/'.join(srcpath.with_suffix('.js').parts[1:])
         self.filename = Path(self.outdir) / fpath
@@ -112,16 +112,15 @@ class JsTranspiler(Transpiler):
         yield
 
     def handle_import(self, node: ast.ImportFrom):
-        if node.level != 1:
-            return
         if len(node.names) == 1 and node.names[0].name == '*' and self._modules:
             modpath = str((self._srcpath.parent / node.module).with_suffix(self._srcpath.suffix))
             names = ', '.join(self._modules[modpath])
         else:
-            names = ', '.join(Casing.camelize(name.name) # type: ignore
+            names = ', '.join(camelize(name.name) # type: ignore
                     for name in node.names
                     if node.module is not None)
-        self.outln(f"import {{ {names} }} from './{node.module}'", self.end_stmt)
+        rel = '.' * node.level
+        self.outln(f"import {{ {names} }} from '{rel}/{node.module}'", self.end_stmt)
 
     def map_isinstance(self, vrepr: str, classname: str):
         if classname in {'String', 'Number', 'Boolean'}:
