@@ -273,7 +273,7 @@ class JavaTranspiler(Transpiler):
                 for i, k in enumerate(expr.keys))
         if data:
             # TODO: decide whether to require imports of these base utils
-            return f'trld.jsonld.Common.mapOf({data})'
+            return f'trld.Common.mapOf({data})'
         return f'new HashMap<>()'
 
     def map_set(self, expr: ast.Set):

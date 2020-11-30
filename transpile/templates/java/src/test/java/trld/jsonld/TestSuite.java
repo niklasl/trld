@@ -6,6 +6,8 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import static org.junit.jupiter.api.Assertions.*;
 
+import trld.Common;
+
 import static trld.jsonld.Base.CONTEXT;
 import static trld.jsonld.Base.JSONLD10;
 

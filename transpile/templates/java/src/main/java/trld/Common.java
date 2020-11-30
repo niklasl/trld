@@ -1,4 +1,4 @@
-package trld.jsonld;
+package trld;
 
 import java.util.*;
 import java.io.IOException;

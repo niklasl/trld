@@ -1,5 +1,5 @@
+from ..common import sorted
 from .base import *
-from .common import sorted
 from .context import Context, Term
 
 

@@ -1,6 +1,6 @@
 from typing import Optional, Dict, List, Set, Tuple, Union, cast
+from ..common import load_json, warning, resolve_iri, sorted
 from .base import *
-from .common import load_json, warning, resolve_iri, sorted
 
 
 DEFAULT_PROCESSING_MODE: str = JSONLD11

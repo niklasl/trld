@@ -3,8 +3,8 @@
 # - Some `if ...: if ....:` could be just `and`
 
 from typing import Optional, Dict, List, Set, Union, cast
+from ..common import warning
 from .base import *
-from .common import warning
 from .context import Context, Term, InvalidBaseDirectionError, InvalidNestValueError
 
 

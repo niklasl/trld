@@ -2,6 +2,9 @@ package trld.jsonld;
 
 import java.util.*;
 
+import trld.Common;
+
+
 public class Cmd {
     public static void main(String[] args) {
         boolean nextIsContext = false;

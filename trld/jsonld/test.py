@@ -3,7 +3,7 @@ import sys
 import traceback
 from pathlib import Path
 
-from . import common
+from .. import common
 
 _load_json = common.load_json
 def load_local_json(url):

@@ -1,6 +1,6 @@
 from typing import List, Dict, Set, Iterable, Iterator, Union, Optional, NamedTuple, cast
+from ..common import sorted, dump_canonical_json, parse_json
 from .base import *
-from .common import sorted, dump_canonical_json, parse_json
 from .context import InvalidBaseDirectionError
 from .expansion import InvalidLanguageTaggedStringError
 from .flattening import BNodes, NodeMap, make_node_map

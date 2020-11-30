@@ -1,7 +1,7 @@
 import tape from 'tape'
 import os from 'os'
 
-import * as common from '../lib/jsonld/common.js'
+import * as common from '../lib/common.js'
 import * as context from '../lib/jsonld/context.js'
 import { JSONLD10, CONTEXT, ID, TYPE } from '../lib/jsonld/base.js'
 import { expand } from '../lib/jsonld/expansion.js'

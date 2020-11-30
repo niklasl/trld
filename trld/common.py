@@ -1,5 +1,6 @@
 import json
 import sys
+from typing import Iterator, Optional
 from os.path import expanduser
 from urllib.parse import urlparse, urljoin
 from urllib.request import urlopen

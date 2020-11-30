@@ -2,7 +2,7 @@ from typing import Any
 import json
 import sys
 import argparse
-from .common import load_json
+from ..common import load_json
 from .expansion import expand
 from .compaction import compact
 from .flattening import flatten

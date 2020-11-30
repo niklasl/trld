@@ -1,6 +1,6 @@
 from typing import Optional, Dict, List, Set, Union, cast
+from ..common import warning, sorted
 from .base import *
-from .common import warning, sorted
 
 
 NodeMap = Dict[str, JsonMap]
