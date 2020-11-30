@@ -2,6 +2,7 @@ import json
 import sys
 import traceback
 from pathlib import Path
+from io import StringIO
 
 from .. import common
 
@@ -13,11 +14,14 @@ def load_local_json(url):
     return _load_json(url)
 common.load_json = load_local_json
 
+from ..common import Input, Output
 from .base import *
 from . import context
 from .expansion import expand
 from .compaction import compact
 from .flattening import flatten
+from .rdf import RdfDataset, to_jsonld, to_rdf_dataset
+from ..nq import parser as nq_parser, serializer as nq_serializer
 
 
 TESTS_URL = 'https://w3c.github.io/json-ld-api/tests'
@@ -56,34 +60,31 @@ def run_testsuite(suitefilepath):
 
         print(f"Running TC {testid} - {tc['name']}:", end=' ')
 
-
         indoc_path = suitedir / tc['input']
-        with indoc_path.open() as f:
-            in_data = json.load(f)
 
         expectdoc_path = tc.get('expect')
-        expect_data = None
         if expectdoc_path:
             assert 'jld:PositiveEvaluationTest' in tc[TYPE]
             expectdoc_path = suitedir / expectdoc_path
-            with expectdoc_path.open() as f:
-                expect_data = json.load(f)
+        elif 'jld:PositiveSyntaxTest' in tc[TYPE]:
+            pass # NOTE: only input; just test conversion!
         else:
-            assert 'jld:NegativeEvaluationTest' in tc[TYPE]
-
-        expected_error = tc.get('expectErrorCode')
-
-        context_path = tc.get('context')
-        context_data = None
-        if context_path:
-            context_path = suitedir / context_path
-            with context_path.open() as f:
-                context_data = json.load(f)
+            assert 'jld:NegativeEvaluationTest' in tc[TYPE], f'Odd type: {tc[TYPE]!r}'
 
         context.DEFAULT_PROCESSING_MODE = options.get('processingMode', JSONLD11)
 
         base_uri = str(indoc_path).replace(str(suitedir), TESTS_URL)
         base_uri = options.get('base', base_uri)
+
+        compact_arrays = options.get('compactArrays', True)
+
+        expand_context = options.get('expandContext')
+        if expand_context:
+            expand_context = str(suitedir / expand_context)
+
+        expected_error = tc.get('expectErrorCode')
+
+        context_path = tc.get('context')
 
         def handle_fail():
             nonlocal fails
@@ -101,17 +102,60 @@ def run_testsuite(suitefilepath):
                 print(f'Expected error: {expected_error}')
 
         try:
-            compact_arrays = options.get('compactArrays', True)
+
+            in_data = None
+            expect_data = None
+            context_data = None
+
+            if context_path:
+                context_path = suitedir / context_path
+                with context_path.open() as f:
+                    context_data = json.load(f)
+
+            if 'jld:FromRDFTest' in tc[TYPE]:
+                with indoc_path.open() as f:
+                    inp = Input(f)
+                    in_data = RdfDataset()
+                    nq_parser.parse(in_data, inp)
+                    ordered = True
+                    rdf_direction = options.get('rdfDirection')
+                    use_native_types = options.get('useNativeTypes', False)
+                    use_rdf_type = options.get('useRdfType', False)
+                    out_data = to_jsonld(in_data, ordered,
+                            rdf_direction, use_native_types, use_rdf_type)
+
+            if in_data is None:
+                with indoc_path.open() as f:
+                    in_data = json.load(f)
+
+
+            if 'jld:ToRDFTest' in tc[TYPE]:
+                sb = StringIO()
+                out = Output(sb)
+                in_data = expand(in_data,
+                        base_uri,
+                        expand_context=expand_context,
+                        ordered=True)
+                rdf_direction = options.get('rdfDirection')
+                dataset = to_rdf_dataset(in_data, rdf_direction)
+                nq_serializer.serialize(dataset, out)
+                out_data = sb.getvalue()
+                out_data = '\n'.join(sorted(out_data.splitlines()))
+                if expectdoc_path:
+                    with expectdoc_path.open() as f:
+                        expect_data = f.read()
+                    expect_data = '\n'.join(sorted(expect_data.splitlines()))
+
+            if expect_data is None and expectdoc_path:
+                with expectdoc_path.open() as f:
+                    expect_data = json.load(f)
 
             if 'jld:ExpandTest' in tc[TYPE] or 'jld:FlattenTest' in tc[TYPE]:
-                expand_context = options.get('expandContext')
-                if expand_context:
-                    expand_context = str(suitedir / expand_context)
-
                 out_data = expand(in_data,
                         base_uri,
                         expand_context=expand_context,
                         ordered=True)
+
             elif 'jld:CompactTest' in tc[TYPE]:
                 out_data = expand(in_data, base_uri, ordered=True)
 
@@ -125,14 +169,15 @@ def run_testsuite(suitefilepath):
                 if isinstance(expect_data, dict):
                     expect_data.pop(CONTEXT, None)
 
-            out_shape = jsonrepr(out_data)
-            expect_shape = jsonrepr(expect_data)
+            out_shape = datarepr(out_data)
+            expect_shape = datarepr(expect_data) if expect_data else out_shape
             if out_shape != expect_shape:
                 handle_fail()
                 print(f'  Got: {out_shape}')
             else:
                 oks += 1
                 print('OK')
+
         except Exception as e:
             if expected_error:
                 if expected_error.translate({ord(c): None for c in ' -@'}).lower() + 'error' == type(e).__name__.lower():
@@ -156,7 +201,9 @@ def run_testsuite(suitefilepath):
     return not fails and not errors
 
 
-def jsonrepr(data):
+def datarepr(data):
+    if isinstance(data, str):
+        return data
     return json.dumps(data, sort_keys=True, indent=2)
 
 
