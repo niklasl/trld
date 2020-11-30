@@ -363,15 +363,15 @@ def to_jsonld(dataset: RdfDataset,
                     # 6.1.6.1)
                     del cl_ref[ID]
                     # 6.1.6.2)
-                    cl_ref[VALUE] = cast(List, cl_node[RDF_VALUE])[0][VALUE]
+                    cl_ref[VALUE] = cast(Dict, cast(List, cl_node[RDF_VALUE])[0])[VALUE]
                     # 6.1.6.3)
                     if RDF_LANGUAGE in cl_node:
-                        cl_ref[LANGUAGE] = cast(List, cl_node[RDF_LANGUAGE])[0][VALUE]
+                        cl_ref[LANGUAGE] = cast(Dict, cast(List, cl_node[RDF_LANGUAGE])[0])[VALUE]
                         if not is_lang_tag(cast(str, cl_ref[LANGUAGE])):
                             raise InvalidLanguageTaggedStringError(str(cl_ref[LANGUAGE]))
                     # 6.1.6.4)
                     if RDF_DIRECTION in cl_node:
-                        cl_ref[DIRECTION] = cast(List, cl_node[RDF_DIRECTION])[0][VALUE]
+                        cl_ref[DIRECTION] = cast(Dict, cast(List, cl_node[RDF_DIRECTION])[0])[VALUE]
                         if not cl_ref[DIRECTION] in DIRECTIONS:
                             raise InvalidBaseDirectionError(str(cl_ref[DIRECTION]))
         # 6.2)
