@@ -1,18 +1,19 @@
 from typing import Optional
+from ..common import Output
 from ..jsonld.base import is_blank
 from ..jsonld.rdf import RdfDataset, RdfGraph, RdfTriple, RdfLiteral, XSD_STRING
 
 
-def serialize(dataset: RdfDataset, writeln):
+def serialize(dataset: RdfDataset, out: Output):
     for graph in dataset:
-        write_graph(graph, writeln)
+        write_graph(graph, out)
 
 
-def write_graph(graph: RdfGraph, writeln):
+def write_graph(graph: RdfGraph, out: Output):
     for triple in graph.triples:
         if triple.s is None or triple.p is None or triple.o is None:
             continue
-        writeln(repr_quad(triple, graph.name))
+        out.writeln(repr_quad(triple, graph.name))
 
 
 def repr_quad(triple: RdfTriple, graph_name: Optional[str]) -> str:
@@ -36,9 +37,9 @@ def repr_term(t: object) -> str:
         v = v.replace('\\', r'\\')
         v = v.replace('"', r'\"')
         v = f'"{v}"'
-        if t.language:
+        if t.language is not None:
             return f'{v}@{t.language}'
-        elif t.datatype and t.datatype != XSD_STRING:
+        elif t.datatype is not None and t.datatype != XSD_STRING:
             dt: str = repr_term(t.datatype)
             return f'{v}^^{dt}'
         else:
