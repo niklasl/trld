@@ -6,6 +6,42 @@ from urllib.parse import urlparse, urljoin
 from urllib.request import urlopen
 
 
+Char = str
+
+
+class Input:
+    def __init__(self, source=None):
+        self._source = source or sys.stdin
+
+    def get_header(self, header: str) -> Optional[str]:
+        raise NotImplementedError
+
+    def lines(self) -> Iterator[str]:
+        return self._source
+
+    def characters(self) -> Iterator[Char]:
+        return (c for l in self._source for c in l)
+
+    def close(self):
+        if self._source is not sys.stdin:
+            self._source.close()
+
+
+class Output:
+    def __init__(self, dest=None):
+        self._dest = dest or sys.stdout
+
+    def write(self, s: str):
+        print(s, file=self._dest, end='')
+
+    def writeln(self, s: str):
+        print(s, file=self._dest)
+
+    def close(self):
+        if self._source is not sys.stdout:
+            self._source.close()
+
+
 sorted = sorted
 
 
