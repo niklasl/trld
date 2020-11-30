@@ -1,4 +1,5 @@
-from typing import List, Optional, Iterable
+from typing import List, Optional, Iterable, cast
+from ..common import Input, dump_json
 from ..jsonld.rdf import RdfDataset, RdfGraph, RdfTriple, RdfLiteral, RdfObject
 
 
@@ -11,13 +12,19 @@ READ_DATATYPE_START: int = 5
 READ_DATATYPE_NEXT: int = 6
 READ_DATATYPE_IRI: int = 7
 READ_LANGUAGE: int = 8
-READ_COMMENT: int = 9
-ESCAPE_NEXT: int = 10
+READ_LITERAL_FINISH: int = 9
+READ_COMMENT: int = 10
+ESCAPE_NEXT: int = 11
 
 ESCAPE_CHAR: str = '\\'
 
+# TODO: allowed chars per state...
+# TODO: consume_next('^'), consume_while(str.isspace) ?
+# TODO: state_stack ? READ_STMT > READ_DATATYPE > READ_IRI
+# ... or just State.parent tree...
 
-def parse(dataset: RdfDataset, stream: Iterable[str]):
+
+def parse(dataset: RdfDataset, inp: Input):
     state: int = READ_STMT
     prev_state: int = -1
     chars: List[str] = []
@@ -26,11 +33,17 @@ def parse(dataset: RdfDataset, stream: Iterable[str]):
     language: Optional[str] = None
     terms: List[RdfObject] = []
 
-    for c in stream:
-        if c == ESCAPE_CHAR:
+    for c in cast(Iterable[str], inp.characters()):
+        if c == ESCAPE_CHAR: # TODO: and state in READS_ESCAPES:
             prev_state = state
             state = ESCAPE_NEXT
             continue
+
+        if state == READ_LITERAL_FINISH:
+            assert literal is not None
+            terms.append(RdfLiteral(literal, datatype, language))
+            literal = datatype = language = None
+            state = READ_STMT
 
         if state == ESCAPE_NEXT:
             state = prev_state
@@ -46,9 +59,6 @@ def parse(dataset: RdfDataset, stream: Iterable[str]):
                 state = READ_STRING
                 continue
             elif c == '.':
-                if literal:
-                    terms.append(RdfLiteral(literal, datatype, language))
-                    literal = datatype = language = None
                 handle_statement(dataset, terms)
                 terms = []
                 continue
@@ -60,10 +70,11 @@ def parse(dataset: RdfDataset, stream: Iterable[str]):
                 s: str = ''.join(chars)
                 if state == READ_IRI:
                     terms.append(s)
+                    state = READ_STMT
                 else:
                     datatype = s
+                    state = READ_LITERAL_FINISH
                 chars = []
-                state = READ_STMT
                 continue
         elif state == READ_BNODE_ID:
             if c.isspace():
@@ -84,17 +95,14 @@ def parse(dataset: RdfDataset, stream: Iterable[str]):
             elif c == '^':
                 state = READ_DATATYPE_START
                 continue
-            elif c.isspace():
-                if literal:
-                    terms.append(RdfLiteral(literal, datatype, language))
-                    literal = datatype = language = None
-                state = READ_STMT
+            else:
+                state = READ_LITERAL_FINISH
                 continue
         elif state == READ_LANGUAGE:
             if c.isspace():
                 language = ''.join(chars)
                 chars = []
-                state = READ_STMT
+                state = READ_LITERAL_FINISH
                 continue
         elif state == READ_DATATYPE_START:
             if c == '^':
@@ -116,17 +124,17 @@ def parse(dataset: RdfDataset, stream: Iterable[str]):
         chars.append(c)
 
     if len(chars) != 0 or len(terms) != 0:
-        raise Exception(f'Trailing data: chars={"".join(chars)}, terms={repr(terms)}')
+        raise Exception(f'Trailing data: chars={"".join(chars)}, terms={str(terms)}')
 
 
-def handle_statement(dataset: RdfDataset, terms):
+def handle_statement(dataset: RdfDataset, terms: List):
     if len(terms) < 3 or len(terms) > 4:
         raise Exception(f'Invalid NQuads statement {str(terms)}')
 
-    s = terms[0]
-    p = terms[1]
-    o = terms[2]
-    g = terms[3] if len(terms) == 4 else None
+    s: str = terms[0]
+    p: str = terms[1]
+    o: RdfObject = terms[2]
+    g: Optional[str] = cast(str, terms[3]) if len(terms) == 4 else None
 
     graph: RdfGraph
     if g is None:
@@ -143,11 +151,9 @@ def handle_statement(dataset: RdfDataset, terms):
 
 if __name__ == '__main__':
     from ..jsonld.rdf import to_jsonld
-    import json
-    import sys
 
-    seq = (c for line in sys.stdin for c in line)
+    inp = Input()
     dataset = RdfDataset()
-    parse(dataset, seq)
+    parse(dataset, inp)
     result = to_jsonld(dataset)
-    print(json.dumps(result, indent=2))
+    print(dump_json(result, pretty=True))
