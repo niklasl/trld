@@ -75,10 +75,10 @@ def dump_canonical_json(o: object, pretty=False) -> str:
 def resolve_iri(base: str, relative: str) -> str:
     if '//' in relative:
         url = urlparse(relative)
-        urlpath = url.path
-        if url.params:
+        urlpath: str = url.path
+        if url.params is not None:
             urlpath += f';{url.params}'
-        if url.query:
+        if url.query is not None:
             urlpath += f'?{url.query}'
         return urljoin(base, urljoin(relative, urlpath))
     return urljoin(base, relative)
