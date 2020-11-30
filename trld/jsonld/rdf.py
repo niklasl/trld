@@ -89,13 +89,14 @@ class _Usage(NamedTuple):
     value: JsonMap
 
 
-def to_rdf_dataset(data: JsonMap) -> RdfDataset:
+def to_rdf_dataset(data: JsonMap,
+        rdf_direction: Optional[str] = None) -> RdfDataset:
     bnodes: BNodes = BNodes()
     dataset: RdfDataset = RdfDataset()
     node_map: NodeMap = {DEFAULT: {}}
     make_node_map(bnodes, data, node_map)
 
-    jsonld_to_rdf_dataset(node_map, dataset, bnodes)
+    jsonld_to_rdf_dataset(node_map, dataset, bnodes, rdf_direction)
 
     return dataset
 
@@ -145,14 +146,15 @@ def jsonld_to_rdf_dataset(node_map: NodeMap, dataset: RdfDataset,
                         list_triples: List[RdfTriple] = []
                         # 1.3.2.5.2)
                         rdf_object: RdfObject = cast(RdfObject,
-                                object_to_rdf_data(item, list_triples, bnodes))
+                                object_to_rdf_data(item, list_triples, bnodes, rdf_direction))
                         list_triples.append(RdfTriple(subject, property, rdf_object))
                         # 1.3.2.5.3)
                         for triple in list_triples:
                             triples.add(triple)
 
 
-def object_to_rdf_data(item: JsonMap, list_triples: List, bnodes: BNodes) -> Optional[RdfObject]:
+def object_to_rdf_data(item: JsonMap, list_triples: List, bnodes: BNodes,
+        rdf_direction: Optional[str] = None) -> Optional[RdfObject]:
     # 1)
     if ID in item and not is_iri_or_blank(cast(str, item[ID])):
         return None
@@ -161,7 +163,7 @@ def object_to_rdf_data(item: JsonMap, list_triples: List, bnodes: BNodes) -> Opt
         return cast(str, item[ID])
     # 3)
     if LIST in item:
-        return list_to_rdf_list(cast(List, item[LIST]), list_triples, bnodes)
+        return list_to_rdf_list(cast(List, item[LIST]), list_triples, bnodes, rdf_direction)
     # 4)
     assert VALUE in item
     value: JsonObject = item[VALUE]
@@ -198,7 +200,6 @@ def object_to_rdf_data(item: JsonMap, list_triples: List, bnodes: BNodes) -> Opt
     # 13)
     assert isinstance(value, str)
     literal: Optional[RdfObject] = None
-    rdf_direction: Optional[str] = None # FIXME: options.rdf_direction
     if DIRECTION in item and rdf_direction is not None:
         # 13.1)
         language: str = cast(str, item.get(LANGUAGE, ''))
@@ -206,7 +207,7 @@ def object_to_rdf_data(item: JsonMap, list_triples: List, bnodes: BNodes) -> Opt
         # 13.2)
         if rdf_direction == I18N_DATATYPE:
             datatype = f'{I18N}{language}_{item[DIRECTION]}'
-            literal = RdfLiteral(value, datatype, None) # TODO: handle NamedTuple defaults in transpile
+            literal = RdfLiteral(value, datatype)
         # 13.3)
         elif rdf_direction == COMPOUND_LITERAL:
             # 13.3.1)
@@ -214,12 +215,12 @@ def object_to_rdf_data(item: JsonMap, list_triples: List, bnodes: BNodes) -> Opt
             literal = nodeid
             # 13.3.2)
             # TODO: spec errata? says to use item[VALUE] (not to use the stringified value)
-            list_triples.append(RdfTriple(nodeid, RDF_VALUE, value))
+            list_triples.append(RdfTriple(nodeid, RDF_VALUE, RdfLiteral(value)))
             # 13.3.3)
             if LANGUAGE in item:
-                list_triples.append(RdfTriple(nodeid, RDF_LANGUAGE, cast(str, item[LANGUAGE])))
+                list_triples.append(RdfTriple(nodeid, RDF_LANGUAGE, RdfLiteral(cast(str, item[LANGUAGE]))))
             # 13.3.4)
-            list_triples.append(RdfTriple(nodeid, RDF_DIRECTION, cast(str, item[DIRECTION])))
+            list_triples.append(RdfTriple(nodeid, RDF_DIRECTION, RdfLiteral(cast(str, item[DIRECTION]))))
     # 14)
     else:
         literal = RdfLiteral(value, datatype, cast(Optional[str], item.get(LANGUAGE)))
@@ -227,7 +228,8 @@ def object_to_rdf_data(item: JsonMap, list_triples: List, bnodes: BNodes) -> Opt
     return literal
 
 
-def list_to_rdf_list(l: List[JsonMap], list_triples: List, bnodes: BNodes) -> str:
+def list_to_rdf_list(l: List[JsonMap], list_triples: List, bnodes: BNodes,
+        rdf_direction: Optional[str] = None) -> str:
     # 1)
     if len(l) == 0:
         return RDF_NIL
@@ -241,7 +243,7 @@ def list_to_rdf_list(l: List[JsonMap], list_triples: List, bnodes: BNodes) -> st
         # 3.1)
         embedded_triples: List = []
         # 3.2)
-        obj: Optional[RdfObject] = object_to_rdf_data(item, embedded_triples, bnodes)
+        obj: Optional[RdfObject] = object_to_rdf_data(item, embedded_triples, bnodes, rdf_direction)
         # 3.3)
         if obj is not None:
             list_triples.append(RdfTriple(subject, RDF_FIRST, obj))
@@ -310,8 +312,11 @@ def to_jsonld(dataset: RdfDataset,
             # 5.7.7)
             values: List[JsonObject] = cast(List, node.setdefault(triple.p, []))
             # 5.7.8)
-            if not any(node_equals(v, value) for v in values):
-                values.append(value)
+            # TODO: spec errata; continue instead, to avoid duplicates in 5.7.9
+            # (see fromRdf/0022)
+            if any(node_equals(v, value) for v in values):
+                continue
+            values.append(value)
             # 5.7.9)
             if triple.o == RDF_NIL:
                 # 5.7.9.1)
@@ -349,7 +354,7 @@ def to_jsonld(dataset: RdfDataset,
                 # TODO: spec errata? not used...
                 #c_value: JsonObject = cl_entry.value
                 # 6.1.5)
-                cl_node: JsonMap = cast(JsonMap, graph_object[cl])
+                cl_node: JsonMap = cast(JsonMap, graph_object.pop(cl))
                 # 6.1.6)
                 for cl_ref in cast(List, c_node[c_property]):
                     assert isinstance(cl_ref, Dict)
@@ -358,15 +363,17 @@ def to_jsonld(dataset: RdfDataset,
                     # 6.1.6.1)
                     del cl_ref[ID]
                     # 6.1.6.2)
-                    cl_ref[VALUE] = cl_node[RDF_VALUE]
+                    cl_ref[VALUE] = cast(List, cl_node[RDF_VALUE])[0][VALUE]
                     # 6.1.6.3)
-                    cl_ref[LANGUAGE] = cl_node[RDF_LANGUAGE]
-                    if not is_lang_tag(cast(str, cl_ref[LANGUAGE])):
-                        raise InvalidLanguageTaggedStringError(str(cl_ref[LANGUAGE]))
+                    if RDF_LANGUAGE in cl_node:
+                        cl_ref[LANGUAGE] = cast(List, cl_node[RDF_LANGUAGE])[0][VALUE]
+                        if not is_lang_tag(cast(str, cl_ref[LANGUAGE])):
+                            raise InvalidLanguageTaggedStringError(str(cl_ref[LANGUAGE]))
                     # 6.1.6.4)
-                    cl_ref[DIRECTION] = cl_node[RDF_DIRECTION]
-                    if not cl_ref[DIRECTION] in DIRECTIONS:
-                        raise InvalidBaseDirectionError(str(cl_ref[DIRECTION]))
+                    if RDF_DIRECTION in cl_node:
+                        cl_ref[DIRECTION] = cast(List, cl_node[RDF_DIRECTION])[0][VALUE]
+                        if not cl_ref[DIRECTION] in DIRECTIONS:
+                            raise InvalidBaseDirectionError(str(cl_ref[DIRECTION]))
         # 6.2)
         if RDF_NIL not in graph_object:
             continue
@@ -478,6 +485,9 @@ def to_jsonld_object(value: RdfObject,
                 converted_value = float(literal.value)
             except ValueError:
                 pass
+        # TODO: spec errata; only done in an otherwise below (thus fromRdf/0018 fails)
+        elif literal.datatype != XSD_STRING:
+            rtype = literal.datatype
     # 2.5)
     elif literal.datatype == RDF_JSON and processing_mode != JSONLD10:
         try:
@@ -525,9 +535,9 @@ def is_iri_or_blank(iri: str) -> bool:
 
 def is_well_formed_list(node: JsonMap) -> bool:
     return is_blank(cast(str, node[ID])) and \
-            _has_list_with_one_item(node, RDF_FIRST) in node and \
+            _has_list_with_one_item(node, RDF_FIRST) and \
             _has_list_with_one_item(node, RDF_REST) and \
-            (len(node) == 2 or len(node) == 3 and TYPE in node and
+            (len(node) == 3 or len(node) == 4 and TYPE in node and
                     as_list(node[TYPE])[0] == RDF_LIST)
 
 

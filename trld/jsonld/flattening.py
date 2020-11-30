@@ -150,7 +150,7 @@ def make_node_map(bnodes: BNodes,
         eid: str
         if ID in element:
             eid = cast(str, element.pop(ID))
-            if is_blank(eid):
+            if eid is None or is_blank(eid):
                 eid = bnodes.make_bnode_id(eid)
         # 6.2)
         else:

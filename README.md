@@ -17,7 +17,11 @@ these algorithms. _It is not a generic transpiler_.
 - [x] Expansion
 - [x] Compaction
 - [x] Flattening
-- [ ] RDF Serialization/Deserialization
+- [x] RDF Serialization/Deserialization
+
+### [N-Quads](https://www.w3.org/TR/n-quads/)
+- [x] Parser
+- [x] Serializer
 
 ## Building & Testing (& Status)
 
@@ -32,13 +36,19 @@ For Python, this runs mypy and the test suite:
     $ make python
     ...
     Running test suite: expand-manifest.jsonld
-    Ran 369 test cases. Passed: 362. Failed: 7. Errors: 0.
+    Ran 369 test cases. Passed: 367. Failed: 2. Errors: 0.
 
     Running test suite: compact-manifest.jsonld
     Ran 239 test cases. Passed: 238. Failed: 1. Errors: 0.
 
     Running test suite: flatten-manifest.jsonld
     Ran 55 test cases. Passed: 55. Failed: 0. Errors: 0.
+
+    Running test suite: fromRdf-manifest.jsonld
+    Ran 51 test cases. Passed: 51. Failed: 0. Errors: 0.
+
+    Running test suite: toRdf-manifest.jsonld
+    Ran 449 test cases. Passed: 401. Failed: 48. Errors: 0.
 
 For the other languages, this will generate packages for each language in the
 build directory, then run their respective test suites:
