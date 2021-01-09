@@ -366,6 +366,26 @@ class JsTranspiler(Transpiler):
     def exit_iterator(self, node):
         pass
 
+    def map_tuple(self, expr, assignedto=None):
+        # TODO: self.on_block_enter_declarations = [...]
+        if assignedto:
+            raise NotImplementedError
+
+        return f"[{', '.join(self.repr_expr(el) for el in expr.elts)}]"
+
+    def map_listcomp(self, comp):
+        r = self.repr_expr
+        mapto = r(comp.elt)
+        assert len(comp.generators) == 1
+        gen = comp.generators[0]
+        args = r(gen.target)
+        iter = r(gen.iter)
+        assert not gen.ifs
+        return f'{iter}.map({args} => {mapto})'
+
+    def map_lambda(self, args, body):
+        return f"({', '.join(args)}) => {body}"
+
 
 if __name__ == '__main__':
     JsTranspiler().main()

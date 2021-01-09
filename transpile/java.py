@@ -34,9 +34,11 @@ class JavaTranspiler(Transpiler):
         'List': 'List',
         'dict': 'HashMap',
         'Dict': 'Map',
+        'OrderedDict': 'LinkedHashMap',
         'set': 'HashSet',
         'Set': 'Set',
         'Iterable': 'Iterable',
+        'Tuple': 'Map.Entry',
     }
 
     constants = {
@@ -115,6 +117,7 @@ class JavaTranspiler(Transpiler):
         self.stmt('import java.util.stream.Stream')
         self.stmt('import java.util.stream.Collectors')
         self.stmt('import java.io.*')
+        self.stmt('import static java.util.AbstractMap.SimpleEntry')
         self.outln()
 
     def handle_import(self, node: ast.ImportFrom):
@@ -131,7 +134,8 @@ class JavaTranspiler(Transpiler):
             if name in self._type_alias:
                 continue
 
-            if name == '*' or name[0].islower() or '_' in name:
+            if name == '*' or name[0].islower() or \
+                    all(c == '_' or c.isupper() or c.isdigit() for c in name):
                 importing = 'import static'
                 namepath = package + [name]
                 namepath[-2] = upper_camelize(namepath[-2])
@@ -149,17 +153,27 @@ class JavaTranspiler(Transpiler):
         return f'{vrepr} instanceof {classname}'
 
     def map_for(self, container, ctype, part, parttype):
-        if self._is_map(ctype):
+        stmts = []
+        if self._is_map(ctype) or parttype.startswith('Map.Entry'):
             entry = part.replace(", ", "_")
-            typedentry = f'Map.Entry<{parttype}> {entry}'
-            parttypes = parttype.split(', ', 1)
-            parts = part.split(', ', 1)
-            stmts = [f'{parttypes[0]} {parts[0]} = {entry}.getKey()',
-                     f'{parttypes[1]} {parts[1]} = {entry}.getValue()']
-            nametypes = [(parts[0], parttypes[0]), (parts[1], parttypes[1])]
+
+            if self._is_map(ctype):
+                typedentry = f'Map.Entry<{parttype}> {entry}'
+                parttypes = parttype.split(', ', 1)
+            else:
+                typedentry = f'{parttype} {entry}'
+                parttypes = parttype.split('<')[1][:-1].split(', ', 1)
+
+            if ', ' in part :
+                parts = part.split(', ', 1)
+                stmts = [f'{parttypes[0]} {parts[0]} = {entry}.getKey()',
+                        f'{parttypes[1]} {parts[1]} = {entry}.getValue()']
+                nametypes = [(parts[0], parttypes[0]), (parts[1], parttypes[1])]
+            else:
+                typedentry = f'{parttypes[1]} {part}'
+                nametypes = [(part, parttype[1])]
         else:
             typedentry = f'{parttype} {part}'
-            stmts = []
             nametypes = [(part, parttype)]
 
         return f'for ({typedentry} : {self._cast(container)})', stmts, nametypes
@@ -240,6 +254,12 @@ class JavaTranspiler(Transpiler):
 
     def map_getitem(self, owner, key):
         ownertype = self.gettype(owner)
+
+        # TODO: hack relying on an already cast owner
+        if '(Map.Entry)' in owner or ownertype and ownertype[0].startswith('Map.Entry'):
+            getter = 'getKey' if key == '0' else 'getValue'
+            return f'{self._cast(owner, parens=True)}.{getter}()'
+
         if ownertype:
             if key.startswith('-'):
                 sizelength = 'size' if self._is_list(ownertype[0]) else 'length'
@@ -259,10 +279,11 @@ class JavaTranspiler(Transpiler):
 
     def map_op_assign(self, owner, op, value):
         value = self._cast(value)
-        if isinstance(op, ast.Add):
+        if isinstance(op, (ast.Add, ast.Sub)):
+            plusminus = '+' if isinstance(op, ast.Add) else '-'
             ownertype = self.gettype(owner)
             if ownertype[0] == 'Integer':
-                return f'{owner} += {value}'
+                return f'{owner} {plusminus}= {value}'
             return f'{owner}.addAll({value})'
         return None
 
@@ -382,6 +403,62 @@ class JavaTranspiler(Transpiler):
 
     def exit_iterator(self, node):
         self.stmt(f'return {self._in_iterator[0]}.iterator()')
+
+    def map_tuple(self, expr, assignedto=None):
+        parts = [self.repr_expr(el) for el in expr.elts]
+        if assignedto:
+            thetuple = '_'.join(parts)
+            ttype = None
+            if '.' in  assignedto:
+                ttype_narrowed = self.gettype(assignedto.split('.', 1)[0])
+                if ttype_narrowed:
+                    ttype = ttype_narrowed[0].split('<', 1)[1][:-1]
+            else:
+                ttype_narrowed = self.gettype(assignedto)
+                if ttype_narrowed:
+                    ttype = ttype_narrowed[0]
+            if ttype:
+                p0type, p1type = ttype.split('<', 1)[1][:-1].split(', ')
+                self.addtype(parts[0], p0type)
+                self.addtype(parts[1], p1type)
+            else:
+                ttype = self.types['Tuple']
+                p0type = 'Object'
+                p1type = 'Object'
+            self._post_stmts = [
+                f'{p0type} {parts[0]} = {thetuple}.getKey()',
+                f'{p1type} {parts[1]} = {thetuple}.getValue()'
+            ]
+            return f"{ttype} {thetuple}"
+
+        return f"new SimpleEntry({', '.join(parts)})"
+
+    def map_listcomp(self, comp):
+        r = self.repr_expr
+        mapto = r(comp.elt)
+
+        assert len(comp.generators) == 1
+        gen = comp.generators[0]
+
+        if isinstance(gen.target, ast.Tuple):
+            parts = [r(el) for el in gen.target.elts]
+            args = '_'.join(parts)
+            mapto = mapto.replace(parts[0], f'{args}.getKey()')
+            mapto = mapto.replace(parts[1], f'{args}.getValue()')
+        else:
+            args = r(gen.target)
+
+        iter = self._cast(r(gen.iter), parens=True)
+
+        assert not gen.ifs
+
+        return f'{iter}.stream().map(({args}) -> {mapto}).collect(Collectors.toList())'
+
+    def map_lambda(self, args, body):
+        # TODO: hardcoded for the simplest case, else just ignoring
+        if ',' not in body:
+            return f"({', '.join(args)}) -> {body}"
+        return self.none
 
 
 if __name__ == '__main__':

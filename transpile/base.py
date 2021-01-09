@@ -12,7 +12,7 @@ import ast
 import re
 import sys
 
-from .typescanner import TypeScanner
+from .typescanner import TypeScanner, ClassType, FuncType
 
 
 __all__ = 'Transpiler', 'Casing'
@@ -80,7 +80,7 @@ class Transpiler(ast.NodeVisitor):
         self.staticname = 'Statics'
         self.statics: List[Tuple] = []
 
-        self._modules = None
+        self._module = None
         self.classes: Dict[str, Dict[str, str]] = {}
         self._iterables: Dict[str, str] = {}
 
@@ -113,12 +113,11 @@ class Transpiler(ast.NodeVisitor):
         for src in sources:
             typescanner.read(src)
 
-        self._modules = typescanner.modules
-
         for src, mod in typescanner.modules.items():
             with open(src) as f:
                 code = f.read()
             tree = ast.parse(code)
+            self._module = typescanner.modules[src]
             self._transpile(tree, src)
 
     def _transpile(self, tree: ast.Module, src: str):
@@ -264,6 +263,14 @@ class Transpiler(ast.NodeVisitor):
             if classinfo:
                 return classinfo.get(attr)
 
+        call = name.split('(', 1)[0] if '(' in name and name.endswith(')') else None
+        # TODO: check '.' and get ClassType if so.
+        # Also define lang-based "builtin" ClassTypes
+        dfn = self._module.get(call)
+        if dfn:
+            if isinstance(dfn, FuncType):
+                return dfn.returns, False
+
         return self._top.get(name)
 
     def visit_Assert(self, node):
@@ -280,10 +287,11 @@ class Transpiler(ast.NodeVisitor):
             return
 
         if not self._handle_type_alias(node):
-            ownerrefs = [self.repr_expr(target) for target in node.targets
+            rval = self.repr_expr(node.value)
+            ownerrefs = [self.repr_expr(target, assignedto=rval) for target in node.targets
                         if not isinstance(target, ast.Subscript)]
             assert len(ownerrefs) == len(node.targets)
-            self._handle_Assign(node, ownerrefs)
+            self._handle_Assign(node, ownerrefs, rval)
 
     def _handle_type_alias(self, node) -> bool:
         if not isinstance(node.value, ast.Subscript) or not isinstance(node.value.value, ast.Name):
@@ -320,12 +328,12 @@ class Transpiler(ast.NodeVisitor):
     def visit_AnnAssign(self, node):
         typename = self.repr_annot(node.annotation)
         name = self.repr_annot(node.target)
-        self._handle_Assign(node, name, typename)
+        rval = self.repr_expr(node.value) if node.value else None
+        self._handle_Assign(node, name, rval, typename)
 
-    def _handle_Assign(self, node, ownerref, typename=None):
+    def _handle_Assign(self, node, ownerref, rval, typename=None):
         isclassattr = self._within and isinstance(self._within[-1].node, ast.ClassDef)
 
-        rval = self.repr_expr(node.value) if node.value else None
         if isinstance(ownerref, list):
             ownerrefs, ownerref = ownerref, ownerref[0]
         else:
@@ -345,7 +353,7 @@ class Transpiler(ast.NodeVisitor):
             prefix += self.declaring
 
         if typename and self.typing:
-            prefix += f'{typename} '
+            prefix += f'{typename} ' # TODO: self.declare_assign(...)
 
         if rval:
             # TODO: 5f831dc1 (java-centric cast logic)
@@ -426,6 +434,8 @@ class Transpiler(ast.NodeVisitor):
                 name.asname or name.name: name.name
                 for name in node.names
             }
+        elif node.module == 'collections':
+            assert not any(name.asname for name in node.names)
         else:
             self.handle_import(node)
 
@@ -449,12 +459,20 @@ class Transpiler(ast.NodeVisitor):
             parttype = self._iterables[ctype]
             ctype = self.types.get('Iterable', 'Iterable')
 
-        part = self.repr_expr(node.target)
+        if isinstance(node.target, ast.Tuple):
+            part = ', '.join(self.repr_expr(el) for el in node.target.elts)
+        else:
+            part = self.repr_expr(node.target)
 
         for_repr, stmts, nametypes = self.map_for(container, ctype, part, parttype)
 
         self.enter_block(scope, for_repr,
                 stmts=stmts, nametypes=nametypes)
+
+    def visit_While(self, node):
+        test = self._thruthy(self.repr_expr(node.test))
+        scope = self.new_scope(node)
+        self.enter_block(scope, 'while (', test, ')')
 
     def visit_Break(self, node):
         self.stmt('break', node=node)
@@ -504,7 +522,7 @@ class Transpiler(ast.NodeVisitor):
             if i >= defaultsat:
                 default = node.args.defaults[i - defaultsat]
                 call = calls[:] + [self.repr_expr(default)]
-                aval_name = default if isinstance(default, ast.Name) else type(default.value).__name__
+                aval_name = default if isinstance(default, ast.Name) else type(default.n if isinstance(default, ast.Num) else default.value).__name__
                 atype = self.types.get(aval_name, atype)
                 if self.func_defaults:
                     aname_val = self.func_defaults.format(
@@ -636,10 +654,11 @@ class Transpiler(ast.NodeVisitor):
                             if isinstance(ann, ast.AnnAssign) and ann.value]
                 callclass = self.this or self.ctor or classname
                 for at in range(len(defaults)):
-                    i = at + 1
+                    defaultargs = defaults[at:]
+                    up_to = -len(defaultargs)
                     signature = ', '.join(f'{sign(atypeinfo)}{aname}'
-                                  for aname, atypeinfo in list(classdfn.items())[:i])
-                    args = list(classdfn)[:i] + defaults[at:]
+                                  for aname, atypeinfo in list(classdfn.items())[:up_to])
+                    args = list(classdfn)[:up_to] + defaultargs
                     self.enter_block(None, ctor, f'({signature})', stmts=[
                             f"{callclass}({', '.join(args)})"
                     ])
@@ -686,7 +705,8 @@ class Transpiler(ast.NodeVisitor):
     def repr_annot(self, expr) -> str:
         return self.repr_expr(expr, annot=True)
 
-    def repr_expr(self, expr, annot=False, isowner=False, callargs=None) -> str:
+    def repr_expr(self, expr, annot=False, isowner=False, callargs=None,
+            assignedto=None) -> str:
         if isinstance(expr, ast.Str):
             # TODO: just use repr(s) with some cleanup?
             s = expr.s.replace('\\', '\\\\')
@@ -725,8 +745,11 @@ class Transpiler(ast.NodeVisitor):
             return self.map_compare(left, op, right)
 
         elif isinstance(expr, ast.IfExp):
+            scope = self.new_scope(expr)
             test = self._cast(self._thruthy(self.repr_expr(expr.test)))
             then = self._cast(self.repr_expr(expr.body))
+            self.exit_scope()
+            self._check_after_negation(keep=True)
             other = self._cast(self.repr_expr(expr.orelse))
             return f'({test} ? {then} : {other})'
 
@@ -744,13 +767,12 @@ class Transpiler(ast.NodeVisitor):
         elif isinstance(expr, ast.UnaryOp):
             if isinstance(expr.op, ast.Not):
                 self._in_negation = True
-                repr = f'!({self.repr_expr(expr.operand)})'
+                repr = self._negated(self.repr_expr(expr.operand))
                 self._in_negation = False
                 return repr
 
         elif isinstance(expr, ast.Tuple):
-            # TODO: self.on_block_enter_declarations = [...]
-            return ', '.join(self.repr_expr(el) for el in expr.elts)
+            return self.map_tuple(expr, assignedto)
 
         elif isinstance(expr, ast.Dict):
             return self.map_dict(expr)
@@ -765,8 +787,14 @@ class Transpiler(ast.NodeVisitor):
             return self.map_joined_str(expr)
 
         elif isinstance(expr, ast.GeneratorExp):
-            # TODO: just support GeneratorExp with any/all and list(?) comprehensions for map/filter...
+            # TODO: just support GeneratorExp with any/all
             return ast.dump(expr)
+
+        elif isinstance(expr, ast.ListComp):
+            return self.map_listcomp(expr)
+
+        elif isinstance(expr, ast.DictComp):
+            return self.map_dictcomp(expr)
 
         elif expr is None:
             return self.none
@@ -782,7 +810,7 @@ class Transpiler(ast.NodeVisitor):
             elif isinstance(expr.op, ast.Sub):
                 bop = '-'
             elif isinstance(expr.op, ast.Mult):
-                bop = '+'
+                bop = '*'
             elif isinstance(expr.op, ast.Div):
                 bop = '/'
             elif isinstance(expr.op, ast.Mod):
@@ -794,6 +822,9 @@ class Transpiler(ast.NodeVisitor):
 
         elif isinstance(expr, ast.YieldFrom):
             return self.add_all_to_iterator(expr.value)
+
+        elif isinstance(expr, ast.Lambda):
+            return self._map_lambda(expr)
 
         raise NotImplementedError(f'unhandled: {(expr)}')
 
@@ -831,8 +862,7 @@ class Transpiler(ast.NodeVisitor):
         if expr.keywords:
             # FIXME: [5f55548d] handle order of kwargs and transpile Lambdas
             print(f'WARNING: keywords in call: {ast.dump(expr)}', file=sys.stderr)
-            call_args += [kw.value for kw in expr.keywords if kw.arg
-                          and not isinstance(kw.value, ast.Lambda)]
+            call_args += [kw.value for kw in expr.keywords if kw.arg]
 
         callargs = [self._cast(self.repr_expr(arg)) for arg in call_args]
 
@@ -927,13 +957,28 @@ class Transpiler(ast.NodeVisitor):
         return name
 
     def _thruthy(self, name, parens=False):
+        ops = self.operators
         ntype_narrowed = self.gettype(name)
-        if ntype_narrowed and ntype_narrowed[0] != 'Boolean':
-            result = f'{name} != null'
+        if ntype_narrowed and ntype_narrowed[0] != self.types['bool']:
+            result = f'{name} {ops[ast.IsNot]} null'
+            if ntype_narrowed[0].startswith(self.types['List'] ):
+                result = f'({result} {ops[ast.And]} {self.map_len(name)} {ops[ast.Gt]} 0)'
+            if ntype_narrowed[0] == self.types['int']:
+                result = f'{name} {ops[ast.Gt]} 0'
             if parens:
                 result = f'({result})'
             return result
         return name
+
+    def _negated(self, expr: str):
+        ntype_narrowed = self.gettype(expr)
+        if ntype_narrowed and ntype_narrowed[0] != self.types['bool']:
+            isop = self.operators[ast.Is]
+            if ntype_narrowed[0] == self.types['int']:
+                return f'{expr} {isop} 0'
+            else:
+                return f'{expr} {isop} null'
+        return f'!({expr})'
 
     def _check_after_negation(self, o=None, keep=False):
         if self._post_negation and (keep or not self._in_negation):
@@ -1033,3 +1078,23 @@ class Transpiler(ast.NodeVisitor):
                     v.value if isinstance(v, ast.FormattedValue)
                     else v)
                 for v in expr.values)
+
+    def map_tuple(self, expr: ast.Tuple, assignedto=False) -> str:
+        raise NotImplementedError
+
+    def map_listcomp(self, comp: ast.ListComp) -> str:
+        raise NotImplementedError
+
+    def map_dictcomp(self, comp: ast.DictComp) -> str:
+        raise NotImplementedError
+
+    def _map_lambda(self, f: ast.Lambda) -> str:
+        assert not f.args.defaults
+        assert not f.args.vararg
+        assert not f.args.kwarg
+        assert not f.args.kwonlyargs
+        assert not f.args.kw_defaults
+        return self.map_lambda([arg.arg for arg in f.args.args], self.repr_expr(f.body))
+
+    def map_lambda(self, args: List[str], body: str) -> str:
+        raise NotImplementedError

@@ -1,6 +1,7 @@
 package trld;
 
 import java.util.*;
+import java.util.function.Function;
 import java.io.IOException;
 import java.net.URL;
 import java.net.MalformedURLException;
@@ -82,9 +83,24 @@ public class Common {
     }
 
     public static List sorted(Collection items) {
+        return sorted(items, false);
+    }
+
+    public static List sorted(Collection items, boolean reversed) {
+        return sorted(items, null, false);
+    }
+
+    public static List sorted(Collection items, Function<Object, Comparable> getKey, boolean reversed) {
         List result = new ArrayList(items.size());
         result.addAll(items);
-        Collections.sort(result);
+        Comparator cmp = null;
+        if (getKey != null) {
+            cmp = (a, b) -> getKey.apply(a).compareTo(getKey.apply(b));
+        }
+        if (reversed) {
+            cmp = Collections.reverseOrder(cmp);
+        }
+        Collections.sort(result, cmp);
         return result;
     }
 
