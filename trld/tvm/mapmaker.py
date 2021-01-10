@@ -49,6 +49,9 @@ SYMMETRIC: Set[str] = {
 }
 
 
+Candidates = List[Tuple[Optional[str], Dict]]
+
+
 class BaseRelation(NamedTuple):
     rel: Optional[str]
     base: str
@@ -89,39 +92,7 @@ def make_target_map(vocab: object, target: object) -> Dict:
 
         _process_property_relations(obj, vocab_index, target_dfn, target_map)
 
-        inverse_of_subject: bool = False
-        invs: List[Dict] = cast(List[Dict], obj.get(OWL_inverseOf))
-
-        if invs is not None:
-            inverse_of_subject = any(p.get(ID) == RDF_subject for p in invs)
-        else:
-            supers: List[Dict] = cast(List[Dict], obj.get(RDFS_subPropertyOf))
-            if supers is not None:
-                inverse_of_subject = any(OWL_inverseOf in sup and
-                                         any(p.get(ID) == RDF_subject
-                                             for p in cast(List[Dict], sup[OWL_inverseOf]))
-                                         for sup in supers)
-
-        if inverse_of_subject:
-            ranges: List[Dict] = as_list(obj[RDFS_range])
-            property_from: Optional[str] = None
-            value_from: Optional[str] = None
-            for range in ranges:
-                range_node: Optional[Dict] = vocab_id_index.get(range[ID])
-                if range_node is None:
-                    continue
-                reverses: Optional[Dict] = cast(Dict, range_node.get(REVERSE))
-                in_domain_of: List[Dict] = cast(List[Dict], reverses.get(RDFS_domain, [])) if reverses is not None else []
-                for prop in in_domain_of:
-                    propdata: Optional[Dict] = cast(Dict, vocab_id_index.get(prop[ID]))
-                    super_props: List[Dict] = cast(List, propdata.get(RDFS_subPropertyOf, [])) if propdata is not None else []
-                    if any(sprop[ID] == RDF_predicate for sprop in super_props):
-                        property_from = prop[ID]
-                    elif any(sprop[ID] == RDF_object for sprop in super_props):
-                        value_from = prop[ID]
-
-            if property_from and value_from and isinstance(id, str):
-                _add_rule(target_map, id, _rule_from(None, property_from, value_from, None))
+        _process_reified_forms(obj, vocab_index, target_map)
 
     for key, rule in target_map.items():
         rules: List[Tuple[int, Union[Dict, str]]] = sorted(as_list(rule),
@@ -135,7 +106,7 @@ def make_target_map(vocab: object, target: object) -> Dict:
 def _process_class_relations(obj: Dict, vocab_index: Dict, target: Dict[str, object], target_map: Dict):
     rels: List[str] = [OWL_equivalentClass, RDFS_subClassOf]
 
-    # TODO: rework this more like process_property_relations
+    # TODO: rework this even more like process_property_relations
     base_rels: List[BaseRelation] = []
 
     id: Optional[str] = cast(Optional[str], obj.get(ID))
@@ -146,12 +117,7 @@ def _process_class_relations(obj: Dict, vocab_index: Dict, target: Dict[str, obj
         if id_targeted:
             base_rels.append(BaseRelation(None, id, id_targeted))
 
-    candidates: List[Tuple[Optional[str], Dict]] = []
-
-    for rel in rels:
-        refs: object = obj.get(rel)
-        if isinstance(refs, List):
-            candidates += cast(List[Tuple[Optional[str], Dict]], [(rel, ref) for ref in refs])
+    candidates: Candidates = _collect_candidates(obj, rels)
 
     while candidates:
         crel, candidate = candidates.pop(0)
@@ -167,12 +133,7 @@ def _process_class_relations(obj: Dict, vocab_index: Dict, target: Dict[str, obj
             assert id is not None
             _add_rule(target_map, candidate_id, id, id_targeted)
         else:
-            for rel in rels:
-                superrefs: Optional[List[Dict]] = cast(Optional[List[Dict]], candidate.get(rel))
-                if superrefs is not None:
-                    for sup in superrefs:
-                        if ID in sup:
-                            candidates.append((None, sup))
+            _extend_candidates(candidates, candidate, rels)
 
     if id is not None and not id_targeted:
         # TODO: transpile filter comprehensions!
@@ -211,12 +172,7 @@ def _process_property_relations(obj: Dict, vocab_index: Dict, target: Dict[str, 
     if property:
         _add_rule(target_map, id, property, id_targeted)
 
-    candidates: List[Tuple[Optional[str], Dict]] = []
-
-    for rel in rels:
-        refs: object = obj.get(rel)
-        if isinstance(refs, List):
-            candidates += cast(List[Tuple[Optional[str], Dict]], [(rel, ref) for ref in refs])
+    candidates: Candidates = _collect_candidates(obj, rels)
 
     baseprops: List[Tuple[int, str]] = []
     if id_targeted:
@@ -242,12 +198,7 @@ def _process_property_relations(obj: Dict, vocab_index: Dict, target: Dict[str, 
             prop_prio = targeted
             #break
         else:
-            for rel in rels:
-                superrefs: Optional[List[Dict]] = cast(Optional[List[Dict]], candidate.get(rel))
-                if superrefs is not None:
-                    for sup in superrefs:
-                        if ID in sup:
-                            candidates.append((None, sup))
+            _extend_candidates(candidates, candidate, rels)
 
     if OWL_propertyChainAxiom in obj:
         prop_chain: List[Dict] = cast(List[Dict], obj[OWL_propertyChainAxiom])
@@ -280,6 +231,61 @@ def _process_property_relations(obj: Dict, vocab_index: Dict, target: Dict[str, 
                 for prio, prop in baseprops:
                     rule: Dict = _rule_from(prop, None, value_from, match)
                     _add_rule(target_map, source_property, rule, prio)
+
+
+def _collect_candidates(obj: Dict, rels: List[str]) -> Candidates:
+    candidates: Candidates = []
+    for rel in rels:
+        refs: object = obj.get(rel)
+        if isinstance(refs, List):
+            candidates += cast(Candidates, [(rel, ref) for ref in refs])
+    return candidates
+
+
+def _extend_candidates(candidates: Candidates, candidate: Dict, rels: List[str]):
+    for rel in rels:
+        superrefs: Optional[List[Dict]] = cast(Optional[List[Dict]], candidate.get(rel))
+        if superrefs is not None:
+            for sup in superrefs:
+                if ID in sup:
+                    candidates.append((None, sup))
+
+
+def _process_reified_forms(obj: Dict, vocab_index: Dict, target_map: Dict[str, object]):
+        inverse_of_subject: bool = False
+        invs: List[Dict] = cast(List[Dict], obj.get(OWL_inverseOf))
+
+        if invs is not None:
+            inverse_of_subject = any(p.get(ID) == RDF_subject for p in invs)
+        else:
+            supers: List[Dict] = cast(List[Dict], obj.get(RDFS_subPropertyOf))
+            if supers is not None:
+                inverse_of_subject = any(OWL_inverseOf in sup and
+                                         any(p.get(ID) == RDF_subject
+                                             for p in cast(List[Dict], sup[OWL_inverseOf]))
+                                         for sup in supers)
+
+        if inverse_of_subject:
+            ranges: List[Dict] = as_list(obj[RDFS_range])
+            property_from: Optional[str] = None
+            value_from: Optional[str] = None
+            for range in ranges:
+                range_node: Optional[Dict] = vocab_index.get(range[ID])
+                if range_node is None:
+                    continue
+                reverses: Optional[Dict] = cast(Dict, range_node.get(REVERSE))
+                in_domain_of: List[Dict] = cast(List[Dict], reverses.get(RDFS_domain, [])) if reverses is not None else []
+                for prop in in_domain_of:
+                    propdata: Optional[Dict] = cast(Dict, vocab_index.get(prop[ID]))
+                    super_props: List[Dict] = cast(List, propdata.get(RDFS_subPropertyOf, [])) if propdata is not None else []
+                    if any(sprop[ID] == RDF_predicate for sprop in super_props):
+                        property_from = prop[ID]
+                    elif any(sprop[ID] == RDF_object for sprop in super_props):
+                        value_from = prop[ID]
+
+            id: str = obj[ID]
+            if property_from and value_from and isinstance(id, str):
+                _add_rule(target_map, id, _rule_from(None, property_from, value_from, None))
 
 
 def _add_rule(target_map: Dict[str, object],
