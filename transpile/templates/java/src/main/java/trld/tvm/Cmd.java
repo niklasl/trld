@@ -20,17 +20,15 @@ public class Cmd {
             target = Common.loadJson((String) target);
         }
 
-        TargetMap tgm = Mapmaker.makeTargetMap(vocab, target);
-        Object data = tgm.targetMap;
+        Map targetMap = Mapmaker.makeTargetMap(vocab, target);
+        Object data = targetMap;
 
         if (inFile != null) {
             Object indata = Common.loadJson(inFile);
             indata = Expansion.expand(indata, inFile);
 
-            Object outdata = Mapper.mapTo(tgm, indata);
-            Map ctx = new HashMap();
-            ctx.put("@context", tgm.target);
-            outdata = Compaction.compact(ctx, outdata);
+            Object outdata = Mapper.mapTo(targetMap, indata);
+            outdata = Compaction.compact(target, outdata);
             data = outdata;
         }
 

@@ -1,40 +1,39 @@
 from typing import Optional, Dict, List, Union, cast
-from .base import CONTEXT, GRAPH, ID, TYPE, VOCAB
-from .base import TargetMap, RuleFrom, as_array
+from ..jsonld.base import CONTEXT, GRAPH, ID, TYPE, VOCAB, as_list
 
 
 ListOrJsonMap = Union[List, Dict[str, object]]
 
 
-def map_to(mapping: TargetMap, indata, drop_unmapped=False) -> ListOrJsonMap:
+def map_to(target_map: Dict, indata, drop_unmapped=False) -> ListOrJsonMap:
     result: ListOrJsonMap = {} if isinstance(indata, Dict) else []
-    _modify(mapping, indata, result)
+    _modify(target_map, indata, result)
     return result
 
 
-def _modify(mapping: TargetMap, ino: ListOrJsonMap, outo: Union[Dict, List]):
+def _modify(target_map: Dict, ino: ListOrJsonMap, outo: Union[Dict, List]):
     if isinstance(ino, Dict):
         for k, v in cast(Dict[str, object], ino).items(): # TODO: cast just for transpile
-            _modify_pair(mapping, k, v, outo)
+            _modify_pair(target_map, k, v, outo)
     elif isinstance(ino, List):
         i: int = 0
         for v in ino:
-            _modify_pair(mapping, i, v, outo)
+            _modify_pair(target_map, i, v, outo)
             i += 1
 
 
-def _modify_pair(mapping: TargetMap, k: Union[str, int], v: object, outo: Union[Dict, List]):
-    mapo: Dict[Union[str, int], Union[List, Dict, str]] = _map(mapping.target_map, k, v)
+def _modify_pair(target_map: Dict, k: Union[str, int], v: object, outo: Union[Dict, List]):
+    mapo: Dict[Union[str, int], Union[List, Dict, str]] = _map(target_map, k, v)
 
     for mapk, mapv in mapo.items():
         outv: Union[List, Dict]
         if isinstance(mapv, List):
             outv = []
-            _modify(mapping, mapv, outv)
+            _modify(target_map, mapv, outv)
             mapv = outv
         elif isinstance(mapv, Dict):
             outv = {}
-            _modify(mapping, mapv, outv)
+            _modify(target_map, mapv, outv)
             mapv = outv
 
         if isinstance(outo, Dict):
@@ -59,32 +58,27 @@ def _map(target_map: Dict, key: Union[str, int], value, drop_unmapped=False) -> 
                 remapped.append(item)
         value = remapped
 
+    if somerule is None:
+        return {key: value}
+
     out: Dict = {}
 
-    rules: List = as_array(somerule)
-    for rule in rules:
+    for rule in as_list(somerule):
         if isinstance(rule, str):
             out[rule] = value
             break
 
         if isinstance(rule, Dict):
-            rule = RuleFrom(
-                    cast(Optional[str], rule.get('property')),
-                    cast(Optional[str], rule.get('property_from')),
-                    cast(Optional[str], rule.get('value_from')),
-                    cast(Optional[Dict[str, str]], rule.get('match')),
-                )
-
-        if isinstance(rule, RuleFrom):
             objectvalues: List[Dict] = value
-            # TODO: support NamedTuple unpacking in transpile!
-            #property, property_from, value_from, match = rule
-            property: Optional[str] = rule.property
+
+            property: Optional[str] = rule.get('property')
+            property_from: Optional[str] = rule.get('propertyFrom')
+
             # TODO: use both property and property_from if present
-            if rule.property_from is not None:
+            if property_from is not None:
                 first: Dict = objectvalues[0]
-                property_from: List[Dict] = first[rule.property_from]
-                property = property_from[0][ID]
+                property_from_object: List[Dict] = first[property_from]
+                property = property_from_object[0][ID]
 
             if property in target_map:
                 property = target_map[property]
@@ -92,13 +86,14 @@ def _map(target_map: Dict, key: Union[str, int], value, drop_unmapped=False) -> 
             outvalue: List[object] = []
             # TODO: if match + use base_map
 
-            if rule.value_from is not None:
+            value_from: Optional[str] = rule.get('valueFrom')
+            if value_from is not None:
                 for v in objectvalues:
                     assert isinstance(v, Dict)
-                    match: Optional[Dict] = rule.match
+                    match: Optional[Dict[str, str]] = rule.get('match')
                     if match is None or TYPE in match and any(
                             t == match[TYPE] for t in cast(List, v[TYPE])):
-                        vv: object = v.get(rule.value_from)
+                        vv: object = v.get(value_from)
                         if isinstance(vv, List):
                             for m in vv:
                                 outvalue.append(m)
@@ -117,4 +112,4 @@ def _map(target_map: Dict, key: Union[str, int], value, drop_unmapped=False) -> 
                 out[property] = outvalue
                 break
 
-    return out if len(rules) > 0 else {key: value}
+    return out

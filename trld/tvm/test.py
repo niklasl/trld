@@ -30,7 +30,7 @@ vocab: dict = {
 }
 target = {"@context": {"@vocab": "http://www.w3.org/2000/01/rdf-schema#"}}
 
-tgm = make_target_map(vocab, target)
-print(json.dumps(tgm, indent=2))
-outdata = map_to(tgm, indata)
+target_map = make_target_map(vocab, target)
+print(json.dumps(target_map, indent=2))
+outdata = map_to(target_map, indata)
 print(json.dumps(outdata, indent=2))

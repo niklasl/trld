@@ -3,8 +3,7 @@ from typing import NamedTuple, Optional, Tuple, Dict, List, Set, Union, cast
 from collections import OrderedDict
 from ..common import sorted
 
-from .base import CONTEXT, GRAPH, ID, LIST, REVERSE, TYPE, VOCAB
-from .base import TargetMap, RuleFrom, as_array
+from ..jsonld.base import CONTEXT, GRAPH, ID, LIST, REVERSE, TYPE, VOCAB, as_list
 
 
 RDF: str = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#'
@@ -56,14 +55,14 @@ class BaseRelation(NamedTuple):
     priority: int = -1
 
 
-def make_target_map(vocab: object, target: object) -> TargetMap:
+def make_target_map(vocab: object, target: object) -> Dict:
     target_dfn: Dict[str, object] = OrderedDict()
     if isinstance(target, str):
         target_dfn[VOCAB] = target
     else:
         if isinstance(target, Dict):
             target = target['@context']
-        for dfn in as_array(target):
+        for dfn in as_list(target):
             target_dfn.update(cast(Dict, dfn))
 
     graph: List[Dict[str, object]] = vocab if isinstance(vocab, List) else cast(List, cast(Dict, vocab)[GRAPH])
@@ -82,21 +81,9 @@ def make_target_map(vocab: object, target: object) -> TargetMap:
     vocab_index: Dict[str, Dict[str, object]] = vocab_id_index
 
     target_map: Dict[str, object] = {}
-    #base_map: Dict = {}
 
     for obj in graph:
         id = cast(Optional[str], obj[ID])
-
-        # TODO: build base_map first to be used for match rules (instead of index)?
-        #base_rels: List[str] = [RDFS_subClassOf, RDFS_subPropertyOf]
-        #for rel in base_rels:
-        #    bases: Optional[List[Dict[str, object]]] = cast(List[Dict[str, object]], obj.get(rel))
-        #    if bases:
-        #        base_ids: List[str] = []
-        #        for base in bases:
-        #            if ID in base:
-        #                base_ids.append(cast(str, base[ID]))
-        #        base_map[id] = base_ids
 
         _process_class_relations(obj, vocab_index, target_dfn, target_map)
 
@@ -116,7 +103,7 @@ def make_target_map(vocab: object, target: object) -> TargetMap:
                                          for sup in supers)
 
         if inverse_of_subject:
-            ranges: List[Dict] = as_array(obj[RDFS_range])
+            ranges: List[Dict] = as_list(obj[RDFS_range])
             property_from: Optional[str] = None
             value_from: Optional[str] = None
             for range in ranges:
@@ -134,20 +121,15 @@ def make_target_map(vocab: object, target: object) -> TargetMap:
                         value_from = prop[ID]
 
             if property_from and value_from and isinstance(id, str):
-                _add_rule(target_map, id, RuleFrom(None, property_from, value_from, None))
-
-    #for key in list(base_map.keys()):
-    #    if not any(_is_targeted(target_dfn, cast(str, base)) > 0 for base in cast(List, base_map[key])):
-    #        del base_map[key]
+                _add_rule(target_map, id, _rule_from(None, property_from, value_from, None))
 
     for key, rule in target_map.items():
-        rules: List[Tuple[int, Union[RuleFrom, str]]] = sorted(as_array(rule),
+        rules: List[Tuple[int, Union[Dict, str]]] = sorted(as_list(rule),
                 key=lambda it: cast(int, cast(Tuple, it)[0]), reverse=True)
                 #key=lambda it: it[0], reverse=True)
-        target_map[key] = [it.repr() if isinstance(it, RuleFrom) else it
-                           for priority, it in rules] # keep all
+        target_map[key] = [it for priority, it in rules] # keep all
 
-    return TargetMap(target_dfn, target_map) #, base_map)
+    return target_map
 
 
 def _process_class_relations(obj: Dict, vocab_index: Dict, target: Dict[str, object], target_map: Dict):
@@ -296,13 +278,13 @@ def _process_property_relations(obj: Dict, vocab_index: Dict, target: Dict[str, 
             if (property is not None and property != source_property and
                 not _is_targeted(target, source_property)):
                 for prio, prop in baseprops:
-                    rule: RuleFrom = RuleFrom(prop, None, value_from, match)
+                    rule: Dict = _rule_from(prop, None, value_from, match)
                     _add_rule(target_map, source_property, rule, prio)
 
 
 def _add_rule(target_map: Dict[str, object],
               source_id: str,
-              rule: Union[str, List, RuleFrom, Dict],
+              rule: Union[str, List, Dict],
               priority=0):
     if source_id == rule:
         return
@@ -320,6 +302,18 @@ def _add_rule(target_map: Dict[str, object],
             rules += rule_priority
         else:
             rules.append(rule_priority)
+
+
+def _rule_from(property: Optional[str],
+               property_from: Optional[str],
+               value_from: Optional[str],
+               match: Optional[Dict[str, str]]) -> Dict:
+    return {
+        'property': property,
+        'propertyFrom': property_from,
+        'valueFrom': value_from,
+        'match': match
+    }
 
 
 # TODO: rename to _get_target_priority

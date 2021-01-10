@@ -24,19 +24,19 @@ with open(vocabfile) as f:
     vocab = json.load(f)
     vocab = expand(vocab, vocabfile)
 
-tgm = make_target_map(vocab, target)
+target_map = make_target_map(vocab, target)
 
 if not infile:
-    print(json.dumps(tgm, indent=2))
+    print(json.dumps(target_map, indent=2))
 else:
     with open(infile) as f:
         indata = json.load(f)
         indata = expand(indata, infile)
 
-    outdata = map_to(tgm, indata)
-    ctx = {"@context": tgm.target}
-    outdata = compact(ctx, outdata) # type: ignore
+    outdata = map_to(target_map, indata)
+    outdata = compact(target, outdata) # type: ignore
     if isinstance(outdata, dict):
+        ctx = {"@context": target} if isinstance(target, str) else target
         outdata.update(ctx)
 
     print(json.dumps(outdata, indent=2))
