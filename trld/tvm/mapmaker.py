@@ -101,11 +101,11 @@ def _process_class_relations(obj: Dict, vocab_index: Dict, target: Dict[str, obj
 
     id: Optional[str] = cast(Optional[str], obj.get(ID))
 
-    id_targeted: int = 0
+    id_target_prio: int = 0
     if id is not None:
-        id_targeted = _is_targeted(target, id)
-        if id_targeted:
-            base_rels.append(BaseRelation(None, id, id_targeted))
+        id_target_prio = _get_target_priority(target, id)
+        if id_target_prio:
+            base_rels.append(BaseRelation(None, id, id_target_prio))
 
     candidates: Candidates = _collect_candidates(obj, rels)
 
@@ -116,16 +116,16 @@ def _process_class_relations(obj: Dict, vocab_index: Dict, target: Dict[str, obj
         candidate_id: str = candidate[ID]
         candidate = cast(Dict, vocab_index.get(candidate_id, candidate))
 
-        targeted: int = _is_targeted(target, candidate_id)
-        if targeted:
-            base_rels.append(BaseRelation(crel, candidate_id, targeted))
-        elif crel in SYMMETRIC and id_targeted:
+        target_prio: int = _get_target_priority(target, candidate_id)
+        if target_prio:
+            base_rels.append(BaseRelation(crel, candidate_id, target_prio))
+        elif crel in SYMMETRIC and id_target_prio:
             assert id is not None
-            _add_rule(target_map, candidate_id, id, id_targeted)
+            _add_rule(target_map, candidate_id, id, id_target_prio)
         else:
             _extend_candidates(candidates, candidate, rels)
 
-    if id is not None and not id_targeted:
+    if id is not None and not id_target_prio:
         # TODO: transpile filter comprehensions!
         #base_rels = [it for it in base_rels if it.base != id]
         filtered_base_rels: List[BaseRelation] = []
@@ -154,19 +154,19 @@ def _process_property_relations(obj: Dict, vocab_index: Dict, target: Dict[str, 
         return
 
     id: str = obj[ID]
-    id_targeted: int = _is_targeted(target, id)
-    property: Optional[str] = id if id_targeted else None
-    prop_prio: int = id_targeted
+    id_target_prio: int = _get_target_priority(target, id)
+    property: Optional[str] = id if id_target_prio else None
+    prop_prio: int = id_target_prio
 
     # TODO: OK to add identity-mapping?
     if property:
-        _add_rule(target_map, id, property, id_targeted)
+        _add_rule(target_map, id, property, id_target_prio)
 
     candidates: Candidates = _collect_candidates(obj, rels)
 
     baseprops: List[Tuple[int, str]] = []
-    if id_targeted:
-        baseprops.append((id_targeted, id))
+    if id_target_prio:
+        baseprops.append((id_target_prio, id))
 
     while candidates:
         crel, candidate = candidates.pop(0)
@@ -175,17 +175,17 @@ def _process_property_relations(obj: Dict, vocab_index: Dict, target: Dict[str, 
         candidate_id: str = candidate[ID]
         candidate = cast(Dict, vocab_index.get(candidate_id, candidate))
 
-        targeted: int = _is_targeted(target, candidate_id)
-        if not id_targeted and targeted:
-            baseprops.append((targeted, candidate_id))
-            _add_rule(target_map, id, candidate_id, targeted)
+        target_prio: int = _get_target_priority(target, candidate_id)
+        if not id_target_prio and target_prio:
+            baseprops.append((target_prio, candidate_id))
+            _add_rule(target_map, id, candidate_id, target_prio)
             property = candidate_id
-            prop_prio = targeted
+            prop_prio = target_prio
             #break
-        elif crel in SYMMETRIC and not targeted and id_targeted:
-            _add_rule(target_map, candidate_id, id, id_targeted)
+        elif crel in SYMMETRIC and not target_prio and id_target_prio:
+            _add_rule(target_map, candidate_id, id, id_target_prio)
             property = candidate_id
-            prop_prio = targeted
+            prop_prio = target_prio
             #break
         else:
             _extend_candidates(candidates, candidate, rels)
@@ -217,7 +217,7 @@ def _process_property_relations(obj: Dict, vocab_index: Dict, target: Dict[str, 
 
         if source_property:
             if (property is not None and property != source_property and
-                not _is_targeted(target, source_property)):
+                not _get_target_priority(target, source_property)):
                 for prio, prop in baseprops:
                     rule: Dict = _rule_from(prop, None, value_from, match)
                     _add_rule(target_map, source_property, rule, prio)
@@ -312,8 +312,7 @@ def _rule_from(property: Optional[str],
     }
 
 
-# TODO: rename to _get_target_priority
-def _is_targeted(target: Dict[str, object], id: str) -> int:
+def _get_target_priority(target: Dict[str, object], id: str) -> int:
     top_prio: int = len(target)
 
     prio: int = top_prio * 3
