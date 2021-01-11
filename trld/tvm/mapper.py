@@ -81,7 +81,7 @@ def _map(target_map: Dict, key: Union[str, int], value, drop_unmapped=False) -> 
                 property = property_from_object[0][ID]
 
             if property in target_map:
-                property = target_map[property]
+                property = as_list(target_map[property])[0]
 
             outvalue: List[object] = []
             # TODO: if match + use base_map
@@ -110,6 +110,8 @@ def _map(target_map: Dict, key: Union[str, int], value, drop_unmapped=False) -> 
 
             if property is not None and outvalue:
                 out[property] = outvalue
-                break
+                # TODO: Using all rules since they may be complementary.
+                # Might need to combine those into one rule instead.
+                #break
 
     return out

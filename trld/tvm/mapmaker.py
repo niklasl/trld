@@ -3,7 +3,8 @@ from typing import NamedTuple, Optional, Tuple, Dict, List, Set, Union, cast
 from collections import OrderedDict
 from ..common import sorted
 
-from ..jsonld.base import CONTEXT, GRAPH, ID, LIST, REVERSE, TYPE, VOCAB, as_list
+from ..jsonld.base import CONTEXT, GRAPH, ID, LIST, REVERSE, TYPE, VOCAB, as_list, JsonMap
+from ..jsonld.extras.index import make_index
 
 
 RDF: str = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#'
@@ -68,25 +69,14 @@ def make_target_map(vocab: object, target: object) -> Dict:
         for dfn in as_list(target):
             target_dfn.update(cast(Dict, dfn))
 
-    graph: List[Dict[str, object]] = vocab if isinstance(vocab, List) else cast(List, cast(Dict, vocab)[GRAPH])
+    graph: List[JsonMap] = vocab if isinstance(vocab, List) else cast(List, cast(Dict, vocab)[GRAPH])
 
-    vocab_id_index: Dict[str, Dict[str, object]] = {}
-    id: Optional[str]
-
-    # TODO: build index with REVERSEs (port ldtr implementation)
-    if isinstance(graph, List):
-        for item in graph:
-            if not isinstance(item, Dict):
-                continue
-            id = cast(Optional[str], item[ID])
-            if isinstance(id, str):
-                vocab_id_index[id] = item
-    vocab_index: Dict[str, Dict[str, object]] = vocab_id_index
+    vocab_index: Dict[str, JsonMap] = make_index(graph)
 
     target_map: Dict[str, object] = {}
 
     for obj in graph:
-        id = cast(Optional[str], obj[ID])
+        id: Optional[str] = cast(Optional[str], obj[ID])
 
         _process_class_relations(obj, vocab_index, target_dfn, target_map)
 
