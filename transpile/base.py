@@ -69,8 +69,11 @@ class Transpiler(ast.NodeVisitor):
     operators: Dict
     types: Dict
     strcmp: Optional[str] = None
+    notmissing: Optional[str] = None
     list_concat: Optional[str] = None
     function_map: Dict[str, Optional[str]]
+
+    indent: str
 
     outdir: str
 
@@ -80,6 +83,7 @@ class Transpiler(ast.NodeVisitor):
         self.staticname = 'Statics'
         self.statics: List[Tuple] = []
 
+        self._modules = None
         self._module = None
         self.classes: Dict[str, Dict[str, str]] = {}
         self._iterables: Dict[str, str] = {}
@@ -117,6 +121,7 @@ class Transpiler(ast.NodeVisitor):
             with open(src) as f:
                 code = f.read()
             tree = ast.parse(code)
+            self._modules = typescanner.modules
             self._module = typescanner.modules[src]
             self._transpile(tree, src)
 
@@ -323,7 +328,7 @@ class Transpiler(ast.NodeVisitor):
             self.stmt(op_assign)
             return
 
-        raise NotImplementedError(f'unhandled: {(ast.dump(node))}')
+        raise NotImplementedError(f'unhandled: {(ast.dump(node))} at {node.lineno}')
 
     def visit_AnnAssign(self, node):
         typename = self.repr_annot(node.annotation)
@@ -960,7 +965,10 @@ class Transpiler(ast.NodeVisitor):
         ops = self.operators
         ntype_narrowed = self.gettype(name)
         if ntype_narrowed and ntype_narrowed[0] != self.types['bool']:
-            result = f'{name} {ops[ast.IsNot]} null'
+            if self.notmissing:
+                result = f"{name} {self.notmissing}"
+            else:
+                result = f"{name} {ops[ast.IsNot]} {self.none}"
             if ntype_narrowed[0].startswith(self.types['List'] ):
                 result = f'({result} {ops[ast.And]} {self.map_len(name)} {ops[ast.Gt]} 0)'
             if ntype_narrowed[0] == self.types['int']:

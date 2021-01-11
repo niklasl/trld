@@ -60,8 +60,6 @@ class JavaTranspiler(Transpiler):
         ast.GtE: '>=',
     }
 
-    indent = '  '
-
     strcmp = '{0}.compareTo({1})'
     list_concat = 'Stream.concat({left}.stream(), {right}.stream()).collect(Collectors.toList())'
 
@@ -72,6 +70,8 @@ class JavaTranspiler(Transpiler):
         'id': '{0}.hashCode()',
         'print': 'System.out.println({0})',
     }
+
+    indent = '  '
 
     _current_imports: List[str]
     _prev_outfile: Optional[IO]

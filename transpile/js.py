@@ -78,7 +78,7 @@ class JsTranspiler(Transpiler):
         ast.GtE: '>=',
     }
 
-    indent = '  '
+    notmissing = '!= null'
 
     list_concat = '{left}.concat({right})'
 
@@ -101,6 +101,8 @@ class JsTranspiler(Transpiler):
             ' not in ': '!{0}.has({1})',
         },
     }
+
+    indent = '  '
 
     @contextmanager
     def enter_file(self, srcpath: Path):
@@ -262,11 +264,17 @@ class JsTranspiler(Transpiler):
         return f'{owner}.substring({lower})'
 
     def map_op_assign(self, owner, op, value):
-        if isinstance(op, ast.Add):
-            ownertype = self.gettype(owner)
-            if ownertype[0] == 'Number':
+        ownertype = self.gettype(owner)
+
+        if ownertype[0] == 'Number':
+            if isinstance(op, ast.Add):
                 return f'{owner} += {value}'
+            elif isinstance(op, ast.Sub):
+                return f'{owner} -= {value}'
+
+        if isinstance(op, ast.Add):
             return f'Array.prototype.push.apply({owner}, {value})'
+
         return None
 
     def map_setitem(self, owner, key, value):
@@ -367,11 +375,12 @@ class JsTranspiler(Transpiler):
         pass
 
     def map_tuple(self, expr, assignedto=None):
-        # TODO: self.on_block_enter_declarations = [...]
+        parts = [self.repr_expr(el) for el in expr.elts]
+        trepr = f"[{', '.join(parts)}]"
         if assignedto:
-            raise NotImplementedError
+            return f"let {trepr} = [{assignedto}]"
 
-        return f"[{', '.join(self.repr_expr(el) for el in expr.elts)}]"
+        return trepr
 
     def map_listcomp(self, comp):
         r = self.repr_expr
