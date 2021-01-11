@@ -164,14 +164,14 @@ class JavaTranspiler(Transpiler):
                 typedentry = f'{parttype} {entry}'
                 parttypes = parttype.split('<')[1][:-1].split(', ', 1)
 
-            if ', ' in part :
+            if ', ' in part:
                 parts = part.split(', ', 1)
                 stmts = [f'{parttypes[0]} {parts[0]} = {entry}.getKey()',
                         f'{parttypes[1]} {parts[1]} = {entry}.getValue()']
                 nametypes = [(parts[0], parttypes[0]), (parts[1], parttypes[1])]
             else:
                 typedentry = f'{parttypes[1]} {part}'
-                nametypes = [(part, parttype[1])]
+                nametypes = [(part, parttypes[1])]
         else:
             typedentry = f'{parttype} {part}'
             nametypes = [(part, parttype)]
