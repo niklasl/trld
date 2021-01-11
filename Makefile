@@ -6,6 +6,7 @@ build:
 
 python:
 	python3 -m trld.jsonld.test $(jsonld_api_dir)/tests/expand-manifest.jsonld $(jsonld_api_dir)/tests/compact-manifest.jsonld $(jsonld_api_dir)/tests/flatten-manifest.jsonld $(jsonld_api_dir)/tests/fromRdf-manifest.jsonld $(jsonld_api_dir)/tests/toRdf-manifest.jsonld 2>&1 | grep '^Running test suite\|^Ran '
+	python3 -m trld.tvm.test
 	mypy trld/jsonld/
 
 java: build
