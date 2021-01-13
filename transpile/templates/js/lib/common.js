@@ -5,9 +5,14 @@ import url from 'url'
 import http from 'http'
 import https from 'https'
 
-export function sorted(array) {
+export function sorted(array, key = null, reversed = false) {
   let copy = array.concat([]);
-  copy.sort()
+  if (key) {
+    copy.sort((a, b) => key(a) - key(b))
+  } else {
+    copy.sort()
+  }
+  if (reversed) copy.reverse()
   return copy
 }
 

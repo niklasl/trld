@@ -404,34 +404,37 @@ class JavaTranspiler(Transpiler):
     def exit_iterator(self, node):
         self.stmt(f'return {self._in_iterator[0]}.iterator()')
 
-    def map_tuple(self, expr, assignedto=None):
+    def map_tuple(self, expr):
         parts = [self.repr_expr(el) for el in expr.elts]
-        if assignedto:
-            thetuple = '_'.join(parts)
-            ttype = None
-            if '.' in  assignedto:
-                ttype_narrowed = self.gettype(assignedto.split('.', 1)[0])
-                if ttype_narrowed:
-                    ttype = ttype_narrowed[0].split('<', 1)[1][:-1]
-            else:
-                ttype_narrowed = self.gettype(assignedto)
-                if ttype_narrowed:
-                    ttype = ttype_narrowed[0]
-            if ttype:
-                p0type, p1type = ttype.split('<', 1)[1][:-1].split(', ')
-                self.addtype(parts[0], p0type)
-                self.addtype(parts[1], p1type)
-            else:
-                ttype = self.types['Tuple']
-                p0type = 'Object'
-                p1type = 'Object'
-            self._post_stmts = [
-                f'{p0type} {parts[0]} = {thetuple}.getKey()',
-                f'{p1type} {parts[1]} = {thetuple}.getValue()'
-            ]
-            return f"{ttype} {thetuple}"
-
         return f"new SimpleEntry({', '.join(parts)})"
+
+    def unpack_tuple(self, expr, assignedto=None):
+        parts = [self.repr_expr(el) for el in expr.elts]
+        thetuple = '_'.join(parts)
+
+        ttype = None
+        if '.' in assignedto: # assuming "get from collection" method
+            ttype_narrowed = self.gettype(assignedto.split('.', 1)[0])
+            if ttype_narrowed:
+                ttype = ttype_narrowed[0].split('<', 1)[1][:-1]
+        else:
+            ttype_narrowed = self.gettype(assignedto)
+            if ttype_narrowed:
+                ttype = ttype_narrowed[0]
+
+        if ttype:
+            p0type, p1type = ttype.split('<', 1)[1][:-1].split(', ')
+            self.addtype(parts[0], p0type)
+            self.addtype(parts[1], p1type)
+        else:
+            ttype = self.types['Tuple']
+            p0type = 'Object'
+            p1type = 'Object'
+        self._post_stmts = [
+            f'{p0type} {parts[0]} = {thetuple}.getKey()',
+            f'{p1type} {parts[1]} = {thetuple}.getValue()'
+        ]
+        return f"{ttype} {thetuple}"
 
     def map_listcomp(self, comp):
         r = self.repr_expr

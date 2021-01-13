@@ -55,6 +55,7 @@ class JsTranspiler(Transpiler):
         'List': 'Array',
         'dict': 'Map',
         'Dict': 'Map',
+        'OrderedDict': 'Object',
         'set': 'Set',
         'Set': 'Set',
     }
@@ -120,9 +121,10 @@ class JsTranspiler(Transpiler):
         else:
             names = ', '.join(camelize(name.name) # type: ignore
                     for name in node.names
-                    if node.module is not None)
+                    if node.module is not None and name.name not in self._type_alias)
         rel = '.' * node.level
-        self.outln(f"import {{ {names} }} from '{rel}/{node.module}'", self.end_stmt)
+        relmodpath = str(node.module).replace('.', '/') + '.js'
+        self.outln(f"import {{ {names} }} from '{rel}/{relmodpath}'", self.end_stmt)
 
     def map_isinstance(self, vrepr: str, classname: str):
         if classname in {'String', 'Number', 'Boolean'}:
@@ -145,6 +147,8 @@ class JsTranspiler(Transpiler):
             nametypes = [(key, ktype), (val, vtype)]
             return f'for (let {key} in {container})', stmts, nametypes
         else:
+            if ',' in part:
+                part = f'[{part}]'
             return f'for (let {part} of {container})', [], [(part, parttype)]
 
     def map_name(self, name, callargs=None):
@@ -164,17 +168,19 @@ class JsTranspiler(Transpiler):
 
         castowner = self._cast(owner, parens=True)
 
+        ismaplike = 'Map' in ownertype[0].split('<', 1)[0]
+
         if attr == 'join':# and ownertype[0] == 'String':
             return f'{callargs[0]}.join({owner})'
 
-        if attr == 'get' and 'Map' in ownertype[0]:
+        if attr == 'get' and (ismaplike or ownertype[0] == 'Object'):
             if len(callargs) == 1:
                 return f'{self._cast(owner, parens=True)}[{callargs[0]}]'
             elif len(callargs) == 2:
                 return f'({self._cast(owner, parens=True)}[{callargs[0]}] || {callargs[1]})'
 
         if not callargs:
-            if attr == 'copy' and 'Map' in ownertype[0]:
+            if attr == 'copy' and ismaplike:
                 return f'Object.assign({{}}, {owner})'
 
         if attr == 'setdefault':# and 'Object' in ownertype[0]:
@@ -185,21 +191,24 @@ class JsTranspiler(Transpiler):
         if attr == 'isalpha':# and ownertype[0] == 'String':
             return f'!!({castowner}.match(/^\w+$/))'
 
-        if attr == 'items' and 'Map' in ownertype[0]:
+        if attr == 'items' and ismaplike:
             member = 'entrySet'
-        elif attr == 'keys' and 'Map' in ownertype[0]:
+        elif attr == 'keys' and (ismaplike or ownertype[0] == 'Object'):
             return f'Object.keys({castowner})'
-        elif attr == 'values' and 'Map' in ownertype[0]:
+        elif attr == 'values' and ismaplike:
             return f'Object.values({castowner})'
-        elif attr == 'update' and 'Map' in ownertype[0]:
+        elif attr == 'update' and ismaplike:
             return f'Object.assign({castowner}, {callargs[0]})'
         elif attr == 'append':
             member = 'push'
         elif attr == 'pop':
-            if 'Map' in ownertype[0]:# and len(callargs) == 2 and callargs[1] == 'null':
+            if ismaplike:# and len(callargs) == 2 and callargs[1] == 'null':
                 access = f'{castowner}[{callargs[0]}]'
                 self._post_stmts = [f'delete {access}']
                 return access
+            elif callargs and callargs[0] == '0':
+                callargs.pop()
+                member = 'shift'
             else:
                 member = 'pop'
         elif attr == 'remove' and 'Set' in ownertype[0]:
@@ -236,6 +245,8 @@ class JsTranspiler(Transpiler):
                 op = ast.NotEq()
 
         if isinstance(op, ast.Eq):
+            if right == 'null':
+                return f'{left} == null'
             ltypeinfo = self.gettype(left)
             if ltypeinfo and ltypeinfo[0].startswith('Object'):
                 return f'global.JSON.stringify({left}) === global.JSON.stringify({right})'
@@ -306,7 +317,7 @@ class JsTranspiler(Transpiler):
             containertype = None
 
         if containertype:
-            if containertype.startswith('Map'):
+            if containertype.startswith(('Map', 'Object')):
                 result = f'Object.hasOwnProperty.call({container}, {contained})'
             elif containertype.startswith('Set'):
                 result = f'{container}.has({contained})'
@@ -340,16 +351,25 @@ class JsTranspiler(Transpiler):
 
     def _repr_generator(self, gen):
         g = gen.generators[0]
-        elt = self.repr_expr(gen.elt)
         item = self.repr_expr(g.target)
         iter = self.repr_expr(g.iter)
 
-        ntype_narrowed = self.gettype(iter)
-        if ntype_narrowed:
-            if ntype_narrowed[0].startswith('Map'):
+        ntypeinfo = self.gettype(iter)
+        if ntypeinfo:
+            if ntypeinfo[0].startswith('Map'):
                 iter = f'Object.keys({iter})'
-            elif ntype_narrowed[0].startswith('Set'):
+            elif ntypeinfo[0].startswith('Set'):
                 iter = f'Array.from({iter})'
+
+        itemtype = None
+        if ntypeinfo and ntypeinfo[0].endswith('>'):
+            itemtype = ntypeinfo[0].split('<', 1)[-1][:-1].split(',')[0]
+
+        self.new_scope()
+        if itemtype:
+            self.addtype(item, itemtype)
+        elt = self.repr_expr(gen.elt)
+        self.exit_scope()
 
         return iter, item, elt
 
@@ -376,9 +396,30 @@ class JsTranspiler(Transpiler):
 
     def map_tuple(self, expr, assignedto=None):
         parts = [self.repr_expr(el) for el in expr.elts]
+        return f"[{', '.join(parts)}]"
+
+    def unpack_tuple(self, expr, assignedto=None):
+        parts = [self.repr_expr(el) for el in expr.elts]
+        ttype = None
+
+        for sep in ('.', '['):
+            if sep in assignedto: # assuming "get from collection" method
+                ttype_narrowed = self.gettype(assignedto.split(sep, 1)[0])
+                if ttype_narrowed:
+                    ttype = ttype_narrowed[0].split('<', 1)[1][:-1]
+                    break
+        else:
+            ttype_narrowed = self.gettype(assignedto)
+            if ttype_narrowed:
+                ttype = ttype_narrowed[0]
+
+        print(ttype, assignedto.split('[', 1)[0])
+        if ttype:
+            p0type, p1type = ttype.split('<', 1)[1][:-1].split(', ')
+            self.addtype(parts[0], p0type)
+            self.addtype(parts[1], p1type)
+        assert self.gettype(parts[0])
         trepr = f"[{', '.join(parts)}]"
-        if assignedto:
-            return f"let {trepr} = [{assignedto}]"
 
         return trepr
 
@@ -390,7 +431,7 @@ class JsTranspiler(Transpiler):
         args = r(gen.target)
         iter = r(gen.iter)
         assert not gen.ifs
-        return f'{iter}.map({args} => {mapto})'
+        return f'{iter}.map(({args}) => {mapto})'
 
     def map_lambda(self, args, body):
         return f"({', '.join(args)}) => {body}"

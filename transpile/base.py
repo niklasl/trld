@@ -347,15 +347,17 @@ class Transpiler(ast.NodeVisitor):
         if not self._within:
             self.in_static = self.has_static
             prefix = 'static ' if self.has_static else ''
-        elif isclassattr: # TODO: unless ownerref source startswith('_') ...
+        elif isclassattr and self.typing: # TODO: unless ownerref source startswith('_') ...
             prefix = self.public
         else:
             prefix = ''
 
+        # TODO: 5ffce0a5 `not self.typing` is a gnarly mess of js-implied switches
         if all(c == '_' or c.isupper() or c.isdigit() for c in ownerref):
             prefix = self.public + prefix + self.constant
         elif not self.typing and '.' not in ownerref and self.gettype(ownerref) == None:
-            prefix += self.declaring
+            if not isclassattr:
+                prefix += self.declaring
 
         if typename and self.typing:
             prefix += f'{typename} ' # TODO: self.declare_assign(...)
@@ -382,10 +384,11 @@ class Transpiler(ast.NodeVisitor):
                         ast.NameConstant, ast.Str, ast.Num, ast.Bytes)):
                     rval = f'({rvaltype}) {rval}'
 
-        if rval:
-            self.stmt(prefix, ' = '.join(ownerrefs + [rval]), node=node)
-        elif self.typing or self._within and not isinstance(self._within[-1].node, ast.ClassDef):
-            self.stmt(prefix, ownerref, node=node)
+        if self.typing or not self._within or not isinstance(self._within[-1].node, ast.ClassDef):
+            if rval:
+                self.stmt(prefix, ' = '.join(ownerrefs + [rval]), node=node)
+            else:
+                self.stmt(prefix, ownerref, node=node)
 
         if typename:
             self.addtype(ownerref, typename)
@@ -657,19 +660,28 @@ class Transpiler(ast.NodeVisitor):
 
                 defaults = [self.repr_expr(ann.value) for ann in node.body
                             if isinstance(ann, ast.AnnAssign) and ann.value]
-                callclass = self.this or self.ctor or classname
-                for at in range(len(defaults)):
-                    defaultargs = defaults[at:]
-                    up_to = -len(defaultargs)
-                    signature = ', '.join(f'{sign(atypeinfo)}{aname}'
-                                  for aname, atypeinfo in list(classdfn.items())[:up_to])
-                    args = list(classdfn)[:up_to] + defaultargs
-                    self.enter_block(None, ctor, f'({signature})', stmts=[
-                            f"{callclass}({', '.join(args)})"
-                    ])
+                if not self.func_defaults:
+                    arg = lambda i, aname: aname
+                    callclass = self.this or self.ctor or classname
+                    for at in range(len(defaults)):
+                        defaultargs = defaults[at:]
+                        up_to = -len(defaultargs)
+                        signature = ', '.join(f'{sign(atypeinfo)}{aname}'
+                                    for aname, atypeinfo in list(classdfn.items())[:up_to])
+                        args = list(classdfn)[:up_to] + defaultargs
+                        self.enter_block(None, ctor, f'({signature})', stmts=[
+                                f"{callclass}({', '.join(args)})"
+                        ])
+                else:
+                    def arg(i, aname):
+                        di = i - (len(classdfn) - len(defaults))
+                        if di > -1:
+                            return self.func_defaults.format(key=aname, value=defaults[di])
+                        else:
+                            return aname
 
-                signature = ', '.join(f'{sign(atypeinfo)}{aname}'
-                                for aname, atypeinfo in classdfn.items())
+                signature = ', '.join(f'{sign(atypeinfo)}{arg(i, aname)}'
+                                for i, (aname, atypeinfo) in enumerate(classdfn.items()))
                 assigns = (f'{self.this}.{aname} = {aname}' for aname in classdfn)
                 self.enter_block(None, ctor, f'({signature})', stmts=assigns)
         elif base:
@@ -777,7 +789,10 @@ class Transpiler(ast.NodeVisitor):
                 return repr
 
         elif isinstance(expr, ast.Tuple):
-            return self.map_tuple(expr, assignedto)
+            if assignedto:
+                return self.unpack_tuple(expr, assignedto)
+            else:
+                return self.map_tuple(expr)
 
         elif isinstance(expr, ast.Dict):
             return self.map_dict(expr)
@@ -1087,7 +1102,10 @@ class Transpiler(ast.NodeVisitor):
                     else v)
                 for v in expr.values)
 
-    def map_tuple(self, expr: ast.Tuple, assignedto=False) -> str:
+    def map_tuple(self, expr: ast.Tuple) -> str:
+        raise NotImplementedError
+
+    def unpack_tuple(self, expr: ast.Tuple, assignedto=None) -> str:
         raise NotImplementedError
 
     def map_listcomp(self, comp: ast.ListComp) -> str:
