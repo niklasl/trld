@@ -1,6 +1,6 @@
 'use(strict)'
 
-import { loadJson, dumpJson } from './common.js'
+import { loadJson, dumpJson } from '../common.js'
 import { expand } from './expansion.js'
 import { compact } from './compaction.js'
 import { flatten } from './flattening.js'
