@@ -8,11 +8,12 @@ import https from 'https'
 export function sorted(array, key = null, reversed = false) {
   let copy = array.concat([]);
   if (key) {
-    copy.sort((a, b) => key(a) - key(b))
+    let cmp = reversed ? (a, b) => key(b) - key(a) : (a, b) => key(a) - key(b)
+    copy.sort(cmp)
   } else {
     copy.sort()
+    if (reversed) copy.reverse()
   }
-  if (reversed) copy.reverse()
   return copy
 }
 
