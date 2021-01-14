@@ -13,12 +13,14 @@ if len(args) < 2:
     sys.exit(0)
 
 vocabfile = args.pop(0)
-target = args.pop(0)
+targetref = args.pop(0)
 infile = args.pop(0) if args else None
 
-if isinstance(target, str) and os.path.isfile(target):
-    with open(target) as f:
+if os.path.isfile(targetref):
+    with open(targetref) as f:
         target = json.load(f)
+else:
+    target = {"@context": {"@vocab": targetref}}
 
 with open(vocabfile) as f:
     vocab = json.load(f)
@@ -36,7 +38,6 @@ else:
     outdata = map_to(target_map, indata)
     outdata = compact(target, outdata) # type: ignore
     if isinstance(outdata, dict):
-        ctx = {"@context": target} if isinstance(target, str) else target
-        outdata.update(ctx)
+        outdata.update(target)
 
     print(json.dumps(outdata, indent=2))
