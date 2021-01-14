@@ -126,13 +126,7 @@ def _process_class_relations(obj: Dict, vocab_index: Dict, target: Dict[str, obj
             _extend_candidates(candidates, candidate, rels)
 
     if id is not None and not id_target_prio:
-        # TODO: transpile filter comprehensions!
-        #base_rels = [it for it in base_rels if it.base != id]
-        filtered_base_rels: List[BaseRelation] = []
-        for it in base_rels:
-            if it.base != id:
-                filtered_base_rels.append(it)
-        base_rels = filtered_base_rels
+        base_rels = [it for it in base_rels if it.base != id]
 
         if len(base_rels) > 0:
             base_classes: List[str] = []

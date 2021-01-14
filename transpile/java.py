@@ -453,9 +453,15 @@ class JavaTranspiler(Transpiler):
 
         iter = self._cast(r(gen.iter), parens=True)
 
-        assert not gen.ifs
+        if gen.ifs:
+            assert len(gen.ifs) == 1
+            optfilter = f'.filter(({args}) -> {r(gen.ifs[0])})'
+        else:
+            optfilter = ''
 
-        return f'{iter}.stream().map(({args}) -> {mapto}).collect(Collectors.toList())'
+        mapcall = '' if args == mapto else f'.map(({args}) -> {mapto})'
+
+        return f'{iter}.stream(){optfilter}{mapcall}.collect(Collectors.toList())'
 
     def map_lambda(self, args, body):
         # TODO: hardcoded for the simplest case, else just ignoring

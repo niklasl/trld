@@ -430,8 +430,13 @@ class JsTranspiler(Transpiler):
         gen = comp.generators[0]
         args = r(gen.target)
         iter = r(gen.iter)
-        assert not gen.ifs
-        return f'{iter}.map(({args}) => {mapto})'
+        if gen.ifs:
+            assert len(gen.ifs) == 1
+            optfilter = f'.filter(({args}) => {r(gen.ifs[0])})'
+        else:
+            optfilter = ''
+        mapcall = '' if args == mapto else f'.map(({args}) => {mapto})'
+        return f'{iter}{optfilter}{mapcall}'
 
     def map_lambda(self, args, body):
         return f"({', '.join(args)}) => {body}"
