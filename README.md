@@ -54,21 +54,21 @@ For Python, this runs mypy and the test suite:
     Ran 51 test cases. Passed: 51. Failed: 0. Errors: 0.
 
     Running test suite: toRdf-manifest.jsonld
-    Ran 449 test cases. Passed: 401. Failed: 48. Errors: 0.
+    Ran 449 test cases. Passed: 400. Failed: 49. Errors: 0.
 
 For the other languages, this will generate packages for each language in the
 build directory, then run their respective test suites:
 
     $ make java
     ...
-    545 tests completed, 19 failed
+    545 tests completed, 18 failed
 
     $ make js
     ...
     1..545
     # tests 545
-    # pass  538
-    # fail  7
+    # pass  542
+    # fail  3
 
 ## Running
 
