@@ -13,15 +13,21 @@ these algorithms. _It is not a generic transpiler_.
 
 ## Implemented Algorithms
 
-### [JSON-LD 1.1](https://www.w3.org/TR/json-ld11-api/)
+### [JSON-LD 1.1](https://www.w3.org/TR/json-ld11-api/) _(W3C Spec)_
 - [x] Expansion
 - [x] Compaction
 - [x] Flattening
 - [x] RDF Serialization/Deserialization
 
-### [N-Quads](https://www.w3.org/TR/n-quads/)
+### [N-Quads](https://www.w3.org/TR/n-quads/) _(W3C Spec)_
 - [x] Parser
 - [x] Serializer
+
+### [Target Vocabulary Maps](#about-target-vocabulary-maps) _(Experimental)_
+- [x] Basic RDFS & OWL
+- [x] Property chains
+- [x] Reified forms
+- [ ] SKOS matches
 
 ## Building & Testing (& Status)
 
@@ -78,3 +84,22 @@ JS-based command-line usage:
 
     $ cd build/js
     $ node -r esm lib/jsonld/cli.js [-f] [-c CONTEXT] FILE
+
+## About Target Vocabulary Maps
+
+This is a mapping technique for translating data using one set of
+vocabularies/ontologies into another, without employing full OWL reasoning in
+the process. It uses RDFS and OWL (sometimes creatively) to derive fairly
+simple maps from source terms to result terms, which are then used at runtime
+for a speedy translation process.
+
+The key difference from regular OWL inference is that a _target_ vocabulary, or
+an ordered array of terms or prefixes (provided as a JSON-LD context) is
+defined and used when creating the mapping. The algorithm then creates a map to
+these terms, from a set of known ontology assertions, ranging from basic RDFS &
+OWL super-, sub- and equivalent relationships, via property chains to
+properties derived from reified forms.
+
+The resulting map is then used to translate input data, described by any terms
+from the known vocabularies, into output data using the desired target
+vocabulary terms.
