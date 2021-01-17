@@ -117,11 +117,12 @@ class Transpiler(ast.NodeVisitor):
         for src in sources:
             typescanner.read(src)
 
+        self._modules = typescanner.modules
+
         for src, mod in typescanner.modules.items():
             with open(src) as f:
                 code = f.read()
             tree = ast.parse(code)
-            self._modules = typescanner.modules
             self._module = typescanner.modules[src]
             self._transpile(tree, src)
 
