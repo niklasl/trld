@@ -1,6 +1,12 @@
-from typing import List, Optional, Iterable, cast
+from typing import List, Optional, Iterable, Union, cast
 from ..common import Input, dump_json
-from ..jsonld.rdf import RdfDataset, RdfGraph, RdfTriple, RdfLiteral, RdfObject
+from ..jsonld.rdf import (
+        RdfDataset, RdfGraph, RdfTriple, RdfLiteral, RdfObject, to_jsonld)
+
+# TODO: Rewrite more based on trig.parser and its nested state handling
+# Should basically become a ReadCompound subclass with restrictions on
+# ReadSymbol allowing only BNodes...
+from ..trig.parser import ESC_CHARS, ReadTerm
 
 
 READ_STMT: int = 0
@@ -14,19 +20,16 @@ READ_DATATYPE_IRI: int = 7
 READ_LANGUAGE: int = 8
 READ_LITERAL_FINISH: int = 9
 READ_COMMENT: int = 10
-ESCAPE_NEXT: int = 11
+#ESCAPE_NEXT: int = 11
 
-ESCAPE_CHAR: str = '\\'
+#ESCAPE_CHAR: str = '\\'
 
-# TODO: allowed chars per state...
-# TODO: consume_next('^'), consume_while(str.isspace) ?
-# TODO: state_stack ? READ_STMT > READ_DATATYPE > READ_IRI
-# ... or just State.parent tree...
+READ_ESCAPES = ReadTerm(None)
 
 
-def parse(dataset: RdfDataset, inp: Input):
-    state: int = READ_STMT
-    prev_state: int = -1
+def load(dataset: RdfDataset, inp: Input):
+    state: Union[int, ReadTerm] = READ_STMT
+    prev_state: Union[int, ReadTerm] = -1
     chars: List[str] = []
     literal: Optional[str] = None
     datatype: Optional[str] = None
@@ -34,10 +37,11 @@ def parse(dataset: RdfDataset, inp: Input):
     terms: List[RdfObject] = []
 
     for c in cast(Iterable[str], inp.characters()):
-        if c == ESCAPE_CHAR: # TODO: and state in READS_ESCAPES:
-            prev_state = state
-            state = ESCAPE_NEXT
-            continue
+        if READ_ESCAPES.handle_escape(c):
+            if state is not READ_ESCAPES:
+                READ_ESCAPES.escape_chars = ESC_CHARS if READ_STRING else {}
+                prev_state = state
+            state = READ_ESCAPES
 
         if state == READ_LITERAL_FINISH:
             assert literal is not None
@@ -45,8 +49,12 @@ def parse(dataset: RdfDataset, inp: Input):
             literal = datatype = language = None
             state = READ_STMT
 
-        if state == ESCAPE_NEXT:
-            state = prev_state
+        if state == READ_ESCAPES:
+            if len(READ_ESCAPES.collected) == 1:
+                c = READ_ESCAPES.pop()
+                state = prev_state
+            else:
+                continue
         elif state == READ_STMT:
             if c.isspace():
                 continue
@@ -124,7 +132,7 @@ def parse(dataset: RdfDataset, inp: Input):
         chars.append(c)
 
     if len(chars) != 0 or len(terms) != 0:
-        raise Exception(f'Trailing data: chars={"".join(chars)}, terms={str(terms)}')
+        raise Exception(f'Trailing data: chars={"".join(chars)!r}, terms={terms!r}')
 
 
 def handle_statement(dataset: RdfDataset, terms: List):
@@ -149,11 +157,13 @@ def handle_statement(dataset: RdfDataset, terms: List):
     graph.add(RdfTriple(s, p, o))
 
 
-if __name__ == '__main__':
-    from ..jsonld.rdf import to_jsonld
-
-    inp = Input()
+def parse(inp: Input):
     dataset = RdfDataset()
-    parse(dataset, inp)
-    result = to_jsonld(dataset)
+    load(dataset, inp)
+    return to_jsonld(dataset)
+
+
+if __name__ == '__main__':
+    inp = Input()
+    result = parse(inp)
     print(dump_json(result, pretty=True))
