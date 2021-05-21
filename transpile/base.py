@@ -489,6 +489,13 @@ class Transpiler(ast.NodeVisitor):
     def visit_Continue(self, node):
         self.stmt('continue', node=node)
 
+    def visit_With(self, node: ast.With):
+        assert len(node.items) == 1
+        withitem = node.items[0]
+        expr = self.repr_expr(withitem.context_expr)
+        var = self.repr_expr(withitem.optional_vars)
+        self.handle_with(expr, var)
+
     def visit_FunctionDef(self, node):
         prefix = ''
         if self.typing or len(self._within) < 1:
@@ -949,7 +956,11 @@ class Transpiler(ast.NodeVisitor):
         elif isinstance(sliceval, ast.Str):
             tname = sliceval.s if annot else self.repr_expr(sliceval)
         elif isinstance(sliceval, ast.Tuple):
-            tname = ', '.join(self.repr_expr(p, annot=annot) for p in sliceval.elts)
+            tname = ', '.join(self.repr_expr(p.elts[0]
+                                             if isinstance(p, ast.List) # Callable[[A1], RT]
+                                             else p,
+                                             annot=annot)
+                              for p in sliceval.elts)
         else:
             tname = self.repr_expr(sliceval, annot=annot)
 
@@ -1124,4 +1135,7 @@ class Transpiler(ast.NodeVisitor):
         return self.map_lambda([arg.arg for arg in f.args.args], self.repr_expr(f.body))
 
     def map_lambda(self, args: List[str], body: str) -> str:
+        raise NotImplementedError
+
+    def handle_with(self, expr: str, var: str) -> Tuple[str, List]:
         raise NotImplementedError

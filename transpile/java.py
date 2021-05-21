@@ -178,6 +178,10 @@ class JavaTranspiler(Transpiler):
 
         return f'for ({typedentry} : {self._cast(container)})', stmts, nametypes
 
+    def handle_with(self, expr, var):
+        vartype = expr.split('(', 1)[0].replace('new ', '')
+        self.enter_block(None, f'try ({vartype} {var} = {expr})', nametypes=[(var, vartype)])
+
     # TODO:
     #def map_name(self, name, callargs=None): ...
 

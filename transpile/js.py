@@ -151,6 +151,14 @@ class JsTranspiler(Transpiler):
                 part = f'[{part}]'
             return f'for (let {part} of {container})', [], [(part, parttype)]
 
+    def handle_with(self, expr, var):
+        vartype = expr.split('(', 1)[0].replace('new ', '')
+        self.enter_block(None, 'try',
+                         stmts=[f'let {var} = {expr}'],
+                         nametypes=[(var, vartype)],
+                         end=' ')
+        self.enter_block(None, f'catch (e)', stmts=[f'{var}.close()'])
+
     def map_name(self, name, callargs=None):
         if name == 'list':
             if not callargs:
