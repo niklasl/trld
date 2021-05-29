@@ -1,6 +1,7 @@
 from typing import List, Dict, Set, Optional, Iterable, Union, Tuple, ClassVar, cast
 import re
-from ..common import Char, Input, dump_json
+from ..builtins import Char
+from ..common import Input, dump_json
 from ..jsonld.base import (
         VALUE, TYPE, LANGUAGE,
         ID, LIST, GRAPH,
@@ -30,7 +31,11 @@ ESC_CHARS = {
     '\\': '\\'
 }
 
-RESERVED_CHARS = "~.-!$&'()*+,;=/?#@%_"
+RESERVED_CHARS = {'~', '.', '-', '!',
+                  '$', '&', "'", '(',
+                  ')', '*', '+', ',',
+                  ';', '=', '/', '?',
+                  '#', '@', '%', '_'}
 
 SYMBOL = '@symbol'
 EOF = ''
@@ -54,7 +59,7 @@ class ParserError(Exception):
         self.lno = lno
         self.cno = cno
 
-    def __str__(self):
+    def __str__(self) -> str:
         return (f'Notation error at line {self.lno}, column {self.cno}:'
                 f' {self.error}')
 
@@ -62,7 +67,7 @@ class ParserError(Exception):
 class ParserState:
 
     parent: 'ParserState'
-    context: Dict
+    context: Dict[str, object]
 
     def __init__(self, parent: 'ParserState' = None):
         self.parent = cast('ParserState', parent)
@@ -72,26 +77,26 @@ class ParserState:
     def init(self):
         pass
 
-    def consume(self, c, prev_value) -> StateResult:
+    def consume(self, c: str, prev_value) -> StateResult:
         raise NotImplementedError
 
-    def symbol(self, value: Dict) -> str:
+    def symbol(self, value: Dict[str, str]) -> str:
         if SYMBOL in value:
-            symbol = value[SYMBOL]
-            if symbol in self.context:
-                symbol = self.context[VOCAB] + symbol
-            return symbol
+            sym = value[SYMBOL]
+            if sym in self.context:
+                sym = cast(str, self.context[VOCAB]) + sym
+            return sym
         return value[ID]
 
 
 class ConsumeWs(ParserState):
 
-    MATCH = re.compile(r'\s')
+    MATCH: ClassVar[re.Pattern] = re.compile(r'\s')
 
     def accept(self, c: Char) -> bool:
         return self.MATCH.match(c) is not None
 
-    def consume(self, c, prev_value) -> StateResult:
+    def consume(self, c: str, prev_value) -> StateResult:
         if self.accept(c):
             return self, None
         else:
@@ -100,8 +105,8 @@ class ConsumeWs(ParserState):
 
 class ConsumeComment(ParserState):
 
-    def consume(self, c, prev_value) -> StateResult:
-        if c in ('\n',):
+    def consume(self, c: str, prev_value) -> StateResult:
+        if c == '\n':
             return self.parent, None
         else:
             return self, None
@@ -136,8 +141,8 @@ class ReadTerm(ParserState):
         if self.unicode_escapes_left:
             self.unicode_chars.append(c)
             if self.unicode_escapes_left == 1:
+                hex_seq = ''.join(self.unicode_chars)
                 try:
-                    hex_seq = ''.join(self.unicode_chars)
                     c = chr(int(hex_seq, 16))
                 except ValueError:
                     raise NotationError(f'Invalid unicode escape: {hex_seq}')
@@ -170,14 +175,14 @@ class ReadTerm(ParserState):
 
         return False
 
-    def backtrack(self, prev_c, c, value):
+    def backtrack(self, prev_c: str, c: str, value) -> StateResult:
         state, value = self.parent.consume(prev_c, value)
         return state.consume(c, value)
 
 
 class ReadIRI(ReadTerm):
 
-    MATCH = re.compile(r'\S') # TODO: specify better
+    MATCH: ClassVar[re.Pattern] = re.compile(r'\S') # TODO: specify better
 
     def init(self):
         self.escape_chars = {}
@@ -185,7 +190,7 @@ class ReadIRI(ReadTerm):
     def accept(self, c: Char) -> bool:
         return self.MATCH.match(c) is not None
 
-    def consume(self, c, prev_value) -> StateResult:
+    def consume(self, c: str, prev_value) -> StateResult:
         if c == '>':
             value = self.pop()
             return self.parent, {ID: value}
@@ -200,7 +205,7 @@ class ReadIRI(ReadTerm):
 
 class ReadSymbol(ReadTerm):
 
-    MATCH = re.compile(r"[^][{}^<>\"\s~!$&'()*,;=/?#]")
+    MATCH: ClassVar[re.Pattern] = re.compile(r"[^][{}^<>\"\s~!$&'()*,;=/?#]")
 
     just_escaped: bool
 
@@ -208,7 +213,7 @@ class ReadSymbol(ReadTerm):
         self.escape_chars = {c: c for c in RESERVED_CHARS}
         self.just_escaped = False
 
-    def accept(self, c) -> bool:
+    def accept(self, c: Char) -> bool:
         if self.MATCH.match(c) is None:
             return False
         if c == ':' and len(self.collected) > 1 and (self.collected[0] == '_' and
@@ -216,10 +221,10 @@ class ReadSymbol(ReadTerm):
             return False
         return True
 
-    def consume(self, c, prev_value) -> StateResult:
+    def consume(self, c: str, prev_value) -> StateResult:
         if len(self.collected) == 0 and c == '<':
             return ReadIRI(self.parent), None
-        elif len(self.collected) == 0 and ReadNumber.LEAD_CHARS.match(c):
+        elif len(self.collected) == 0 and ReadNumber.LEAD_CHARS.match(c) is not None:
             return ReadNumber(self.parent).consume(c, None)
         elif self.handle_escape(c):
             self.just_escaped = True
@@ -240,7 +245,7 @@ class ReadSymbol(ReadTerm):
             value = value[:-1]
             last_dot = True
 
-        if value in ('true', 'false'):
+        if value in {'true', 'false'}:
             value = cast(bool, value == 'true')
         elif value == 'a':
             value = TYPE
@@ -264,7 +269,7 @@ class ReadSymbol(ReadTerm):
 
 class ReadNumber(ReadTerm):
 
-    LEAD_CHARS = re.compile(r'[+-.0-9]')
+    LEAD_CHARS: ClassVar[re.Pattern] = re.compile(r'[+-.0-9]')
     EXP = {'E', 'e'}
 
     whole: Optional[str]
@@ -276,7 +281,7 @@ class ReadNumber(ReadTerm):
         self.dot = ''
         self.exp = False
 
-    def consume(self, c, prev_value) -> StateResult:
+    def consume(self, c: str, prev_value) -> StateResult:
         exp = c in self.EXP
         if exp:
             self.exp = True
@@ -288,11 +293,13 @@ class ReadNumber(ReadTerm):
             self.whole = self.pop()
             self.collect(c)
             return self, None
-        elif c.isdigit() or (self.whole is None and
-                             len(self.collected) == 0 and self.LEAD_CHARS.match(c)) or (
+        elif c.isdecimal() or (self.whole is None and
+                                len(self.collected) == 0 and
+                                self.LEAD_CHARS.match(c) is not None) or (
                             self.whole is not None and c in self.EXP) or (
-                            self.collected and self.collected[-1] in self.EXP and
-                            self.LEAD_CHARS.match(c)):
+                                len(self.collected) > 0
+                                and self.collected[-1] in self.EXP
+                                and self.LEAD_CHARS.match(c) is not None):
             self.collect(c)
             return self, None
         else:
@@ -331,6 +338,7 @@ class ReadLiteral(ReadTerm):
     value: Optional[str]
     quotechar: str
     multiline: int
+    prev_dt_start: int
 
     def __init__(self, parent: Optional[ParserState], quotechar: str):
         super().__init__(parent)
@@ -342,7 +350,7 @@ class ReadLiteral(ReadTerm):
         self.value = None
         self.multiline = 0
 
-    def consume(self, c, prev_value) -> StateResult:
+    def consume(self, c: str, prev_value) -> StateResult:
         if self.value == '' and c == self.quotechar:
             self.multiline = 1
             self.value = None
@@ -405,12 +413,12 @@ class ReadLiteral(ReadTerm):
 
 class ReadLanguage(ReadTerm):
 
-    MATCH = re.compile(r'[A-Za-z0-9-]') # TODO: only allow numbers in subtag
+    MATCH: ClassVar[re.Pattern] = re.compile(r'[A-Za-z0-9-]') # TODO: only allow numbers in subtag
 
     def accept(self, c: Char) -> bool:
         return self.MATCH.match(c) is not None
 
-    def consume(self, c, prev_value) -> StateResult:
+    def consume(self, c: str, prev_value) -> StateResult:
         if self.accept(c):
             self.collect(c)
             return self, None
@@ -440,9 +448,9 @@ class ReadCompound(ParserState):
 
     def node_with_id(self, value: Dict) -> Dict:
         if SYMBOL in value:
-            node_id = value[SYMBOL]
+            node_id: str = value[SYMBOL]
             if ':' not in node_id and VOCAB in self.context:
-                node_id = self.context[VOCAB] + node_id
+                node_id = cast(str, self.context[VOCAB]) + node_id
             value = {ID: node_id}
         return value
 
@@ -459,13 +467,14 @@ class ReadCompound(ParserState):
 class ReadDecl(ReadCompound):
 
     final_dot: bool
+    completed: bool
 
     def __init__(self, parent: 'ReadNodes', final_dot: bool):
         super().__init__(parent)
         self.final_dot = final_dot
         self.completed = False
 
-    def consume(self, c, prev_value) -> StateResult:
+    def consume(self, c: str, prev_value) -> StateResult:
         if isinstance(prev_value, Dict):
             if not self.more_parts(prev_value):
                 self.completed = True
@@ -503,7 +512,7 @@ class ReadPrefix(ReadDecl):
 
     def more_parts(self, value: Dict) -> bool:
         if self.pfx is None:
-            pfx = value[SYMBOL]
+            pfx = cast(str, value[SYMBOL])
             if pfx != '':
                 if pfx.endswith(':'):
                     pfx = pfx[:-1]
@@ -518,10 +527,11 @@ class ReadPrefix(ReadDecl):
         return False
 
     def declare(self):
-        ns = self.ns
-        if self.pfx != '' and ns != '' and not ns[-1] in PREFIX_DELIMS:
-            ns = {ID: ns, PREFIX: True}
-        self.parent.context[self.pfx or VOCAB] = ns
+        ns: Union[str, Dict[str, object]] = self.ns
+        if self.pfx != '' and self.ns != '' and not self.ns[-1] in PREFIX_DELIMS:
+            ns = {ID: self.ns, PREFIX: True}
+        key: str = self.pfx if self.pfx is not None and self.pfx != '' else VOCAB
+        self.parent.context[key] = ns
 
 
 class ReadBase(ReadDecl):
@@ -557,25 +567,22 @@ class ReadNode(ReadCompound):
         elif self.accept_value:
             if self.p == TYPE:
                 assert isinstance(value, Dict)
-                value = self.symbol(value)
+                value = cast(str, self.symbol(value))
 
             value = self.compact_value(value)
 
-            given = self.node.get(self.p)
+            given: Optional[object] = self.node.get(self.p)
             if given is not None:
-                if isinstance(given, List):
-                    values = given
-                else:
-                    values = [given]
-                    self.node[self.p] = values
+                values: List = given if isinstance(given, List) else [given]
                 values.append(value)
+                self.node[self.p] = values
             else:
                 self.node[self.p] = value
             self.accept_value = False
         else:
             raise NotationError(f'Unexpected: {value!r}')
 
-    def consume_node_char(self, c) -> StateResult:
+    def consume_node_char(self, c: str) -> StateResult:
         readspace = self.read_space(c)
         if readspace:
             return readspace
@@ -606,7 +613,7 @@ class ReadBNode(ReadNode):
         self.p = None
         self.accept_value = True
 
-    def consume(self, c, prev_value) -> StateResult:
+    def consume(self, c: str, prev_value) -> StateResult:
         if prev_value is not None:
             self.fill_node(prev_value)
 
@@ -628,7 +635,7 @@ class ReadCollection(ReadCompound):
     def reset(self):
         self.nodes = []
 
-    def consume(self, c, prev_value) -> StateResult:
+    def consume(self, c: str, prev_value) -> StateResult:
         if prev_value is not None:
             self.nodes.append(self.compact_value(prev_value))
 
@@ -664,7 +671,7 @@ class ReadNodes(ReadNode):
         self.accept_value = True
         self.expect_graph = False
 
-    def consume(self, c, prev_value) -> StateResult:
+    def consume(self, c: str, prev_value) -> StateResult:
         if prev_value is not None:
             if isinstance(prev_value, str):
                 final_dot = False
@@ -680,6 +687,7 @@ class ReadNodes(ReadNode):
                     return self, None
 
             if self.node is None:
+                assert isinstance(prev_value, Dict)
                 self.node = self.node_with_id(prev_value)
             else:
                 if self.p is None and self.expect_graph and self.node is not None:
@@ -712,7 +720,7 @@ class ReadGraph(ReadNodes):
 
     parent: ReadNodes
 
-    def consume(self, c, prev_value) -> StateResult:
+    def consume(self, c: str, prev_value) -> StateResult:
         if isinstance(prev_value, str) and prev_value != TYPE:
             raise NotationError(f'Directive not allowed in graph: {prev_value!r}')
 
@@ -734,17 +742,18 @@ class ReadGraph(ReadNodes):
             return super().consume(c, prev_value)
 
 
-def parse(inp):
-    state = ReadNodes()
+def parse(inp: Input) -> object:
+    state: ParserState = ReadNodes(None)
     value = None
 
     lno = 1
     cno = 1
-    for c in cast(Iterable[str], inp.characters()):
+    for c in cast(Iterable[Char], inp.characters()):
         if c == '\n':
             lno += 1
             cno = 0
 
+        next_state: ParserState
         try:
             next_state, value = state.consume(c, value)
         except NotationError as e:
@@ -755,7 +764,7 @@ def parse(inp):
         assert next_state is not None
         state = next_state
 
-    _, result = state.consume(EOF, value)
+    endstate, result = state.consume(EOF, value)
 
     return result
 

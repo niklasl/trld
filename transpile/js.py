@@ -1,13 +1,12 @@
 from pathlib import Path
-from typing import Union
+from typing import Union, Optional
 from contextlib import contextmanager
 import ast
-from .base import Transpiler, Casing, camelize, under_camelize
+from .base import camelize, under_camelize
+from .cstyle import CStyleTranspiler
 
 
-class JsTranspiler(Transpiler):
-
-    class_based = True
+class JsTranspiler(CStyleTranspiler):
     ctor = 'constructor'
     has_static = False
     typing = False
@@ -18,18 +17,8 @@ class JsTranspiler(Transpiler):
     declaring = 'let '
     protected = '_'
 
-    this = 'this'
-    none = 'null'
-
     func_defaults = '{key} = {value}'
 
-    class_casing = Casing.UpperCamelCase
-    constant_casing = Casing.UPPER_SNAKE_CASE
-    method_casing = Casing.lowerCamelCase
-    name_casing = Casing.lowerCamelCase
-
-    begin_block = ' {'
-    end_block = '}'
     control_parens = True
     end_stmt = ''#';'
 
@@ -58,15 +47,16 @@ class JsTranspiler(Transpiler):
         'OrderedDict': 'Object',
         'set': 'Set',
         'Set': 'Set',
+        'Pattern': 'RegExp',
     }
 
     constants = {
-        None: 'null',
-        True: 'true',
-        False: 'false',
+        None: ('null', None),
+        True: ('true', 'Boolean'),
+        False: ('false', 'Boolean'),
     }
 
-    operators =  {
+    operators = {
         ast.And: '&&',
         ast.Or: '||',
         ast.Is: '===',
@@ -110,14 +100,15 @@ class JsTranspiler(Transpiler):
         self._srcpath = srcpath
         fpath = '/'.join(srcpath.with_suffix('.js').parts[1:])
         self.filename = Path(self.outdir) / fpath
-        self.stmt("'use strict'" + self.end_stmt)
+        self.stmt("'use strict'")
         self.outln()
         yield
 
     def handle_import(self, node: ast.ImportFrom):
         if len(node.names) == 1 and node.names[0].name == '*' and self._modules:
             modpath = str((self._srcpath.parent / node.module).with_suffix(self._srcpath.suffix))
-            names = ', '.join(self._modules[modpath])
+            names = ', '.join(name for name, ntype in self._modules[modpath].items()
+                              if ntype and not name.startswith('__'))
         else:
             names = ', '.join(camelize(name.name) # type: ignore
                     for name in node.names
@@ -125,6 +116,13 @@ class JsTranspiler(Transpiler):
         rel = '.' * node.level
         relmodpath = str(node.module).replace('.', '/') + '.js'
         self.outln(f"import {{ {names} }} from '{rel}/{relmodpath}'", self.end_stmt)
+
+    def funcdef(self, name: str, args: str, ret: Optional[str] = None):
+        #if not self.typing:
+        ret = 'function' if len(self._within) < 2 else ''
+        if ret:
+            ret += ' '
+        return f'{ret}{name} ({args})'
 
     def map_isinstance(self, vrepr: str, classname: str):
         if classname in {'String', 'Number', 'Boolean'}:
@@ -135,11 +133,11 @@ class JsTranspiler(Transpiler):
             return f"Array.isArray({vrepr})"
         return f'{vrepr} instanceof {classname}'
 
-    def visit_Assert(self, node):
-        self.stmt(f'// {self.repr_expr(node.test)}')
+    def map_assert(self, expr: str, failmsg: str) -> str:
+        return f'// assert {expr} : {failmsg}'
 
     def map_for(self, container, ctype, part, parttype):
-        if 'Map' in ctype or container.endswith('.entrySet()'):
+        if ctype.endswith('Map') or container.endswith('.entrySet()'):
             container = container.replace('.entrySet()', '')
             key, val = part.split(', ')
             ktype, vtype = parttype.split(', ', 1)
@@ -150,6 +148,10 @@ class JsTranspiler(Transpiler):
             if ',' in part:
                 part = f'[{part}]'
             return f'for (let {part} of {container})', [], [(part, parttype)]
+
+    def map_for_to(self, counter, ceiling):
+        ct = [(counter, 'Number')]
+        return f'for (let {counter} = 0; {counter} < {ceiling}; {counter}++)', [], ct
 
     def handle_with(self, expr, var):
         vartype = expr.split('(', 1)[0].replace('new ', '')
@@ -172,16 +174,18 @@ class JsTranspiler(Transpiler):
         return super().map_name(name, callargs)
 
     def map_attr(self, owner, attr, callargs=None):
-        ownertype = self.gettype(owner) or ('Object', False)
+        ownertypeinfo = self.gettype(owner)
+        ownertype = ownertypeinfo[0] if ownertypeinfo else None
+        ownertype = ownertype or 'Object'
 
         castowner = self._cast(owner, parens=True)
 
-        ismaplike = 'Map' in ownertype[0].split('<', 1)[0]
+        ismaplike = 'Map' in ownertype.split('<', 1)[0]
 
-        if attr == 'join':# and ownertype[0] == 'String':
+        if attr == 'join':# and ownertype == 'String':
             return f'{callargs[0]}.join({owner})'
 
-        if attr == 'get' and (ismaplike or ownertype[0] == 'Object'):
+        if attr == 'get' and (ismaplike or ownertype == 'Object'):
             if len(callargs) == 1:
                 return f'{self._cast(owner, parens=True)}[{callargs[0]}]'
             elif len(callargs) == 2:
@@ -191,17 +195,17 @@ class JsTranspiler(Transpiler):
             if attr == 'copy' and ismaplike:
                 return f'Object.assign({{}}, {owner})'
 
-        if attr == 'setdefault':# and 'Object' in ownertype[0]:
+        if attr == 'setdefault':# and 'Object' in ownertype:
             a = castowner
             b = callargs[0]
             return f'{a}[{b}] || ({a}[{b}] = {callargs.pop(1)})'
 
-        if attr == 'isalpha':# and ownertype[0] == 'String':
+        if attr == 'isalpha':# and ownertype == 'String':
             return f'!!({castowner}.match(/^\w+$/))'
 
         if attr == 'items' and ismaplike:
             member = 'entrySet'
-        elif attr == 'keys' and (ismaplike or ownertype[0] == 'Object'):
+        elif attr == 'keys' and (ismaplike or ownertype == 'Object'):
             return f'Object.keys({castowner})'
         elif attr == 'values' and ismaplike:
             return f'Object.values({castowner})'
@@ -219,9 +223,9 @@ class JsTranspiler(Transpiler):
                 member = 'shift'
             else:
                 member = 'pop'
-        elif attr == 'remove' and 'Set' in ownertype[0]:
+        elif attr == 'remove' and 'Set' in ownertype:
             member = 'delete'
-        elif ownertype and ownertype[0] == 'String':
+        elif ownertype and ownertype == 'String':
             member = {
                 'startswith': 'startsWith',
                 'endswith': 'endsWith',
@@ -317,7 +321,7 @@ class JsTranspiler(Transpiler):
         if containertypeinfo:
             containertype = containertypeinfo[0]
             if containertype.startswith('Union'):
-                # FIXME: something slipped through!
+                # FIXME: it slipped through (no union_surrogate here)
                 containertype = 'Map'
         elif 'new Set' in container:
             containertype = 'Set'
@@ -329,8 +333,10 @@ class JsTranspiler(Transpiler):
                 result = f'Object.hasOwnProperty.call({container}, {contained})'
             elif containertype.startswith('Set'):
                 result = f'{container}.has({contained})'
+
         if negated:
             return f'!({result})'
+
         return result
 
     def map_list(self, expr: Union[ast.List, ast.Set]):
@@ -370,8 +376,10 @@ class JsTranspiler(Transpiler):
                 iter = f'Array.from({iter})'
 
         itemtype = None
-        if ntypeinfo and ntypeinfo[0].endswith('>'):
-            itemtype = ntypeinfo[0].split('<', 1)[-1][:-1].split(',')[0]
+        if ntypeinfo:
+            containertype = self.container_type(ntypeinfo[0])
+            if containertype:
+                itemtype = containertype.contained.split(',')[0]
 
         self.new_scope()
         if itemtype:
@@ -414,22 +422,32 @@ class JsTranspiler(Transpiler):
             if sep in assignedto: # assuming "get from collection" method
                 ttype_narrowed = self.gettype(assignedto.split(sep, 1)[0])
                 if ttype_narrowed:
-                    ttype = ttype_narrowed[0].split('<', 1)[1][:-1]
                     break
         else:
             ttype_narrowed = self.gettype(assignedto)
-            if ttype_narrowed:
-                ttype = ttype_narrowed[0]
 
-        print(ttype, assignedto.split('[', 1)[0])
-        if ttype:
-            p0type, p1type = ttype.split('<', 1)[1][:-1].split(', ')
+        if ttype_narrowed:
+            ttype = ttype_narrowed[0].split('<', 1)[-1]
+            if ttype.endswith('>'):
+                ttype = ttype[:-1]
+
+        containertype = self.container_type(ttype)
+        if containertype:
+            p0type, p1type = containertype.contained.split(', ')
+        else:
+            p0type, p1type = None, None
+
+        if not self.gettype(parts[0]):
             self.addtype(parts[0], p0type)
-            self.addtype(parts[1], p1type)
-        assert self.gettype(parts[0])
-        trepr = f"[{', '.join(parts)}]"
+        else:
+            p0type = None
 
-        return trepr
+        if not self.gettype(parts[1]):
+            self.addtype(parts[1], p1type)
+        else:
+            p1type = None
+
+        return f"[{', '.join(parts)}]", None
 
     def map_listcomp(self, comp):
         r = self.repr_expr
@@ -446,8 +464,32 @@ class JsTranspiler(Transpiler):
         mapcall = '' if args == mapto else f'.map(({args}) => {mapto})'
         return f'{iter}{optfilter}{mapcall}'
 
+    def map_dictcomp(self, comp):
+        r = self.repr_expr
+
+        assert len(comp.generators) == 1
+        gen = comp.generators[0]
+
+        iter = self._cast(r(gen.iter), parens=True)
+
+        if gen.ifs:
+            assert len(gen.ifs) == 1
+            optfilter = f'.filter(({args}) -> {r(gen.ifs[0])})'
+        else:
+            optfilter = ''
+
+        gkey = self.map_lambda('it', r(comp.key))
+        gval = self.map_lambda('it', r(comp.value))
+        reduce = f'reduce((d, it) => {{ d[{gkey}] = {gval}; return d }}, {{}})'
+
+        return f'{iter}{optfilter}.{reduce}'
+
     def map_lambda(self, args, body):
         return f"({', '.join(args)}) => {body}"
+
+    def new_regexp(self, callargs):
+        args = ', '.join(callargs)
+        return f'/{args}/', 'RegExp'
 
 
 if __name__ == '__main__':

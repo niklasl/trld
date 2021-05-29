@@ -1,33 +1,30 @@
 import ast
-from typing import List, Optional, Union, IO
+from typing import List, Tuple, Optional, Union, IO
 from contextlib import contextmanager
 from pathlib import Path
-from .base import Transpiler, camelize, upper_camelize, under_camelize
+from .base import camelize, upper_camelize, under_camelize
+from .cstyle import CStyleTranspiler
 
 
-class JavaTranspiler(Transpiler):
-
-    class_based = True
+class JavaTranspiler(CStyleTranspiler):
     has_static = True
     typing = True
+    inherit_constructor = False
     union_surrogate = 'Object'
     optional_type_form = '/*@Nullable*/ {0}'
+    static_annotation_form = '/*@Static*/ {0}'
     public = 'public '
     constant = 'final '
     protected = 'protected '
 
-    begin_block = ' {'
-    end_block = '}'
-    end_stmt = ';'
-
-    this = 'this'
-    none = 'null'
-
     types = {
         'object': 'Object',
         'Exception': 'RuntimeException',
+        'ValueError': 'NumberFormatException',
+        'NotImplementedError': 'RuntimeException',
         'bool': 'Boolean',
         'str': 'String',
+        'Char': 'String', #'Character',
         'int': 'Integer',
         'float': 'Double',
         'list': 'ArrayList',
@@ -39,15 +36,16 @@ class JavaTranspiler(Transpiler):
         'Set': 'Set',
         'Iterable': 'Iterable',
         'Tuple': 'Map.Entry',
+        're.Pattern': 'Pattern'
     }
 
     constants = {
-        None: 'null',
-        True: 'true',
-        False: 'false',
+        None: ('null', 'Object'),
+        True: ('true', 'Boolean'),
+        False: ('false', 'Boolean'),
     }
 
-    operators =  {
+    operators = {
         ast.And: '&&',
         ast.Or: '||',
         ast.Is: '==',
@@ -65,13 +63,13 @@ class JavaTranspiler(Transpiler):
 
     function_map = {
         'str': '{0}.toString()',
+        'int': ('Integer.valueOf({0})', 'Integer.valueOf({0}, {1}).intValue()'),
+        'chr': 'Character.toString(((char) {0}))',
         'pow': 'Math.pow({0}, {1})',
         'type': '{0}.getClass()',
         'id': '{0}.hashCode()',
         'print': 'System.out.println({0})',
     }
-
-    indent = '  '
 
     _current_imports: List[str]
     _prev_outfile: Optional[IO]
@@ -114,6 +112,7 @@ class JavaTranspiler(Transpiler):
         self.outln()
         self.stmt('//import javax.annotation.Nullable')
         self.stmt('import java.util.*')
+        self.stmt('import java.util.regex.Pattern')
         self.stmt('import java.util.stream.Stream')
         self.stmt('import java.util.stream.Collectors')
         self.stmt('import java.io.*')
@@ -135,7 +134,7 @@ class JavaTranspiler(Transpiler):
                 continue
 
             if name == '*' or name[0].islower() or \
-                    all(c == '_' or c.isupper() or c.isdigit() for c in name):
+                    all(c == '_' or c.isupper() or c.isdecimal() for c in name):
                 importing = 'import static'
                 namepath = package + [name]
                 namepath[-2] = upper_camelize(namepath[-2])
@@ -149,8 +148,21 @@ class JavaTranspiler(Transpiler):
             self._current_imports.append(impstr)
             self.stmt(impstr)
 
+    def cleantype(self, typename: Optional[str]) -> Optional[str]:
+        if typename is None:
+            return None
+        typename = typename.replace('/*@Nullable*/ ', '')
+        typename = typename.replace('/*@Static*/ ', '')
+        return typename
+
     def map_isinstance(self, vrepr: str, classname: str):
         return f'{vrepr} instanceof {classname}'
+
+    def map_assert(self, expr, failmsg):
+        stmt = f'assert {expr}'
+        if failmsg and failmsg != self.none:
+            stmt += f' : {failmsg}'
+        return stmt
 
     def map_for(self, container, ctype, part, parttype):
         stmts = []
@@ -162,7 +174,7 @@ class JavaTranspiler(Transpiler):
                 parttypes = parttype.split(', ', 1)
             else:
                 typedentry = f'{parttype} {entry}'
-                parttypes = parttype.split('<')[1][:-1].split(', ', 1)
+                parttypes = self.container_type(parttype).contained.split(', ', 1)
 
             if ', ' in part:
                 parts = part.split(', ', 1)
@@ -178,6 +190,10 @@ class JavaTranspiler(Transpiler):
 
         return f'for ({typedentry} : {self._cast(container)})', stmts, nametypes
 
+    def map_for_to(self, counter, ceiling):
+        ct = [(counter, 'int')]
+        return f'for (int {counter} = 0; {counter} < {ceiling}; {counter}++)', [], ct
+
     def handle_with(self, expr, var):
         vartype = expr.split('(', 1)[0].replace('new ', '')
         self.enter_block(None, f'try ({vartype} {var} = {expr})', nametypes=[(var, vartype)])
@@ -186,56 +202,79 @@ class JavaTranspiler(Transpiler):
     #def map_name(self, name, callargs=None): ...
 
     def map_attr(self, owner, attr, callargs=None):
-        ownertype = self.gettype(owner) or ('Object', False)
+        ownertypeinfo = self.gettype(owner)
+        ownertype = ownertypeinfo[0] if ownertypeinfo else 'Object'
+        ownertype = self.cleantype(ownertype)
 
         castowner = self._cast(owner, parens=True)
 
-        if attr == 'join':# and ownertype[0] == 'String':
-            return f'String.join({owner}, {callargs[0]})'
+        if attr == 'join':# and ownertype == 'String':
+            return f'String.join({owner}, {callargs[0]})', 'String'
 
-        elif attr == 'get' and self._is_map(ownertype[0]) and len(callargs) == 2:
+        elif attr == 'get' and self._is_map(ownertype) and len(callargs) == 2:
             return f'{self._cast(owner, parens=True)}.getOrDefault({callargs[0]}, {callargs[1]})'
 
         elif not callargs:
-            if attr == 'sort' and self._is_list(ownertype[0]):
+            if attr == 'sort' and self._is_list(ownertype):
                     return f'Collections.sort({owner})'
 
-            if attr == 'reverse' and self._is_list(ownertype[0]):
+            if attr == 'reverse' and self._is_list(ownertype):
                     return f'Collections.reverse({owner})'
 
-            if attr == 'copy' and self._is_map(ownertype[0]):
+            if attr == 'copy' and self._is_map(ownertype):
                     return f'new HashMap({owner})'
 
-        if attr == 'items':# and self._is_map(ownertype[0]):
+        member = under_camelize(attr, self.protected == '_')
+        rtype = None
+
+        if attr == 'items':# and self._is_map(ownertype):
             member = 'entrySet'
-        elif attr == 'keys':# and self._is_map(ownertype[0]):
+        elif attr == 'keys':# and self._is_map(ownertype):
             member = 'keySet'
-        elif attr == 'update' and self._is_map(ownertype[0]):
+        elif attr == 'update' and self._is_map(ownertype):
             member = 'putAll'
         elif attr == 'pop':
-            if self._is_map(ownertype[0]) and len(callargs) == 2 and callargs[1] == 'null':
-                callargs.pop(1)
-            member = 'remove'
-        elif attr == 'setdefault' and self._is_map(ownertype[0]):
+            if self._is_map(ownertype):
+                if len(callargs) == 2 and callargs[1] == 'null':
+                    callargs.pop(1)
+                member = 'remove'
+            elif self._is_list(ownertype):
+                member = 'remove'
+        elif attr == 'setdefault' and self._is_map(ownertype):
             self._pre_stmts = [
                 f'if (!{castowner}.containsKey({callargs[0]})) '
                 f'{castowner}.put({callargs[0]}, {callargs.pop(1)})'
             ]
             member = 'get'
         elif attr == 'append':
-            if self.typing and 'List' not in ownertype[0] and not castowner.startswith('('):
+            if self.typing and 'List' not in ownertype and not castowner.startswith('('):
                 castowner = f'((List) {castowner})'
             member = 'add'
-        elif attr == 'isalpha':# and ownertype[0] == 'String':
+        elif attr == 'isalpha':# and ownertype == 'String':
             member = 'matches'
             callargs.append(r'"^\\w+$"')
-        elif attr == 'isnumeric':# and ownertype[0] == 'String':
+        elif attr == 'isdecimal':# and ownertype == 'String':
             member = 'matches'
             callargs.append(r'"^\\d+$"')
-        elif attr == 'isspace':# and ownertype[0] == 'String':
+        elif attr == 'isspace':# and ownertype == 'String':
             member = 'matches'
             callargs.append(r'"^\\s+$"')
-        elif ownertype and ownertype[0] == 'String':
+        elif ownertype and ownertype == 'Pattern' and attr == 'match':
+            v = callargs.pop()
+            assert not callargs
+            return f'({castowner}.matcher({v}).matches() ? {v} : null)'
+        elif ownertype and ownertype == 'String':
+            check = {
+                'startswith': 'startsWith',
+                'endswith': 'endsWith',
+            }.get(attr)
+            # TODO: would be less brittle not to hack up the tuple repr
+            # (which might contain checks for ',')...
+            if check and callargs[0].startswith('new SimpleEntry('):
+                alts = ' || '.join(f'{castowner}.{check}({arg})' for arg in
+                                   callargs[0][16:-1].split(', '))
+                return f'({alts})'
+
             member = {
                 'startswith': 'startsWith',
                 'endswith': 'endsWith',
@@ -246,15 +285,24 @@ class JavaTranspiler(Transpiler):
                 'upper': 'toUpperCase',
                 'lower': 'toLowerCase',
             }.get(attr, attr)
-        else:
-            member = under_camelize(attr, self.protected == '_')
+            rtype = 'String'
+        elif ownertype and ownertype == 'Double' and attr == 'is_integer':
+            assert not callargs
+            return f'({castowner} % 1 == 0)'
 
-        obj = f'{castowner}.{member}'
+        if attr == '__init__':
+            classdfn = self._within[-2].node
+            assert isinstance(classdfn, ast.ClassDef) and owner == 'super()'
+            obj = 'super'
+        else:
+            if owner == 'super()':
+                castowner = 'super'
+            obj = f'{castowner}.{member}'
 
         if callargs is not None:
-            return f"{obj}({', '.join(callargs)})"
+            return f"{obj}({', '.join(callargs)})", rtype
 
-        return obj
+        return obj, rtype
 
     def map_getitem(self, owner, key):
         ownertype = self.gettype(owner)
@@ -318,34 +366,57 @@ class JavaTranspiler(Transpiler):
         return result
 
     def map_list(self, expr: Union[ast.List, ast.Set]):
-        elems = ', '.join(self.repr_expr(el) for el in expr.elts)
+        reprs_types = [self.repr_expr_and_type(el) for el in expr.elts]
+        elems = ', '.join(r for r, t in reprs_types)
 
-        def is_string(el):
-            if isinstance(el, ast.Str):
-                return True
-            if isinstance(el, ast.Name):
-                eltype = self.gettype(self.repr_expr(el))
-                if eltype:
-                    return eltype[0] == 'String'
-            return False
+        eltype = None
+        for r, t in reprs_types:
+            if eltype and eltype != t:
+                eltype = None
+                break
+            eltype = t
+        eltype = eltype or 'Object'
 
-        eltype = 'String' if all(is_string(el) for el in expr.elts) else 'Object'
+        ltype = f"List<{eltype}>"
         if elems:
-            return f'new ArrayList(Arrays.asList(new {eltype}[] {{{elems}}}))'
+            if '<' in eltype:
+                arr = f'new Object[] {{{elems}}}'
+            else:
+                arr = f'new {eltype}[] {{({eltype}) {elems}}}'
+            return f'new ArrayList<>(Arrays.asList({arr}))', ltype
         else:
-            return 'new ArrayList<>()'
+            return 'new ArrayList<>()', ltype
 
     def map_dict(self, expr: ast.Dict):
-        data = ', '.join(
-                f'{self.repr_expr(k)}, {self.repr_expr(expr.values[i])}'
-                for i, k in enumerate(expr.keys))
-        if data:
-            # TODO: decide whether to require imports of these base utils
-            return f'trld.Common.mapOf({data})'
-        return f'new HashMap<>()'
+        typed_kvs = [(self.repr_expr_and_type(k),
+                      self.repr_expr_and_type(expr.values[i]))
+                     for i, k in enumerate(expr.keys)]
+        data = ', '.join(f'{k}, {v}' for (k, kt), (v, vt) in typed_kvs)
+
+        if not data:
+            return f'new HashMap<>()', 'Map'
+
+        ktype, vtype = None, None
+        for (k, kt), (v, vt) in typed_kvs:
+            if ktype and ktype != kt:
+                ktype = None
+                break
+            ktype = kt
+            if vtype and vtype != vt:
+                vtype = None
+                break
+            vtype = vt
+        ktype = ktype or 'Object'
+        vtype = vtype or 'Object'
+
+        mtype = f'Map<{ktype}, {vtype}>'
+
+        # TODO: change to trld.Builtins.mapOf ...
+        return f'trld.Common.mapOf({data})', mtype
 
     def map_set(self, expr: ast.Set):
-        return f'new HashSet({self.map_list(expr)})'
+        l, ltype = self.map_list(expr)
+        return f'new HashSet({l})', ltype.replace('List', 'Set', 1)
 
     def map_joined_str(self, expr: ast.JoinedStr):
         return super().map_joined_str(expr)
@@ -367,8 +438,10 @@ class JavaTranspiler(Transpiler):
             view = '.keySet()'
 
         itemtype = None
-        if ntypeinfo and ntypeinfo[0].endswith('>'):
-            itemtype = ntypeinfo[0].split('<', 1)[-1][:-1].split(',')[0]
+        if ntypeinfo:
+            containertype = self.container_type(ntypeinfo[0])
+            if containertype:
+                itemtype = containertype.contained.split(',')[0]
 
         self.new_scope()
         if itemtype:
@@ -387,9 +460,11 @@ class JavaTranspiler(Transpiler):
         return f"{itemcast}.{'length' if itemtype == 'String' else 'size'}()"
 
     def _is_map(self, typerepr: str) -> bool:
+        #return (self.container_type(typerepr) or typerepr).endswith(('Map', 'HashMap'))
         return typerepr.split('<', 1)[0] in {'Map', 'HashMap'}
 
     def _is_list(self, typerepr: str) -> bool:
+        #return (self.container_type(typerepr) or typerepr).endswith(('List', 'ArrayList'))
         return typerepr.split('<', 1)[0] in {'List', 'ArrayList'}
 
     def declare_iterator(self, iter_type):
@@ -416,29 +491,42 @@ class JavaTranspiler(Transpiler):
         parts = [self.repr_expr(el) for el in expr.elts]
         thetuple = '_'.join(parts)
 
-        ttype = None
-        if '.' in assignedto: # assuming "get from collection" method
+        ttype = self.types['Tuple']
+        p0type = 'Object'
+        p1type = 'Object'
+
+        if any(s in assignedto for s in ['.get(', '.remove(']): # assuming "get from collection" method
             ttype_narrowed = self.gettype(assignedto.split('.', 1)[0])
             if ttype_narrowed:
-                ttype = ttype_narrowed[0].split('<', 1)[1][:-1]
+                ttype = ttype_narrowed[0]
+                if ttype and '<' in ttype:
+                    ttype = ttype.split('<', 1)[1][:-1]
         else:
-            ttype_narrowed = self.gettype(assignedto)
+            objpath = assignedto.split('(', 1)[0]
+            ttype_narrowed = self.gettype(objpath)
             if ttype_narrowed:
                 ttype = ttype_narrowed[0]
 
-        if ttype:
-            p0type, p1type = ttype.split('<', 1)[1][:-1].split(', ')
+        containertype = self.container_type(ttype)
+        if containertype:
+            p0type, p1type = containertype.contained.split(', ')
+
+        if not self.gettype(parts[0]):
             self.addtype(parts[0], p0type)
+        else:
+            p0type = None
+
+        if not self.gettype(parts[1]):
             self.addtype(parts[1], p1type)
         else:
-            ttype = self.types['Tuple']
-            p0type = 'Object'
-            p1type = 'Object'
+            p1type = None
+
         self._post_stmts = [
-            f'{p0type} {parts[0]} = {thetuple}.getKey()',
-            f'{p1type} {parts[1]} = {thetuple}.getValue()'
+            f'{self.typed(parts[0], p0type)} = {thetuple}.getKey()',
+            f'{self.typed(parts[1], p1type)} = {thetuple}.getValue()'
         ]
-        return f"{ttype} {thetuple}"
+
+        return self.typed(thetuple, ttype), None # TODO: hack the spaghetti
 
     def map_listcomp(self, comp):
         r = self.repr_expr
@@ -467,11 +555,35 @@ class JavaTranspiler(Transpiler):
 
         return f'{iter}.stream(){optfilter}{mapcall}.collect(Collectors.toList())'
 
+    def map_dictcomp(self, comp):
+        r = self.repr_expr
+
+        assert len(comp.generators) == 1
+        gen = comp.generators[0]
+
+        iter = self._cast(r(gen.iter), parens=True)
+        args = [r(gen.target)]
+
+        if gen.ifs:
+            assert len(gen.ifs) == 1
+            optfilter = f'.filter(({args}) -> {r(gen.ifs[0])})'
+        else:
+            optfilter = ''
+
+        gkey = self.map_lambda(args, r(comp.key))
+        gval = self.map_lambda(args, r(comp.value))
+
+        return f'{iter}.stream(){optfilter}.collect(Collectors.toMap({gkey}, {gval}))'
+
     def map_lambda(self, args, body):
         # TODO: hardcoded for the simplest case, else just ignoring
         if ',' not in body:
             return f"({', '.join(args)}) -> {body}"
         return self.none
+
+    def new_regexp(self, callargs) -> Tuple[str, str]:
+        args = ', '.join(callargs)
+        return f'Pattern.compile({args})', 'Pattern'
 
 
 if __name__ == '__main__':

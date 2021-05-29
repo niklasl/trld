@@ -32,7 +32,8 @@ class TypeScanner(ast.NodeVisitor):
 
     @property
     def module(self):
-        return self.modules.setdefault(str(self._in_src[-1]), {})
+        src = str(self._in_src[-1])
+        return self.modules.setdefault(src, {'__file': src})
 
     def read(self, src):
         self._in_src.append(Path(src))
@@ -59,10 +60,18 @@ class TypeScanner(ast.NodeVisitor):
                     basedir = basedir.parent
                 src = basedir / src
             src = src.with_suffix('.py')
+
+            imprefs = self.module.setdefault('__imports', {})
+            for impname in node.names:
+                imprefs[impname.name] = str(src)
+
             self.read(src)
 
     def visit_Assign(self, node):
         self._transpiler._handle_type_alias(node)
+        name = self.map_name(self._transpiler.repr_annot(node.targets[0]))
+        typename = self._transpiler.repr_expr_and_type(node.value)[1]
+        self.addtype(name, typename)
 
     def visit_AnnAssign(self, node):
         name = self.map_name(self.repr_annot(node.target))
@@ -100,7 +109,13 @@ if __name__ == '__main__':
     from .java import JavaTranspiler
 
     typescanner = TypeScanner(JavaTranspiler())
+    sort_keys = False
+
     for src in sys.argv[1:]:
+        if src == '-k':
+            sort_keys = True
+            continue
+
         typescanner.read(src)
 
-    print(json.dumps(typescanner.modules, indent=2))
+    print(json.dumps(typescanner.modules, indent=2, sort_keys=sort_keys))

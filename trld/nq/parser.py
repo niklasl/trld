@@ -1,4 +1,5 @@
 from typing import List, Optional, Iterable, Union, cast
+from ..builtins import Char
 from ..common import Input, dump_json
 from ..jsonld.rdf import (
         RdfDataset, RdfGraph, RdfTriple, RdfLiteral, RdfObject, to_jsonld)
@@ -36,7 +37,7 @@ def load(dataset: RdfDataset, inp: Input):
     language: Optional[str] = None
     terms: List[RdfObject] = []
 
-    for c in cast(Iterable[str], inp.characters()):
+    for c in cast(Iterable[Char], inp.characters()):
         if READ_ESCAPES.handle_escape(c):
             if state is not READ_ESCAPES:
                 READ_ESCAPES.escape_chars = ESC_CHARS if READ_STRING else {}

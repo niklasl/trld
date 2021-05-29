@@ -6,11 +6,9 @@ from os.path import expanduser
 from urllib.parse import urlparse, urljoin
 from urllib.request import urlopen
 
+from .builtins import Char
 
 sorted = sorted
-
-
-Char = str
 
 
 class Input:

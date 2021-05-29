@@ -150,17 +150,16 @@ def add_value_as_list(map: Dict, key: str, value: object):
 def add_value(map: Dict, key: str, value: object, aslist=False):
     # TODO: rework this according to spec..
     existing: object = map.get(key)
-    waslist: bool = isinstance(existing, List)
     if aslist and key not in map:
         map[key] = as_list(value)
-    #elif waslist:
+    #elif isinstance(existing, List):
     #    map.pop(key)
     #    for v in existing:
     #        add_value(map, key, v, aslist)
     elif key not in map:
         map[key] = value
     else:
-        if not waslist:
+        if not isinstance(existing, List):
             map[key] = [existing]
         if isinstance(value, List):
             map[key] += value
