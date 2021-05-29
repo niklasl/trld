@@ -89,7 +89,7 @@ class _Usage(NamedTuple):
     value: JsonMap
 
 
-def to_rdf_dataset(data: JsonMap,
+def to_rdf_dataset(data: JsonObject,
         rdf_direction: Optional[str] = None) -> RdfDataset:
     bnodes: BNodes = BNodes()
     dataset: RdfDataset = RdfDataset()
@@ -124,7 +124,9 @@ def jsonld_to_rdf_dataset(node_map: NodeMap, dataset: RdfDataset,
                 continue
             # 1.3.2)
             for property in cast(Iterable[str], sorted(node.keys())):
-                values: List[object] = cast(List[object], node[property])
+                # TODO: isn't this always a list if this is properly expanded
+                # and flattened (as this algoritm implicitly expects..)?
+                values: List[object] = as_list(node[property])
                 # 1.3.2.1)
                 if property == TYPE:
                     for type in values:
@@ -478,9 +480,9 @@ def to_jsonld_object(value: RdfObject,
                 converted_value = False
             else:
                 rtype = XSD_BOOLEAN
-        elif literal.datatype == XSD_INTEGER and literal.value.isnumeric():
+        elif literal.datatype == XSD_INTEGER and literal.value.isdecimal():
             converted_value = int(literal.value)
-        elif literal.datatype == XSD_DOUBLE:# and all(c == '.' or c.isnumeric() for c in literal.value):
+        elif literal.datatype == XSD_DOUBLE:# and all(c == '.' or c.isdecimal() for c in literal.value):
             try:
                 converted_value = float(literal.value)
             except ValueError:
@@ -516,7 +518,7 @@ def to_jsonld_object(value: RdfObject,
     elif literal.language is not None:
         result[LANGUAGE] = literal.language
     # 2.8)
-    elif literal.datatype != XSD_STRING:
+    elif literal.datatype and literal.datatype != XSD_STRING:
         rtype = literal.datatype
 
     # 2.9)
