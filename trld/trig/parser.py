@@ -205,7 +205,7 @@ class ReadIRI(ReadTerm):
 
 class ReadSymbol(ReadTerm):
 
-    MATCH: ClassVar[re.Pattern] = re.compile(r"[^][{}^<>\"\s~!$&'()*,;=/?#]")
+    MATCH: ClassVar[re.Pattern] = re.compile(r"[^\]\[{}^<>\"\s~!$&'()*,;=/?#]")
 
     just_escaped: bool
 
@@ -260,6 +260,8 @@ class ReadSymbol(ReadTerm):
                     elif value[0] == ':':
                         value = value[1:]
                 value = cast(Dict, {SYMBOL: value})
+
+        assert isinstance(value, object)
 
         if last_dot:
             return self.backtrack('.', c, value)
@@ -718,11 +720,11 @@ class ReadNodes(ReadNode):
 
 class ReadGraph(ReadNodes):
 
-    parent: ReadNodes
-
     def consume(self, c: str, prev_value) -> StateResult:
         if isinstance(prev_value, str) and prev_value != TYPE:
             raise NotationError(f'Directive not allowed in graph: {prev_value!r}')
+
+        readnodes = cast(ReadNodes, self.parent)
 
         if self.expect_graph or c == '{':
             raise NotationError('Nested graphs are not allowed in TriG')
@@ -732,12 +734,12 @@ class ReadGraph(ReadNodes):
                 if self.p is not None and prev_value is not None:
                     self.fill_node(prev_value)
                 self.next_node()
-            if self.parent.node is None:
-                self.parent.nodes += self.nodes
+            if readnodes.node is None:
+                readnodes.nodes += self.nodes
             else:
-                self.parent.node[GRAPH] = self.nodes
-                self.parent.next_node()
-            return self.parent, None
+                readnodes.node[GRAPH] = self.nodes
+                readnodes.next_node()
+            return readnodes, None
         else:
             return super().consume(c, prev_value)
 
