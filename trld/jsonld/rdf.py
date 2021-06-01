@@ -4,26 +4,24 @@ from .base import *
 from .context import InvalidBaseDirectionError
 from .expansion import InvalidLanguageTaggedStringError
 from .flattening import BNodes, NodeMap, make_node_map
+from ..rdfterms import (
+    RDF_TYPE,
+    RDF_VALUE,
+    RDF_LIST,
+    RDF_FIRST,
+    RDF_REST,
+    RDF_NIL,
+    RDF_DIRECTION,
+    RDF_LANGUAGE,
+    RDF_JSON,
+    RDF_LANGSTRING,
+    XSD_BOOLEAN,
+    XSD_DOUBLE,
+    XSD_INTEGER,
+    XSD_STRING,
+    I18N,
+)
 
-
-RDF: str = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#'
-RDF_TYPE: str = f'{RDF}type'
-RDF_VALUE: str = f'{RDF}value'
-RDF_LIST: str = f'{RDF}List'
-RDF_FIRST: str = f'{RDF}first'
-RDF_REST: str = f'{RDF}rest'
-RDF_NIL: str = f'{RDF}nil'
-RDF_DIRECTION: str = f'{RDF}direction'
-RDF_LANGUAGE: str = f'{RDF}language'
-RDF_JSON: str = f'{RDF}JSON'
-RDF_LANGSTRING: str = f'{RDF}langString'
-
-XSD: str = 'http://www.w3.org/2001/XMLSchema#'
-XSD_BOOLEAN: str = f'{XSD}boolean'
-XSD_DOUBLE: str = f'{XSD}double'
-XSD_INTEGER: str = f'{XSD}integer'
-XSD_STRING: str = f'{XSD}string'
-I18N: str = 'https://www.w3.org/ns/i18n#'
 
 MAX_INT: float = pow(10, 21)
 

@@ -7,7 +7,7 @@ from ..jsonld.base import (
         ID, LIST, GRAPH,
         CONTEXT, VOCAB, BASE,
         PREFIX, PREFIX_DELIMS)
-from ..jsonld.rdf import RDF_TYPE, XSD, XSD_DOUBLE, XSD_INTEGER
+from ..rdfterms import RDF_TYPE, XSD, XSD_DOUBLE, XSD_INTEGER
 
 
 XSD_DECIMAL: str = f'{XSD}decimal'
