@@ -1,7 +1,8 @@
 from typing import Optional
 from ..common import Output
 from ..jsonld.base import is_blank
-from ..jsonld.rdf import RdfDataset, RdfGraph, RdfTriple, RdfLiteral, XSD_STRING
+from ..jsonld.rdf import RdfDataset, RdfGraph, RdfTriple, RdfLiteral
+from ..rdfterms import XSD_STRING
 
 
 def serialize(dataset: RdfDataset, out: Output):
