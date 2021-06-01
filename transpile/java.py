@@ -324,9 +324,7 @@ class JavaTranspiler(CStyleTranspiler):
             return f'{self._cast(owner, parens=True)}.{getter}()'
 
         if ownertype:
-            if key.startswith('-'):
-                sizelength = 'size' if self._is_list(ownertype[0]) else 'length'
-                key = f"{owner}.{sizelength}() {key.replace('-', '- ')}"
+            key = self._get_upper_key(key, owner, ownertype)
             if ownertype[0] == 'String':
                 return f'{self._cast(owner, parens=True)}.substring({key}, {key} + 1)'
 
@@ -336,9 +334,16 @@ class JavaTranspiler(CStyleTranspiler):
         if lower == 'null':
             lower = '0'
         if upper:
-            if upper != '-1':
-                return f'{owner}.substring({lower}, {upper})'
+            upper = self._get_upper_key(upper, owner)
+            return f'{owner}.substring({lower}, {upper})'
         return f'{owner}.substring({lower})'
+
+    def _get_upper_key(self, key, owner, ownertype=None):
+        ownertype = ownertype or self.gettype(owner)
+        if ownertype and key.startswith('-'):
+            sizelength = 'size' if self._is_list(ownertype[0]) else 'length'
+            return f"{self._cast(owner, parens=True)}.{sizelength}() {key.replace('-', '- ')}"
+        return key
 
     def map_op_assign(self, owner, op, value):
         value = self._cast(value)

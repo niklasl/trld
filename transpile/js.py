@@ -327,8 +327,7 @@ class JsTranspiler(CStyleTranspiler):
     def map_getitem(self, owner, key):
         ownertype = self.gettype(owner)
         if ownertype:
-            if key.startswith('-'):
-                key = f"{owner}.length {key.replace('-', '- ')}"
+            key = self._get_upper_key(key, owner)
             if ownertype[0] == 'String':
                 return f'{owner}.substring({key}, {key} + 1)'
 
@@ -338,9 +337,14 @@ class JsTranspiler(CStyleTranspiler):
         if lower == 'null':
             lower = '0'
         if upper:
-            if upper != '-1':
-                return f'{owner}.substring({lower}, {upper})'
+            upper = self._get_upper_key(upper, owner)
+            return f'{owner}.substring({lower}, {upper})'
         return f'{owner}.substring({lower})'
+
+    def _get_upper_key(self, key, owner):
+        if key.startswith('-'):
+            key = f"{owner}.length {key.replace('-', '- ')}"
+        return key
 
     def map_op_assign(self, owner, op, value):
         ownertype = self.gettype(owner)
