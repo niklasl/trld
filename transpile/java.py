@@ -573,7 +573,7 @@ class JavaTranspiler(CStyleTranspiler):
         gen = comp.generators[0]
 
         iter = self._cast(r(gen.iter), parens=True)
-        args = [r(gen.target)]
+        args = r(gen.target)
 
         if gen.ifs:
             assert len(gen.ifs) == 1
@@ -581,8 +581,8 @@ class JavaTranspiler(CStyleTranspiler):
         else:
             optfilter = ''
 
-        gkey = self.map_lambda(args, r(comp.key))
-        gval = self.map_lambda(args, r(comp.value))
+        gkey = self.map_lambda([args], r(comp.key))
+        gval = self.map_lambda([args], r(comp.value))
 
         return f'{iter}.stream(){optfilter}.collect(Collectors.toMap({gkey}, {gval}))'
 

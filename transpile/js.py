@@ -519,18 +519,18 @@ class JsTranspiler(CStyleTranspiler):
 
         assert len(comp.generators) == 1
         gen = comp.generators[0]
-
+        args = r(gen.target)
         iter = self._cast(r(gen.iter), parens=True)
 
         if gen.ifs:
             assert len(gen.ifs) == 1
-            optfilter = f'.filter(({args}) -> {r(gen.ifs[0])})'
+            optfilter = f'.filter(({args}) => {r(gen.ifs[0])})'
         else:
             optfilter = ''
 
-        gkey = self.map_lambda('it', r(comp.key))
-        gval = self.map_lambda('it', r(comp.value))
-        reduce = f'reduce((d, it) => {{ d[{gkey}] = {gval}; return d }}, {{}})'
+        gkey = r(comp.key)
+        gval = r(comp.value)
+        reduce = f'reduce((d, {args}) => {{ d[{gkey}] = {gval}; return d }}, {{}})'
 
         return f'Array.from({iter}){optfilter}.{reduce}'
 
