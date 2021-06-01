@@ -195,7 +195,16 @@ class JsTranspiler(CStyleTranspiler):
                 return '{}'
             return f'Object.assign({{}}, {callargs[0]})'
 
-        return super().map_name(name, callargs)
+        call = super().map_name(name, callargs)
+
+        if callargs:
+            for arg in callargs:
+                argtinfo = self.gettype(arg)
+                if argtinfo and argtinfo[0] == 'Input':
+                    call = f'await {call}'
+                    break
+
+        return call
 
     def map_attr(self, owner, attr, callargs=None):
         ownertypeinfo = self.gettype(owner)
