@@ -239,6 +239,9 @@ class JsTranspiler(CStyleTranspiler):
         if attr == 'isdecimal':# and ownertype == 'String':
             return fr'!!({castowner}.match(/^\d+$/))'
 
+        if attr == 'isspace':# and ownertype == 'String':
+            return fr'!!({castowner}.match(/^\s+$/))'
+
         if attr == 'items' and ismaplike:
             member = 'entrySet'
         elif attr == 'keys' and (ismaplike or ownertype == 'Object'):
@@ -279,6 +282,9 @@ class JsTranspiler(CStyleTranspiler):
                 'upper': 'toUpperCase',
                 'lower': 'toLowerCase',
             }.get(attr, attr)
+        elif ownertype and ownertype == 'Number' and attr == 'is_integer':
+            assert not callargs
+            return f'({castowner} % 1 == 0)'
         else:
             member = under_camelize(attr, self.protected == '_')
 
