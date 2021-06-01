@@ -1,3 +1,4 @@
+from typing import Iterator, List, Dict, Union, NamedTuple, cast
 from pathlib import Path
 from ..common import Input, dump_canonical_json
 from ..jsonld.base import CONTEXT, GRAPH, ID, TYPE, LIST
@@ -13,22 +14,31 @@ from . import parser
 # Official test suite located at: https://www.w3.org/2013/TrigTests/TESTS.tar.gz
 
 
-def read_manifest(manifest_path):
-    data = parser.parse(Input(str(manifest_path)))
+class TestCase(NamedTuple):
+    ttype: str
+    taction: str
+    tresult: str
+
+
+def read_manifest(manifest_path) -> Iterator[TestCase]:
+    data = cast(Dict, parser.parse(Input(str(manifest_path))))
     index = {node[ID]: node for node in data[GRAPH] if ID in node}
 
-    for testentry in index['']['mf:entries'][LIST]:
+    testentries = cast(List[Dict], index['']['mf:entries'][LIST])
+    for testentry in testentries:
         tnode = index[testentry[ID]]
         ttype = tnode['rdf:type'][ID] if 'rdf:type' in tnode else tnode[TYPE]
         taction = tnode['mf:action'][ID]
         tresult = tnode['mf:result'][ID] if 'mf:result' in tnode else None
-        yield ttype, taction, tresult
+        yield TestCase(ttype, taction, tresult)
 
 
-def run_tests(test_suite_dir):
+def run_tests(test_suite_dir: Union[str, Path]):
     test_suite_dir = Path(test_suite_dir)
 
-    i, failed, passed = 0, 0, 0
+    i = 0
+    failed = 0
+    passed = 0
 
     manifest = read_manifest(test_suite_dir / 'manifest.ttl')
 
@@ -38,7 +48,7 @@ def run_tests(test_suite_dir):
         negative = ttype == 'rdft:TestTrigNegativeSyntax'
         inp = Input(str(trig_path))
         try:
-            result = parser.parse(inp)
+            result = cast(Dict, parser.parse(inp))
             assert result is not None
         except Exception as e:
             if negative:
@@ -77,7 +87,7 @@ def run_tests(test_suite_dir):
     print(f'Ran {i} tests. Passed {passed}, failed {failed}')
 
 
-def datarepr(data, context, base_uri):
+def datarepr(data, context, base_uri) -> str:
     data = expand(data, base_uri)
     data = flatten(data)
     dataset = to_rdf_dataset(data)

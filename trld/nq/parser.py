@@ -158,7 +158,7 @@ def handle_statement(dataset: RdfDataset, terms: List):
     graph.add(RdfTriple(s, p, o))
 
 
-def parse(inp: Input):
+def parse(inp: Input) -> object:
     dataset = RdfDataset()
     load(dataset, inp)
     return to_jsonld(dataset)
