@@ -776,7 +776,6 @@ def parse(inp: Input) -> object:
 
 if __name__ == '__main__':
     import sys
-    from ..jsonld.rdf import to_jsonld
 
     inp = Input(sys.argv[1]) if len(sys.argv) > 1 else Input()
     try:
