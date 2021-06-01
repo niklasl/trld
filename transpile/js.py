@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Union, Optional
+from typing import Union, Optional, List, Tuple
 from contextlib import contextmanager
 import ast
 from .base import camelize, under_camelize
@@ -11,6 +11,7 @@ class JsTranspiler(CStyleTranspiler):
     has_static = False
     typing = False
     optional_type_form = '{0}'
+    static_annotation_form = '/*@Static*/ {0}'
 
     public = 'export ' # FIXME: top_level_export
     constant = 'const '
@@ -47,7 +48,7 @@ class JsTranspiler(CStyleTranspiler):
         'OrderedDict': 'Object',
         'set': 'Set',
         'Set': 'Set',
-        'Pattern': 'RegExp',
+        're.Pattern': 'RegExp',
     }
 
     constants = {
@@ -75,6 +76,9 @@ class JsTranspiler(CStyleTranspiler):
 
     function_map = {
         'str': '{0}.toString()',
+        'chr': 'String.fromCharCode({0})',
+        'int': ('parseInt({0})', 'parseInt({0}, {1})'),
+        'pow': 'Math.pow({0}, {1})',
         'type': 'typeof {0}',
         'id': '{0}',
         'print': 'console.log({0})',
@@ -117,12 +121,30 @@ class JsTranspiler(CStyleTranspiler):
         relmodpath = str(node.module).replace('.', '/') + '.js'
         self.outln(f"import {{ {names} }} from '{rel}/{relmodpath}'", self.end_stmt)
 
-    def funcdef(self, name: str, args: str, ret: Optional[str] = None):
+    def cleantype(self, typename: Optional[str]) -> Optional[str]:
+        if typename is None:
+            return None
+        typename = typename.replace('/*@Nullable*/ ', '')
+        typename = typename.replace('/*@Static*/ ', '')
+        return typename
+
+    def typed(self, name, typename=None):
+        return name
+
+    def funcdef(self, name: str, argdecls: List[Tuple], ret: Optional[str] = None):
         #if not self.typing:
-        ret = 'function' if len(self._within) < 2 else ''
-        if ret:
-            ret += ' '
-        return f'{ret}{name} ({args})'
+        decl = 'function' if len(self._within) < 2 else ''
+        if decl:
+            decl += ' '
+
+        for arg in argdecls:
+            if arg[2] == 'Input':
+                decl = f'async {decl}'
+                break
+
+        argrepr = ', '.join(arg[0] for arg in argdecls)
+
+        return f'{decl}{name} ({argrepr})'
 
     def map_isinstance(self, vrepr: str, classname: str):
         if classname in {'String', 'Number', 'Boolean'}:
@@ -145,9 +167,11 @@ class JsTranspiler(CStyleTranspiler):
             nametypes = [(key, ktype), (val, vtype)]
             return f'for (let {key} in {container})', stmts, nametypes
         else:
+            typeinfo = self.gettype(container.split('.', 1)[0])
+            wait = 'await ' if typeinfo and typeinfo[0] == 'Input' else ''
             if ',' in part:
                 part = f'[{part}]'
-            return f'for (let {part} of {container})', [], [(part, parttype)]
+            return f'for {wait}(let {part} of {container})', [], [(part, parttype)]
 
     def map_for_to(self, counter, ceiling):
         ct = [(counter, 'Number')]
@@ -201,7 +225,10 @@ class JsTranspiler(CStyleTranspiler):
             return f'{a}[{b}] || ({a}[{b}] = {callargs.pop(1)})'
 
         if attr == 'isalpha':# and ownertype == 'String':
-            return f'!!({castowner}.match(/^\w+$/))'
+            return fr'!!({castowner}.match(/^\w+$/))'
+
+        if attr == 'isdecimal':# and ownertype == 'String':
+            return fr'!!({castowner}.match(/^\d+$/))'
 
         if attr == 'items' and ismaplike:
             member = 'entrySet'
@@ -225,6 +252,13 @@ class JsTranspiler(CStyleTranspiler):
                 member = 'pop'
         elif attr == 'remove' and 'Set' in ownertype:
             member = 'delete'
+        elif attr == 'reduce' and 'Set' in ownertype:
+            castowner = f'Array.from({castowner})'
+            member = attr
+        elif ownertype and ownertype == 'RegExp' and attr == 'match':
+            v = callargs.pop()
+            assert not callargs
+            return f'{v}.match({castowner})'
         elif ownertype and ownertype == 'String':
             member = {
                 'startswith': 'startsWith',
@@ -239,7 +273,14 @@ class JsTranspiler(CStyleTranspiler):
         else:
             member = under_camelize(attr, self.protected == '_')
 
-        obj = f'{castowner}.{member}'
+        if attr == '__init__':
+            classdfn = self._within[-2].node
+            assert isinstance(classdfn, ast.ClassDef) and owner == 'super()'
+            obj = 'super'
+        else:
+            if owner == 'super()':
+                castowner = 'super'
+            obj = f'{castowner}.{member}'
 
         if callargs is not None:
             return f"{obj}({', '.join(callargs)})"
@@ -289,7 +330,7 @@ class JsTranspiler(CStyleTranspiler):
     def map_op_assign(self, owner, op, value):
         ownertype = self.gettype(owner)
 
-        if ownertype[0] == 'Number':
+        if ownertype and ownertype[0] == 'Number':
             if isinstance(op, ast.Add):
                 return f'{owner} += {value}'
             elif isinstance(op, ast.Sub):
@@ -341,16 +382,16 @@ class JsTranspiler(CStyleTranspiler):
 
     def map_list(self, expr: Union[ast.List, ast.Set]):
         elems = ', '.join(self.repr_expr(el) for el in expr.elts)
-        return f'[{elems}]'
+        return f'[{elems}]', 'Array'
 
     def map_dict(self, expr: ast.Dict):
         data = ', '.join(
                 f'[{self.repr_expr(k)}]: {self.repr_expr(expr.values[i])}'
                 for i, k in enumerate(expr.keys))
-        return f'{{{data}}}'
+        return f'{{{data}}}', 'Map'
 
     def map_set(self, expr: ast.Set):
-        return f'new Set({self.map_list(expr)})'
+        return f'new Set({self.map_list(expr)[0]})', 'Set'
 
     def map_joined_str(self, expr: ast.JoinedStr):
         return super().map_joined_str(expr)
@@ -437,17 +478,26 @@ class JsTranspiler(CStyleTranspiler):
         else:
             p0type, p1type = None, None
 
+        decls = []
         if not self.gettype(parts[0]):
             self.addtype(parts[0], p0type)
+            decls.append(parts[0])
         else:
             p0type = None
 
         if not self.gettype(parts[1]):
             self.addtype(parts[1], p1type)
+            decls.append(parts[1])
         else:
             p1type = None
 
-        return f"[{', '.join(parts)}]", None
+        destructure = f"[{', '.join(parts)}]"
+        if len(decls) < 2:
+            for part in decls:
+                self.stmt(f'let {part}')
+            self.addtype(destructure, '/*DESTRUCTURE*/')
+
+        return destructure, None
 
     def map_listcomp(self, comp):
         r = self.repr_expr
@@ -482,14 +532,19 @@ class JsTranspiler(CStyleTranspiler):
         gval = self.map_lambda('it', r(comp.value))
         reduce = f'reduce((d, it) => {{ d[{gkey}] = {gval}; return d }}, {{}})'
 
-        return f'{iter}{optfilter}.{reduce}'
+        return f'Array.from({iter}){optfilter}.{reduce}'
 
     def map_lambda(self, args, body):
         return f"({', '.join(args)}) => {body}"
 
     def new_regexp(self, callargs):
-        args = ', '.join(callargs)
-        return f'/{args}/', 'RegExp'
+        assert len(callargs) == 1
+        rexp = callargs[0][1:-1]
+        rexp = rexp.replace(r'\\\"', '"')
+        rexp = rexp.replace(r"\\\'", "'")
+        rexp = rexp.replace('\\\\', '\\')
+        rexp = rexp.replace('/', r'\/')
+        return f'/{rexp}/', 'RegExp'
 
 
 if __name__ == '__main__':

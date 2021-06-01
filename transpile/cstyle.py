@@ -17,11 +17,3 @@ class CStyleTranspiler(Transpiler):
     line_comment = '//'
     inline_comment = '/*', '*/'
     indent = '  '
-
-    def typed(self, name, typename=None):
-        return f'{typename} {name}' if typename and self.typing else name
-
-    def funcdef(self, name: str, args: str, ret: Optional[str] = None):
-        if ret == '':
-            return f'{name}({args})'
-        return f"{ret or 'void'} {name}({args})"

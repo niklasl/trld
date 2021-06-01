@@ -37,6 +37,12 @@ RESERVED_CHARS = {'~', '.', '-', '!',
                   ';', '=', '/', '?',
                   '#', '@', '%', '_'}
 
+NUMBER_LEAD_CHARS = re.compile(r'[+-.0-9]')
+
+TURTLE_INT_CHARS = re.compile(r'[+-.0-9]')
+
+LITERAL_QUOTE_CHARS = {'"', "'"}
+
 SYMBOL = '@symbol'
 EOF = ''
 
@@ -224,7 +230,7 @@ class ReadSymbol(ReadTerm):
     def consume(self, c: str, prev_value) -> StateResult:
         if len(self.collected) == 0 and c == '<':
             return ReadIRI(self.parent), None
-        elif len(self.collected) == 0 and ReadNumber.LEAD_CHARS.match(c) is not None:
+        elif len(self.collected) == 0 and NUMBER_LEAD_CHARS.match(c) is not None:
             return ReadNumber(self.parent).consume(c, None)
         elif self.handle_escape(c):
             self.just_escaped = True
@@ -271,7 +277,6 @@ class ReadSymbol(ReadTerm):
 
 class ReadNumber(ReadTerm):
 
-    LEAD_CHARS: ClassVar[re.Pattern] = re.compile(r'[+-.0-9]')
     EXP = {'E', 'e'}
 
     whole: Optional[str]
@@ -297,11 +302,11 @@ class ReadNumber(ReadTerm):
             return self, None
         elif c.isdecimal() or (self.whole is None and
                                 len(self.collected) == 0 and
-                                self.LEAD_CHARS.match(c) is not None) or (
+                                NUMBER_LEAD_CHARS.match(c) is not None) or (
                             self.whole is not None and c in self.EXP) or (
                                 len(self.collected) > 0
                                 and self.collected[-1] in self.EXP
-                                and self.LEAD_CHARS.match(c) is not None):
+                                and NUMBER_LEAD_CHARS.match(c) is not None):
             self.collect(c)
             return self, None
         else:
@@ -328,14 +333,12 @@ class ReadNumber(ReadTerm):
                 return {VALUE: value, TYPE: XSD_DOUBLE if self.exp else XSD_DECIMAL}
             return number
         else:
-            if len(value) > 1 and value.startswith(('+', '0')):
+            if len(value) > 1 and TURTLE_INT_CHARS.match(value[0]) is not None:
                 return {VALUE: value, TYPE: XSD_INTEGER}
             return int(value)
 
 
 class ReadLiteral(ReadTerm):
-
-    QUOTE_CHARS: ClassVar[Set[str]] = {'"', "'"}
 
     value: Optional[str]
     quotechar: str
@@ -599,7 +602,7 @@ class ReadNode(ReadCompound):
         elif c == ',':
             self.accept_value = True
             return self, None
-        elif c in ReadLiteral.QUOTE_CHARS:
+        elif c in LITERAL_QUOTE_CHARS:
             return ReadLiteral(self, c), None
         else:
             return ReadSymbol(self).consume(c, None)
@@ -652,7 +655,7 @@ class ReadCollection(ReadCompound):
             return ReadCollection(self), None
         elif c == ')':
             return self.parent, {LIST: self.nodes}
-        elif c in ReadLiteral.QUOTE_CHARS:
+        elif c in LITERAL_QUOTE_CHARS:
             return ReadLiteral(self, c), None
         else:
             return ReadSymbol(self).consume(c, None)
@@ -746,7 +749,7 @@ class ReadGraph(ReadNodes):
 
 def parse(inp: Input) -> object:
     state: ParserState = ReadNodes(None)
-    value = None
+    value: object = None
 
     lno = 1
     cno = 1
@@ -775,7 +778,7 @@ if __name__ == '__main__':
     import sys
     from ..jsonld.rdf import to_jsonld
 
-    inp = Input()
+    inp = Input(sys.argv[1]) if len(sys.argv) > 1 else Input()
     try:
         result = parse(inp)
     except ParserError as e:

@@ -89,6 +89,7 @@ class Transpiler(ast.NodeVisitor):
             self.argparser.add_argument('source', nargs='+')
             self.argparser.add_argument('-I', '--ignore', nargs='*')
             self.argparser.add_argument('-o', '--output-dir')
+            self.argparser.add_argument('-L', '--no-lineno', action='store_true')
         else:
             self.outdir = outdir
 
@@ -96,6 +97,7 @@ class Transpiler(ast.NodeVisitor):
         if not sources and self.argparser:
             args = self.argparser.parse_args()
             self.outdir = args.output_dir
+            self.show_lineno = not args.no_lineno
             sources = args.source
             ignores = set(args.ignore or [])
 
@@ -145,8 +147,10 @@ class Transpiler(ast.NodeVisitor):
             self.outln()
             if not inclass:
                 self.outln(f'{self.public}{self.classdfn}', self.staticname, self.begin_block)
+            nl = True
             for args, kwargs in self.statics:
-                self.outln(self.indent if args and not inclass else '', *args, **kwargs)
+                self.outln(self.indent if nl and args and not inclass else '', *args, **kwargs)
+                nl = kwargs.get('end') is None
             if inclass:
                 self.outln()
             else:
@@ -164,7 +168,7 @@ class Transpiler(ast.NodeVisitor):
         else:
             indent = '' if continued else self.indent * self._level
             lineno = self.note_lineno(node, eol=end is None)
-            notes = (lineno,) if lineno else () 
+            notes = (lineno,) if lineno else ()
             out(indent, *parts + notes, sep='', end=end)
 
     def stmt(self, *args, **kwargs):
@@ -465,12 +469,18 @@ class Transpiler(ast.NodeVisitor):
                     if not self.isname(rval) or (knowntypeinfo and rvaltype != knowntypeinfo[0]):
                         rval = f'({rvaltype}) {rval}'
 
-        if self.typing or not self._within or not isinstance(self._within[-1].node, ast.ClassDef):
+        # TODO: for JS < 7?
+        classlevel = self._within and isinstance(self._within[-1].node, ast.ClassDef)
+        ok_to_declare = self.typing or not classlevel
+        if ok_to_declare:
             if rval:
                 self.stmt(prefix, self.typed(ownerref, typename), ' = ',
                           ' = '.join(ownerrefs[1:] + [rval]), node=node)
             else:
                 self.stmt(prefix, self.typed(ownerref, typename), node=node)
+        elif rval:
+            self.stmt(self.typed(ownerref, typename), ' = ',
+                        ' = '.join(ownerrefs[1:] + [rval]), node=node)
 
         if typename:
             self.addtype(ownerref, typename)
@@ -647,11 +657,11 @@ class Transpiler(ast.NodeVisitor):
                     aname_val = self.func_defaults.format(
                             key=aname, value=call[-1])
                 else:
-                    defaultcalls.append((', '.join(argdecls[:]), ', '.join(call)))
+                    defaultcalls.append((argdecls[:], ', '.join(call)))
 
             calls.append(aname)
 
-            argdecls.append(self.typed(aname_val, atype))
+            argdecls.append((aname_val, aname, atype))
             nametypes.append((aname, atype))
 
         ret = self.repr_annot(node.returns) if node.returns else None
@@ -701,9 +711,7 @@ class Transpiler(ast.NodeVisitor):
                     f'{doreturn}{method}({call})'
             ])
 
-        argrepr = ', '.join(argdecls)
-
-        self.enter_block(scope, prefix, self.funcdef(name, argrepr, ret), nametypes=nametypes, stmts=stmts, on_exit=on_exit)
+        self.enter_block(scope, prefix, self.funcdef(name, argdecls, ret), nametypes=nametypes, stmts=stmts, on_exit=on_exit)
         self.in_static = False
 
     #def map_function(self, node: ast.AST, method):
@@ -734,7 +742,7 @@ class Transpiler(ast.NodeVisitor):
             # TODO: 5f831dc1 (java-specific)
             etype = self.repr_annot(handler.type) if handler.type else 'Exception'
             etypevar = self.typed('e', etype)
-            self.enter_block(handler, f'catch ({etypevar})', continued=True)
+            self.enter_block(handler, f' catch ({etypevar})', continued=True)
 
     def visit_ClassDef(self, node):
         self.outln()
@@ -809,7 +817,7 @@ class Transpiler(ast.NodeVisitor):
 
         stmts = []
         # TODO: if derived from an Exception...
-        if node.name.endswith('Error'):
+        if not self.inherit_constructor and node.name.endswith('Error'):
             msgdecl = self.typed('msg', 'String')
             ctor = self.ctor or classname
             if self.func_defaults:
@@ -1051,7 +1059,7 @@ class Transpiler(ast.NodeVisitor):
                 castvalue = f'({arg0typerepr}) {arg1repr}'
                 self._last_cast = arg0typerepr
                 if not self.typing:
-                    return arg1repr, arg1typerepr
+                    return arg1repr, arg0typerepr
                 #if isowner:
                 #    castvalue = f'({castvalue})'
                 return f'({castvalue})', arg0typerepr
@@ -1116,6 +1124,7 @@ class Transpiler(ast.NodeVisitor):
                     and self.optional_type_form:
                 return self.optional_type_form.format(tname), None
 
+            # TODO: unhack the static_annotation_form and cleantype juggling
             if isinstance(expr.value, ast.Name) and expr.value.id == 'ClassVar' \
                     and self.static_annotation_form:
                 return self.static_annotation_form.format(tname), None
@@ -1197,7 +1206,7 @@ class Transpiler(ast.NodeVisitor):
     def typed(self, name: str, typename: Optional[str] = None):
         raise NotImplementedError
 
-    def funcdef(self, name: str, args: str, ret: Optional[str] = None):
+    def funcdef(self, name: str, args: List[Tuple], ret: Optional[str] = None):
         raise NotImplementedError
 
     def map_assert(self, expr: str, failmsg: str) -> str:

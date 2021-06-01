@@ -4,6 +4,7 @@ import fs from 'fs'
 import url from 'url'
 import http from 'http'
 import https from 'https'
+import process from 'process'
 
 export function sorted(array, key = null, reversed = false) {
   let copy = array.concat([]);
@@ -21,9 +22,9 @@ export class Input {
 
   constructor(source = null) {
     if (typeof source === 'string') {
-      this._source = open(removeFileProtocol(source)) // TODO
+      this._source = fs.createReadStream(removeFileProtocol(source))
     } else {
-      this._source = (source != null || sys.stdin) // TODO
+      this._source = (source != null || process.stdin)
     }
   }
 
@@ -35,17 +36,21 @@ export class Input {
     return this._source.read() // TODO
   }
 
-  *[Symbol.iterator]() { // LINE: 29
-    return this._source // LINE: 30
+  async *characters() {
+    for await (const chunk of this._source) {
+      for (let c of chunk.toString()) {
+        yield c
+      }
+    }
   }
 
-  *[Symbol.iterator]() { // LINE: 32
-    return GeneratorExp(elt=Name(id='c', ctx=Load()), generators=[comprehension(target=Name(id='l', ctx=Store()), iter=Attribute(value=Name(id='self', ctx=Load()), attr='_source', ctx=Load()), ifs=[], is_async=0), comprehension(target=Name(id='c', ctx=Store()), iter=Name(id='l', ctx=Load()), ifs=[], is_async=0)]) // LINE: 33
+  *[Symbol.iterator]() {
+    return this._source
   }
 
-  close() { // LINE: 35
-    if (this._source !== sys.stdin) { // LINE: 36
-      this._source.close() // LINE: 37
+  close() {
+    if (this._source !== process.stdin) {
+      this._source.close()
     }
   }
 }
@@ -110,6 +115,10 @@ export function loadJson(uri) {
     buf = fs.readFileSync(location)
   }
   return JSON.parse(buf.toString('utf-8'))
+}
+
+export function parseJson(s) {
+  return JSON.parse(s)
 }
 
 export function dumpJson(o, pretty=false) {

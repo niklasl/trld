@@ -155,6 +155,17 @@ class JavaTranspiler(CStyleTranspiler):
         typename = typename.replace('/*@Static*/ ', '')
         return typename
 
+    def typed(self, name, typename=None):
+        return f'{typename} {name}' if typename else name
+
+    def funcdef(self, name: str, argdecls: List[Tuple], ret: Optional[str] = None):
+        argrepr = ', '.join(self.typed(arg[0], arg[2]) for arg in argdecls)
+
+        if ret == '':
+            return f'{name}({argrepr})'
+
+        return f"{ret or 'void'} {name}({argrepr})"
+
     def map_isinstance(self, vrepr: str, classname: str):
         return f'{vrepr} instanceof {classname}'
 
