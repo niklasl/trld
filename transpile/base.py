@@ -15,6 +15,23 @@ import sys
 from .typescanner import TypeScanner, ClassType, FuncType
 
 
+# Handle the change of ast implementation in Python 3.8+:
+
+# All literals are ast.Constant and the others are deprecated.
+AST_NAME_CONSTANT = (ast.NameConstant,) if hasattr(ast, 'NameConstant') else ()
+AST_ELLIPSIS = (ast.Ellipsis,) if hasattr(ast, 'Ellipsis') else ()
+AST_STR = (ast.Str,) if hasattr(ast, 'Str') else ()
+AST_NUM = (ast.Num,) if hasattr(ast, 'Num') else ()
+AST_BYTES = (ast.Bytes,) if hasattr(ast, 'Bytes') else ()
+AST_CONSTANTS = (ast.Constant,) + AST_NAME_CONSTANT + AST_STR + AST_NUM + AST_BYTES
+
+# In 3.9, simple indices are represented by value, extended slices as tuples.
+AST_INDEX = (ast.Index,) if hasattr(ast, 'Index') else ()
+
+def _get_slice(slice):
+    return slice.value if isinstance(slice, AST_INDEX) else slice
+
+
 ReprAndType = Tuple[str, Optional[str]]
 
 
@@ -346,7 +363,7 @@ class Transpiler(ast.NodeVisitor):
         if len(node.targets) == 1 and isinstance(node.targets[0], ast.Subscript):
             target = node.targets[0]
             owner = self.repr_expr(target.value)
-            key = self.repr_expr(target.slice.value)
+            key = self.repr_expr(_get_slice(target.slice))
             rval = self.repr_expr(node.value)
             self.stmt(self.map_setitem(owner, key, rval), node=node)
             return
@@ -377,7 +394,7 @@ class Transpiler(ast.NodeVisitor):
         rval = self._cast(self.repr_expr(node.value))
         if isinstance(node.target, ast.Subscript):
             owner = self.repr_expr(node.target.value)
-            key = self.repr_expr(node.target.slice.value) # type: ignore
+            key = self.repr_expr(_get_slice(node.target.slice)) # type: ignore
             op_setitem = self.map_op_setitem(owner, key, node.op, rval)
             if op_setitem is not None:
                 self.stmt(op_setitem)
@@ -463,8 +480,7 @@ class Transpiler(ast.NodeVisitor):
                         rvaltype = ownertype[0]
 
                 v = node.value.operand if isinstance(node.value, ast.UnaryOp) else node.value
-                if self.typing and rvaltype and not isinstance(v, (ast.Constant,
-                        ast.NameConstant, ast.Str, ast.Num, ast.Bytes)):
+                if self.typing and rvaltype and not isinstance(v, AST_CONSTANTS):
                     knowntypeinfo = self.gettype(rval)
                     if not self.isname(rval) or (knowntypeinfo and rvaltype != knowntypeinfo[0]):
                         rval = f'({rvaltype}) {rval}'
@@ -493,12 +509,11 @@ class Transpiler(ast.NodeVisitor):
     def visit_Delete(self, node):
         target = node.targets[0]
 
-        if not isinstance(target, ast.Subscript) \
-           or not isinstance(target.slice, ast.Index):
+        if not isinstance(target, ast.Subscript):
             raise NotImplementedError(f'unhandled: {(ast.dump(node))}')
 
         owner = self.repr_expr(target.value)
-        key = self.repr_expr(target.slice.value)
+        key = self.repr_expr(_get_slice(target.slice))
         self.stmt(self.map_delitem(owner, key), node=node)
 
     def visit_Expr(self, node):
@@ -651,7 +666,7 @@ class Transpiler(ast.NodeVisitor):
                 default = node.args.defaults[i - defaultsat]
                 call = calls[:] + [self.repr_expr(default)]
                 # TODO: self.repr_expr(default)?
-                aval_name = default if isinstance(default, ast.Name) else type(default.n if isinstance(default, ast.Num) else default.value).__name__
+                aval_name = default if isinstance(default, ast.Name) else type(default.n if isinstance(default, AST_NUM) else default.value).__name__
                 atype = self.types.get(aval_name, atype)
                 if self.func_defaults:
                     aname_val = self.func_defaults.format(
@@ -675,7 +690,7 @@ class Transpiler(ast.NodeVisitor):
         if isinstance(node.returns, ast.Subscript) and \
                 isinstance(node.returns.value, ast.Name) and \
                 node.returns.value.id == 'Iterator':
-            iterated_type = self.repr_expr(node.returns.slice.value)
+            iterated_type = self.repr_expr(_get_slice(node.returns.slice))
             name, stmts = self.declare_iterator(iterated_type)
             def on_exit():
                 self.exit_iterator(node)
@@ -807,7 +822,7 @@ class Transpiler(ast.NodeVisitor):
             if not (isinstance(member, ast.FunctionDef) and
                     member.name == '__iter__'):
                 continue
-            iterated_type = self.repr_expr(member.returns.slice.value)
+            iterated_type = self.repr_expr(_get_slice(member.returns.slice))
             # TODO: 5f831dc1 (java-specific)
             iterable_type = self.types.get('Iterable', 'Iterable')
             if self.typing:
@@ -870,7 +885,13 @@ class Transpiler(ast.NodeVisitor):
                 typeinfo = self.gettype(r)
                 return r, typeinfo[0] if typeinfo else etype
 
-        if isinstance(expr, ast.Str):
+        if isinstance(expr, AST_ELLIPSIS):
+            return '/* ... */', None
+
+        elif isinstance(expr, AST_NAME_CONSTANT):
+            return self.constants.get(expr.value, (expr.value, None))
+
+        elif isinstance(expr, AST_STR):
             # TODO: just use repr(s) with some cleanup?
             s = expr.s.replace('\\', '\\\\')
             s = s.replace('"', r'\"')
@@ -878,18 +899,18 @@ class Transpiler(ast.NodeVisitor):
                         if c.isspace() else c for c in s)
             return (str(expr.s) if annot else f'"{s}"'), gt('str')
 
-        elif isinstance(expr, ast.Num):
+        elif isinstance(expr, AST_NUM):
             s = str(expr.n)
             return s, gt('float' if '.' in s else 'int')
+
+        elif isinstance(expr, ast.Constant):
+            if expr.value is Ellipsis:
+                return '/* ... */', None
+            return self.constants.get(expr.value, (expr.value, None))
 
         elif isinstance(expr, ast.UnaryOp) and isinstance(expr.op, ast.USub):
             s, t = self.repr_expr_and_type(expr.operand)
             return f'-{expr.operand.n}', t # type: ignore
-
-        elif isinstance(expr, (ast.Constant, ast.NameConstant, ast.Ellipsis)):
-            if isinstance(expr, ast.Ellipsis) or expr.value is Ellipsis:
-                return '/* ... */', None
-            return self.constants.get(expr.value, (expr.value, None))
 
         elif isinstance(expr, ast.Name):
             name = self.map_name(expr.id, callargs)
@@ -1002,7 +1023,7 @@ class Transpiler(ast.NodeVisitor):
         elif isinstance(expr, ast.Lambda):
             return self._map_lambda(expr), gt('function')
 
-        raise NotImplementedError(f'unhandled: {(expr)}')
+        raise NotImplementedError(f'unhandled: {expr!r}')
 
     def map_compare(self, left: str, op: ast.cmpop, right: str) -> str:
         if isinstance(op, ast.In):
@@ -1098,19 +1119,20 @@ class Transpiler(ast.NodeVisitor):
             upper = self.repr_expr(expr.slice.upper) if expr.slice.upper else None
             return self.map_getslice(owner, lower, upper), ownertype
 
-        sliceval = expr.slice.value
+        sliceval = _get_slice(expr.slice)
+
         if isinstance(sliceval, ast.Constant):
-            tname = sliceval.value
-        elif isinstance(sliceval, ast.Subscript):
-            tname = self.repr_expr(sliceval, annot=annot)
-        elif isinstance(sliceval, ast.Str):
+            tname = sliceval.value if annot else self.repr_expr(sliceval)
+        elif isinstance(sliceval, AST_STR):
             tname = sliceval.s if annot else self.repr_expr(sliceval)
         elif isinstance(sliceval, ast.Tuple):
             tname = ', '.join(self.repr_expr(p.elts[0]
-                                             if isinstance(p, ast.List) # Callable[[A1], RT]
-                                             else p,
-                                             annot=annot)
+                                    if isinstance(p, ast.List) # Callable[[A1], RT]
+                                    else p,
+                                    annot=annot)
                               for p in sliceval.elts)
+        elif isinstance(sliceval, ast.Subscript):
+            tname = self.repr_expr(sliceval, annot=annot)
         else:
             tname = self.repr_expr(sliceval, annot=annot)
 
