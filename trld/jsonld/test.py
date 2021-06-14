@@ -3,31 +3,21 @@ import sys
 import traceback
 from pathlib import Path
 
-from .. import common
-
-# TODO: hack to resolve import URL against file base.
-# Instead, "install" a LoadDocumentCallback with this hack!
-_load_json = common.load_json
-def load_local_json(url):
-    url = url.replace(TESTS_URL, SUITE_FILE_DIR)
-    return _load_json(url)
-common.load_json = load_local_json
-
+from ..common import set_source_locator
 from .base import JSONLD10, JSONLD11
 from . import context
 from .testcase import TestCase, TESTS_URL
 
 
-def _set_suite_file_dir(suitedir):
-    global SUITE_FILE_DIR
-    while suitedir.parent.name and suitedir.name != 'tests':
-        suitedir = suitedir.parent
-    SUITE_FILE_DIR = str(suitedir)
-
-
 realprint = print
 def print(*args, **kwargs):
     realprint(*args, file=sys.stderr, **kwargs)
+
+
+def _find_suite_file_dir(suitedir):
+    while suitedir.parent.name and suitedir.name != 'tests':
+        suitedir = suitedir.parent
+    return str(suitedir)
 
 
 def run_testsuite(suitefilepath: str) -> bool:
@@ -37,19 +27,20 @@ def run_testsuite(suitefilepath: str) -> bool:
     with suitefile.open() as fp:
         testsuite = json.load(fp)
 
-    _set_suite_file_dir(suitedir)
+    suite_file_dir = _find_suite_file_dir(suitedir)
+    set_source_locator(lambda url: url.replace(TESTS_URL, suite_file_dir))
 
     runs, oks, fails, errors = 0, 0, 0, 0
 
     for tc_data in testsuite['sequence']:
-        tc = TestCase(suitedir, tc_data)
+        tc = TestCase(str(suitedir), tc_data)
         if tc.options.get('specVersion') == JSONLD10:
             continue
 
         runs += 1
         print(f"Running TC {tc.testid} - {tc.name}:", end=' ')
 
-        context.DEFAULT_PROCESSING_MODE = tc.options.get('processingMode', JSONLD11)
+        context.DEFAULT_PROCESSING_MODE = tc.options.get('processingMode', JSONLD11) # type: ignore
 
         try:
             out_data, expect_data = tc.run()
