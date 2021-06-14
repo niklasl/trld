@@ -8,7 +8,7 @@ import { expand } from '../lib/jsonld/expansion.js'
 import { compact } from '../lib/jsonld/compaction.js'
 import { flatten } from '../lib/jsonld/flattening.js'
 
-const TESTSUITE_DIR = `file://${os.homedir()}/repos/github/w3c/json-ld-api/tests/`
+const TESTSUITE_DIR = `file://${process.env.TRLD_JSONLD_TESTDIR}/`
 const TESTSUITE_BASE_URL = 'https://w3c.github.io/json-ld-api/tests/'
 
 let loadJson = common.loadJson

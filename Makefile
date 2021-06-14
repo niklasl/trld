@@ -27,8 +27,10 @@ java: build | cache/json-ld-api
 js: build/js/node_modules
 	python3 -m transpile.js $(trld_modules) -o build/js/lib
 	cp -R transpile/templates/js build
-	(cd build/js && npm test || true)
+	(cd build/js && TRLD_JSONLD_TESTDIR=$(shell pwd)/cache/json-ld-api/tests npm test || true)
 
-build/js/node_modules: build
-	mkdir -p build/js
+build/js/node_modules: build/js/package.json
 	(cd build/js && npm i)
+
+build/js/package.json: build
+	cp -R transpile/templates/js build
