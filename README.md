@@ -44,35 +44,46 @@ Requirements:
 For Python, this runs mypy and the test suite:
 
     $ make python
-    ...
-    Running test suite: expand-manifest.jsonld
-    Ran 369 test cases. Passed: 367. Failed: 2. Errors: 0.
+    [...]
 
-    Running test suite: compact-manifest.jsonld
+    python3 -m trld.jsonld.test [...]
+    Running test suite: cache/json-ld-api/tests/expand-manifest.jsonld
+    Ran 371 test cases. Passed: 366. Failed: 4. Errors: 1.
+    Running test suite: cache/json-ld-api/tests/compact-manifest.jsonld
     Ran 239 test cases. Passed: 238. Failed: 1. Errors: 0.
-
-    Running test suite: flatten-manifest.jsonld
+    Running test suite: cache/json-ld-api/tests/flatten-manifest.jsonld
     Ran 55 test cases. Passed: 55. Failed: 0. Errors: 0.
-
-    Running test suite: fromRdf-manifest.jsonld
+    Running test suite: cache/json-ld-api/tests/fromRdf-manifest.jsonld
     Ran 51 test cases. Passed: 51. Failed: 0. Errors: 0.
+    Running test suite: cache/json-ld-api/tests/toRdf-manifest.jsonld
+    Ran 451 test cases. Passed: 399. Failed: 51. Errors: 1.
 
-    Running test suite: toRdf-manifest.jsonld
-    Ran 449 test cases. Passed: 400. Failed: 49. Errors: 0.
+    python3 -m trld.tvm.test
+    Running [...]: OK
+
+    python3 -m trld.trig.test [...]
+    Ran 335 tests. Passed 301, failed 34
 
 For the other languages, this will generate packages for each language in the
 build directory, then run their respective test suites:
 
     $ make java
-    ...
-    545 tests completed, 18 failed
+    [...]
+    java -cp build/java/build/libs/trld-with-deps.jar trld.jsonld.TestRunner [...]
+    Ran 371 test cases. Passed: 329. Failed: 15. Errors: 27.
+
+    java -cp build/java/build/libs/trld-with-deps.jar trld.trig.Test [...]
+    Ran 335 tests. Passed 252, failed 83
 
     $ make js
-    ...
-    1..545
-    # tests 545
+    [...]
+    1..547
+    # tests 547
     # pass  542
-    # fail  3
+    # fail  5
+
+    [...] node [...] lib/trig/test.js [...]
+    Ran 335 tests. Passed 270, failed 65
 
 ## Running
 
