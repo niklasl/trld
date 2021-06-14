@@ -1,7 +1,9 @@
 build
 cache
+dist
 .mypy_cache
 __pycache__
 *.sw[f-p]
 .gradle
 _bak
+Session.vim
