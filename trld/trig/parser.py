@@ -75,16 +75,20 @@ class ParserState:
     parent: 'ParserState'
     context: Dict[str, object]
 
-    def __init__(self, parent: 'ParserState' = None):
-        self.parent = cast('ParserState', parent)
-        self.context = self.parent.context if self.parent else {}
+    def consume(self, c: str, prev_value) -> StateResult:
+        raise NotImplementedError
+
+
+class BaseParserState(ParserState):
+
+    def __init__(self, parent: Optional[ParserState]):
+        super().__init__()
+        self.parent = parent if parent is not None else ParserState()
+        self.context = self.parent.context if isinstance(self.parent, BaseParserState) else {}
         self.init()
 
     def init(self):
         pass
-
-    def consume(self, c: str, prev_value) -> StateResult:
-        raise NotImplementedError
 
     def symbol(self, value: Dict[str, str]) -> str:
         if SYMBOL in value:
@@ -95,7 +99,7 @@ class ParserState:
         return value[ID]
 
 
-class ConsumeWs(ParserState):
+class ConsumeWs(BaseParserState):
 
     MATCH: ClassVar[re.Pattern] = re.compile(r'\s')
 
@@ -109,7 +113,7 @@ class ConsumeWs(ParserState):
             return self.parent.consume(c, prev_value)
 
 
-class ConsumeComment(ParserState):
+class ConsumeComment(BaseParserState):
 
     def consume(self, c: str, prev_value) -> StateResult:
         if c == '\n':
@@ -118,7 +122,7 @@ class ConsumeComment(ParserState):
             return self, None
 
 
-class ReadTerm(ParserState):
+class ReadTerm(BaseParserState):
 
     ESCAPE_CHAR: ClassVar[str] = '\\'
 
@@ -128,7 +132,7 @@ class ReadTerm(ParserState):
     unicode_chars: List[Char]
     unicode_escapes_left: int
 
-    def __init__(self, parent: Optional[ParserState] = None):
+    def __init__(self, parent: Optional[ParserState]):
         super().__init__(parent)
         self.collected = []
         self.escape_next = False
@@ -345,7 +349,7 @@ class ReadLiteral(ReadTerm):
     multiline: int
     prev_dt_start: int
 
-    def __init__(self, parent: Optional[ParserState], quotechar: str):
+    def __init__(self, parent: ParserState, quotechar: str):
         super().__init__(parent)
         self.quotechar = quotechar
         self.escape_chars = ESC_CHARS
@@ -433,12 +437,12 @@ class ReadLanguage(ReadTerm):
             return self.parent.consume(c, {LANGUAGE: value})
 
 
-class ReadCompound(ParserState):
+class ReadCompound(BaseParserState):
 
     ws: ConsumeWs
     comment: ConsumeComment
 
-    def __init__(self, parent: Optional[ParserState] = None):
+    def __init__(self, parent: Optional[ParserState]):
         super().__init__(parent)
         self.ws = ConsumeWs(self)
         self.comment = ConsumeComment(self)
