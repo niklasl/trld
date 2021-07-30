@@ -82,6 +82,7 @@ class JsTranspiler(CStyleTranspiler):
         'chr': 'String.fromCharCode({0})',
         'int': ['parseInt({0})', 'parseInt({0}, {1})'],
         'pow': 'Math.pow({0}, {1})',
+        'max': 'Math.max({0}, {1})',
         'type': 'typeof {0}',
         'id': '{0}',
         'print': 'console.log({0})',

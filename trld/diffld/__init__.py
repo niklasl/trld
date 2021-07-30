@@ -23,12 +23,12 @@ def some_id(node: Dict, path: List[str]) -> str:
         clean_path = [CLEAN_BNODE.sub('', s) for s in path]
         node[ID] = f"{GEN_BNODE_PFX}{'-'.join(clean_path)}"
 
-    return node[ID]
+    return cast(str, node[ID])
 
 
 def diffld(a: Dict, b: Dict) -> Dict:
-    a_id = a.get(ID, '_:diffgraph-a')
-    b_id = b.get(ID, '_:diffgraph-b')
+    a_id = cast(str, a.get(ID, '_:diffgraph-a'))
+    b_id = cast(str, b.get(ID, '_:diffgraph-b'))
 
     result = DiffResult(a[GRAPH], {}, {})
     diff_nodes(result, a, b)
@@ -95,7 +95,17 @@ def diff_nodes(result, a_node: object, b_node: object, path: List = None) -> boo
         b_nid = some_id(b_node, path)
         b_node_diff = cast(Dict, result.in_b.setdefault(b_nid, {ID: b_nid}))
 
-        for key in sorted(set(a_node) | set(b_node)):
+        # TODO: transpile this expression instead of the below manoeuvre
+        #for key in sorted(set(a_node) | set(b_node)):
+        node_keys = list(a_node.keys())
+        node_keys += list(b_node.keys())
+        node_keys.sort()
+        prev_key = ''
+
+        for key in node_keys:
+            if key == prev_key: continue
+            prev_key = key
+
             a_val: object
             b_val: object
 
@@ -154,4 +164,11 @@ def _reembed(node: Dict, map: Dict):
 
 
 def to_nodemap(nodes: Iterable[Dict]) -> Dict:
-    return {node.pop(ID): node for node in nodes if len(node) > 1}
+    # TODO: transpile dict comprehension doesn't infer types and methods properly
+    #return {node.pop(ID): node for node in nodes if len(node) > 1}
+    nodemap = {}
+    for node in nodes:
+        if len(node) > 1:
+            nodemap[node.pop(ID)] = node
+
+    return nodemap
