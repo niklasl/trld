@@ -1,0 +1,24 @@
+{
+  "@graph": [
+    {
+      "@id": "#1",
+      "@type": "Thing",
+      "name": "One thing",
+      "knows": [
+        {"label": "Something"},
+        {"label": "Some one"}
+      ]
+    },
+    {
+      "@id": "#2",
+      "@type": "Thing",
+      "knows": [ {"label": "Something"} ]
+    },
+    {
+      "@id": "#3",
+      "@type": "Thing",
+      "name": "Another Thing",
+      "knows": [ {"label": "Yet Another"} ]
+    }
+  ]
+}

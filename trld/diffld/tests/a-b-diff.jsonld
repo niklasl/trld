@@ -1,0 +1,42 @@
+{
+  "nodemap": {
+    "#1": {
+      "@type": "Thing",
+      "knows": [
+        {"label": "Something"},
+        {"@id": "_:diffnode-graph-0-knows-1"}
+      ]
+    },
+    "#2": {
+      "@type": "Thing",
+      "knows": [
+        {"label": "Something"},
+        {"@id": "_:diffnode-graph-1-knows-1"}
+      ]
+    },
+    "#3": {
+      "@type": "Thing",
+      "knows": [
+        {"@id": "_:diffnode-graph-2-knows-0"}
+      ]
+    }
+  },
+  "diffs": {
+    "trld/diffld/tests/a.jsonld": {
+      "nodemap": {
+        "#2": {"label": "Other thing"},
+        "_:diffnode-graph-1-knows-1": {"label": "Some one"},
+        "#3": {"label": "Another thing"},
+        "_:diffnode-graph-2-knows-0": {"label": "Yet another"}
+      }
+    },
+    "trld/diffld/tests/b.jsonld": {
+      "nodemap": {
+        "#1": {"name": "One thing"},
+        "_:diffnode-graph-0-knows-1": {"label": "Some one"},
+        "#3": {"name": "Another Thing"},
+        "_:diffnode-graph-2-knows-0": {"label": "Yet Another"}
+      }
+    }
+  }
+}
