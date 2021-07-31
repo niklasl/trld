@@ -156,11 +156,9 @@ def diff_nodes(result, a_node: object, b_node: object, path: List = None) -> boo
 
 
 def _reembed(node: Dict, map: Dict):
-    nid = cast(str, node[ID])
-    if nid.startswith(GEN_BNODE_PFX):
-        copy = cast(Dict, map.pop(nid))
-        node.update(copy)
-        node.pop(ID)
+    copy = cast(Dict, map.pop(node[ID]))
+    node.update(copy)
+    node.pop(ID)
 
 
 def to_nodemap(nodes: Iterable[Dict]) -> Dict:
