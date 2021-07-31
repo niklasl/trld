@@ -1,4 +1,4 @@
-from typing import List, Dict, Iterable, NamedTuple, cast
+from typing import List, Dict, Iterable, NamedTuple, Optional, cast
 import re
 
 #from ..jsonld.base import CONTEXT, GRAPH, ID, TYPE
@@ -33,12 +33,20 @@ def diffld(a: Dict, b: Dict) -> Dict:
     result = DiffResult(a[GRAPH], {}, {})
     diff_nodes(result, a, b)
 
+    diff_context: object = {
+        "nodemap": {"@id": "@graph", "@container": "@id"},
+        "diffs": {"@id": "diffs", "@container": ["@graph", "@id"]}
+    }
+
+    given_context: Optional[object] = a.get(CONTEXT)
+    assert given_context == b.get(CONTEXT)
+    if given_context:
+        if not isinstance(given_context, List):
+            given_context = [given_context]
+        diff_context = given_context + [diff_context]
+
     return {
-        CONTEXT: {
-            "@vocab": "https://id.kb.se/vocab/",
-            "nodemap": {"@id": "@graph", "@container": "@id"},
-            "diffs": {"@id": "diffs", "@container": ["@graph", "@id", "@set"]}
-        },
+        CONTEXT: diff_context,
         "nodemap": to_nodemap(result.in_both),
         "diffs": {
             a_id: {
