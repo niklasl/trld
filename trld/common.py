@@ -114,9 +114,9 @@ def resolve_iri(base: str, relative: str) -> str:
     if '//' in relative:
         url = urlparse(relative)
         urlpath: str = url.path
-        if url.params is not None:
+        if url.params:
             urlpath += f';{url.params}'
-        if url.query is not None:
+        if url.query:
             urlpath += f'?{url.query}'
         return urljoin(base, urljoin(relative, urlpath))
     return urljoin(base, relative)
