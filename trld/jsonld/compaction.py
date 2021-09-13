@@ -52,7 +52,7 @@ def compaction(
     compacted_item: JsonObject
 
     # 2)
-    if is_scalar(element):
+    if element is None or is_scalar(element):
         return element
 
     # 3)

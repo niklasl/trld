@@ -121,6 +121,7 @@ def is_lang_tag(value: Optional[str]) -> bool:
     return value is not None and value[0].isalpha() and  ' ' not in value
 
 
+# TODO: spec errata: spec def excludes null but links to whatwg which includes it
 def is_scalar(o: object) -> bool:
     return isinstance(o, (str, int, float, bool))
 
