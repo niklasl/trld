@@ -37,6 +37,11 @@ def _modify_pair(target_map: Dict, k: Union[str, int], v: object, outo: Union[Di
             mapv = outv
 
         if isinstance(outo, Dict):
+            if mapk in outo:
+                values: List = as_list(outo[mapk])
+                values += as_list(mapv)
+                mapv = values
+
             outo[mapk] = mapv
         else:
             outo.append(mapv)

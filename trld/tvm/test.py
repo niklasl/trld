@@ -238,6 +238,41 @@ def test_property_chains_for_events():
     check(**locals())
 
 
+def test_add_to_existing_key():
+    given = {
+        "@id": "",
+        "dc:title": "Title",
+        "foaf:name": "Name",
+        "rdfs:label": "Label"
+    }
+
+    expect = {
+        "@id": "",
+        "rdfs:label": ["Title", "Name", "Label"]
+    }
+
+    target = {"@vocab": "http://www.w3.org/2000/01/rdf-schema#"}
+
+    assuming = {
+        "@graph": [
+            {
+                "@id": "foaf:name",
+                "rdfs:subPropertyOf": {
+                    "@id": "rdfs:label"
+                }
+            },
+            {
+                "@id": "dc:title",
+                "rdfs:subPropertyOf": {
+                    "@id": "rdfs:label"
+                }
+            }
+        ]
+    }
+
+    check(**locals())
+
+
 def check(given, target, expect, assuming):
     vocab = expand(dict(context, **assuming), "")
     target_map = make_target_map(expand(vocab, ""), {"@context": target})
