@@ -273,6 +273,42 @@ def test_add_to_existing_key():
     check(**locals())
 
 
+def test_only_add_most_specific():
+    given = {
+        "@id": "",
+        "bf:identifiedBy": {
+            "rdf:value": "0000000000"
+        }
+    }
+
+    expect = {
+        "@id": "",
+        "dc:identifier": "0000000000"
+    }
+
+    target = [
+        {"dc": "http://purl.org/dc/terms/"},
+        {"rdfs": "http://www.w3.org/2000/01/rdf-schema#"}
+    ]
+
+    assuming = {
+        "@graph": [
+            {
+                "@id": "bibo:identifier",
+                "rdfs:subPropertyOf": [{"@id": "dc:identifier"}, {"@id": "rdfs:label"}],
+                "owl:propertyChainAxiom": {
+                    "@list": [
+                        {"@id": "bf:identifiedBy"},
+                        {"@id": "rdf:value"}
+                    ]
+                }
+            }
+        ]
+    }
+
+    check(**locals())
+
+
 def check(given, target, expect, assuming):
     vocab = expand(dict(context, **assuming), "")
     target_map = make_target_map(expand(vocab, ""), {"@context": target})

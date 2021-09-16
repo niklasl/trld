@@ -1,4 +1,4 @@
-from typing import Optional, Dict, List, Union, cast
+from typing import Optional, Dict, List, Set, Union, cast
 from ..jsonld.base import CONTEXT, GRAPH, ID, TYPE, VOCAB, as_list
 
 
@@ -68,6 +68,8 @@ def _map(target_map: Dict, key: Union[str, int], value, drop_unmapped=False) -> 
 
     out: Dict = {}
 
+    mapped_keypaths: Set[str] = set()
+
     for rule in as_list(somerule):
         if isinstance(rule, str):
             out[rule] = value
@@ -114,6 +116,15 @@ def _map(target_map: Dict, key: Union[str, int], value, drop_unmapped=False) -> 
             outvalue = mappedvalue
 
             if property is not None and outvalue:
+                if value_from is not None:
+                    mapped_key = f'{key} {value_from}'
+
+                    # Skipping rule if earlier rule used the same source parts
+                    if mapped_key in mapped_keypaths:
+                        continue
+
+                    mapped_keypaths.add(mapped_key)
+
                 out[property] = outvalue
                 # TODO: Using all rules since they may be complementary.
                 # Might need to combine those into one rule instead.
