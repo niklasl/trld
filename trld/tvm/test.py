@@ -60,12 +60,15 @@ def test_reducing_foaf_to_rdfs():
         "@type": "foaf:Document",
         "dc:title": "A"
     }
+
     expect = {
         "@id": "",
         "@type": "rdfs:Resource",
         "rdfs:label": "A"
     }
+
     target = {"@vocab": "http://www.w3.org/2000/01/rdf-schema#"}
+
     assuming = {
         "@graph": [
             {
@@ -83,7 +86,7 @@ def test_reducing_foaf_to_rdfs():
         ]
     }
 
-    check(given, expect, target, assuming)
+    check(**locals())
 
 
 def test_structured_values_and_shorthand_properties():
@@ -119,7 +122,7 @@ def test_structured_values_and_shorthand_properties():
         ]
     }
 
-    check(given, expect, target, assuming)
+    check(**locals())
 
 
 def test_qualified_relations_as_reifications():
@@ -180,7 +183,7 @@ def test_qualified_relations_as_reifications():
         ]
     }
 
-    check(given, expect, target, assuming)
+    check(**locals())
 
 
 def test_property_chains_for_events():
@@ -232,10 +235,10 @@ def test_property_chains_for_events():
         ]
     }
 
-    check(given, expect, target, assuming)
+    check(**locals())
 
 
-def check(given, expect, target, assuming):
+def check(given, target, expect, assuming):
     vocab = expand(dict(context, **assuming), "")
     target_map = make_target_map(expand(vocab, ""), {"@context": target})
     if DEBUG:
