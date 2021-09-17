@@ -14,6 +14,7 @@ context = {
         "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
         "owl": "http://www.w3.org/2002/07/owl#",
         "skos": "http://www.w3.org/2004/02/skos/core#",
+        "bibo": "http://purl.org/ontology/bibo/",
         "dc": "http://purl.org/dc/terms/",
         "foaf": "http://xmlns.com/foaf/0.1/",
         "schema": "http://schema.org/",
@@ -302,10 +303,11 @@ def test_only_add_most_specific():
 
     expect = {
         "@id": "",
-        "dc:identifier": "0000000000"
+        "bibo:identifier": "0000000000"
     }
 
     target = [
+        {"bibo": "http://purl.org/ontology/bibo/"},
         {"dc": "http://purl.org/dc/terms/"},
         {"rdfs": "http://www.w3.org/2000/01/rdf-schema#"}
     ]
