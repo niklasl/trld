@@ -12,8 +12,9 @@ def err(msg): print(msg, file=sys.stderr)
 
 argparser = argparse.ArgumentParser()
 argparser.add_argument('source', nargs='+')
-argparser.add_argument('-c', '--context')
-argparser.add_argument('-b', '--base')
+argparser.add_argument('-c', '--context', help='Use to compact expanded JSON-LD')
+argparser.add_argument('-e', '--expand-context', help='Use to expand plain JSON to JSON-LD')
+argparser.add_argument('-b', '--base', help='Set the base IRI (default is current source)')
 argparser.add_argument('-f', '--flatten', action='store_true')
 
 args = argparser.parse_args()
@@ -35,7 +36,7 @@ for doc_path in args.source:
     base_iri = args.base if args.base else f'file://{doc_path}'
 
     try:
-        result: Any = expand(doc_data, base_iri, ordered=ordered)
+        result: Any = expand(doc_data, base_iri, args.expand_context, ordered=ordered)
         if args.flatten:
             result = flatten(result, ordered=ordered)
         if context_data:
