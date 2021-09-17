@@ -109,6 +109,8 @@ def _process_class_relations(obj: Dict, vocab_index: Dict, target: Dict[str, obj
 
     candidates: Candidates = _collect_candidates(obj, rels)
 
+    seen_candidates: Set[str] = set()
+
     while candidates:
         crel, candidate = candidates.pop(0)
         if ID not in candidate:
@@ -122,8 +124,10 @@ def _process_class_relations(obj: Dict, vocab_index: Dict, target: Dict[str, obj
         elif crel in SYMMETRIC and id_target_prio:
             assert id is not None
             _add_rule(target_map, candidate_id, id, id_target_prio)
-        else:
+        elif candidate_id not in seen_candidates:
             _extend_candidates(candidates, candidate, rels)
+
+        seen_candidates.add(candidate_id)
 
     if id is not None and not id_target_prio:
         base_rels = [it for it in base_rels if it.base != id]

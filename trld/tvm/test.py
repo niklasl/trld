@@ -54,6 +54,25 @@ def test_make_target_map():
     assert_json_equals(target_map, expect)
 
 
+def test_cope_with_circular_references():
+    target = {"@vocab": "http://www.w3.org/2000/01/rdf-schema#"}
+
+    assuming = {
+        "@graph": [
+            {
+                "@id": "owl:Thing",
+                "rdfs:subClassOf": {"@id": "skos:Concept"}
+            },
+            {
+                "@id": "skos:Concept",
+                "rdfs:subClassOf": {"@id": "owl:Thing"}
+            }
+        ]
+    }
+
+    _to_target_map(target, assuming)
+
+
 def test_reducing_foaf_to_rdfs():
     given = {
         "@id": "",
@@ -310,8 +329,7 @@ def test_only_add_most_specific():
 
 
 def check(given, target, expect, assuming):
-    vocab = expand(dict(context, **assuming), "")
-    target_map = make_target_map(expand(vocab, ""), {"@context": target})
+    target_map = _to_target_map(target, assuming)
     if DEBUG:
         print(_jsonstr(target_map))
     indata = expand(dict(context, **given), "")
@@ -325,6 +343,11 @@ def assert_json_equals(given, expect):
     e = _jsonstr(expect)
     assert g == e, f'Expected:\n{e}\nGot:\n{g}'
     print('OK', end='')
+
+
+def _to_target_map(target, assuming):
+    vocab = expand(dict(context, **assuming), "")
+    return make_target_map(expand(vocab, ""), {"@context": target})
 
 
 def _jsonstr(data):
