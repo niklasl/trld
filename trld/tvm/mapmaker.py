@@ -166,6 +166,8 @@ def _process_property_relations(obj: Dict, vocab_index: Dict, target: Dict[str, 
     if id_target_prio:
         baseprops.append((id_target_prio, id))
 
+    candidate_prop: Optional[str] = None
+
     while candidates:
         crel, candidate = candidates.pop(0)
         if ID not in candidate:
@@ -177,48 +179,66 @@ def _process_property_relations(obj: Dict, vocab_index: Dict, target: Dict[str, 
         if not id_target_prio and target_prio:
             baseprops.append((target_prio, candidate_id))
             _add_rule(target_map, id, candidate_id, target_prio)
-            property = candidate_id
+            candidate_prop = candidate_id
             prop_prio = target_prio
             #break
         elif crel in SYMMETRIC and not target_prio and id_target_prio:
             _add_rule(target_map, candidate_id, id, id_target_prio)
-            property = candidate_id
+            candidate_prop = candidate_id
             prop_prio = target_prio
             #break
         else:
             _extend_candidates(candidates, candidate, rels)
 
-    if OWL_propertyChainAxiom in obj:
-        prop_chain: List[Dict] = cast(List[Dict], obj[OWL_propertyChainAxiom])
-        source_property: Optional[str] = None
+    _process_property_chain(obj, target, target_map, candidate_prop, baseprops)
 
-        lst: List[Dict] = prop_chain[0][LIST]
-        lead: Dict = lst[0]
-        # TODO: assert(len(lst) == 2) or use rest as path to value...
-        if lead:
-            source_property = lead.get(ID)
 
-        value_from: str = lst[1][ID]
-        rtype: Optional[str] = None
-        if source_property is None or source_property.startswith('_:'):
-            try:
-                ranges: List[Dict] = lead[RDFS_range]
-                rtype = ranges[0][ID]
-            except:
-                pass
-            superprops: List[Dict] = lead[RDFS_subPropertyOf]
-            source_property = superprops[0][ID]
+def _process_property_chain(obj: Dict,
+                             target: Dict[str, object],
+                             target_map: Dict,
+                             candidate_prop: Optional[str],
+                             baseprops: List[Tuple[int, str]]) -> bool:
+    if OWL_propertyChainAxiom not in obj:
+        return False
 
-        match: Optional[Dict] = {TYPE: rtype} if rtype else None
-        # TODO: also match OWL_Restriction using OWL_onProperty PLUS
-        # OWL_hasValue OR OWL_allValuesFrom
+    prop_chain: List[Dict] = cast(List[Dict], obj[OWL_propertyChainAxiom])
+    source_property: Optional[str] = None
 
-        if source_property:
-            if (property is not None and property != source_property and
-                not _get_target_priority(target, source_property)):
-                for prio, prop in baseprops:
-                    rule: Dict = _rule_from(prop, None, value_from, match)
-                    _add_rule(target_map, source_property, rule, prio)
+    lst: List[Dict] = prop_chain[0][LIST]
+    lead: Dict = lst[0]
+    # TODO: assert(len(lst) == 2) or use rest as path to value...
+    if lead:
+        source_property = lead.get(ID)
+
+    value_from: str = lst[1][ID]
+    rtype: Optional[str] = None
+
+    # TODO: don't rely solely on anonymous subPropertyOf
+    if source_property is None or source_property.startswith('_:'):
+        try:
+            ranges: List[Dict] = lead[RDFS_range]
+            rtype = ranges[0][ID]
+        except:
+            pass
+        superprops: List[Dict] = lead[RDFS_subPropertyOf]
+        source_property = superprops[0][ID]
+
+    match: Optional[Dict] = {TYPE: rtype} if rtype else None
+    # TODO: also match OWL_Restriction using OWL_onProperty PLUS
+    # OWL_hasValue OR OWL_allValuesFrom
+
+    if source_property:
+        if (candidate_prop != source_property and
+            not _get_target_priority(target, source_property)):
+            for prio, baseprop in baseprops:
+                rule: Dict = _rule_from(baseprop, None, value_from, match)
+                _add_rule(target_map, source_property, rule, prio)
+
+            return True
+
+    # TODO: also check vocab_index[source_property][REVERSE][RDFS_subPropertyOf]
+
+    return False
 
 
 def _collect_candidates(obj: Dict, rels: List[str]) -> Candidates:
