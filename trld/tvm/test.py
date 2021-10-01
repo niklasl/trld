@@ -14,6 +14,7 @@ context = {
     "@context": {
         "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
         "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+        "xsd": "http://www.w3.org/2001/XMLSchema#",
         "owl": "http://www.w3.org/2002/07/owl#",
         "skos": "http://www.w3.org/2004/02/skos/core#",
         "bibo": "http://purl.org/ontology/bibo/",
@@ -21,7 +22,8 @@ context = {
         "foaf": "http://xmlns.com/foaf/0.1/",
         "schema": "http://schema.org/",
         "bf": "http://id.loc.gov/ontologies/bibframe/",
-        "lcrel": "http://id.loc.gov/vocabulary/relators/"
+        "lcrel": "http://id.loc.gov/vocabulary/relators/",
+        "edtf": "http://id.loc.gov/datatypes/edtf/"
     }
 }
 
@@ -75,6 +77,8 @@ def test_cope_with_circular_references():
 
     _to_target_map(target, assuming)
 
+    print('OK', end='')
+
 
 def test_reducing_foaf_to_rdfs():
     given = {
@@ -104,6 +108,36 @@ def test_reducing_foaf_to_rdfs():
                 "rdfs:subPropertyOf": {
                     "@id": "rdfs:label"
                 }
+            }
+        ]
+    }
+
+    check(**locals())
+
+
+def test_remap_datatypes():
+    given = {
+        "@id": "",
+        "dc:issued": {"@type": "2021", "@type": "xsd:year"}
+    }
+
+    expect = {
+        "@id": "",
+        "dc:issued": {"@type": "2021", "@type": "edtf:EDTF-level0"}
+    }
+
+    target = {
+        "dc": "http://purl.org/dc/terms/",
+        "edtf": "http://id.loc.gov/datatypes/edtf/"
+    }
+
+    assuming = {
+        "@graph": [
+            {
+                "@id": "xsd:year",
+                "rdfs:subClassOf": [
+                    {"@id": "edtf:EDTF-level0"}
+                ]
             }
         ]
     }
