@@ -86,8 +86,12 @@ def make_target_map(vocab: object, target: object) -> Dict:
 
     for key, rule in target_map.items():
         rules: List[Tuple[int, Union[Dict, str]]] = sorted(as_list(rule),
-                key=lambda it: cast(int, cast(Tuple, it)[0]), reverse=True)
-                #key=lambda it: it[0], reverse=True)
+                key=lambda it: (
+                        cast(int, cast(Tuple, it)[0]),
+                        cast(Tuple, it)[1].get('match') is not None
+                        if isinstance(cast(Tuple, it)[1], Dict) else None
+                    ),
+                reverse=True)
         target_map[key] = [it for priority, it in rules] # keep all
 
     return target_map

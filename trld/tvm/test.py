@@ -7,6 +7,8 @@ from .mapper import map_to
 
 DEBUG = False
 
+null = None
+
 
 context = {
     "@context": {
@@ -328,6 +330,56 @@ def test_only_add_most_specific():
     }
 
     check(**locals())
+
+
+def test_sort_target_rules():
+    vocab = {
+        "@graph": [
+            {
+                "@id": "schema:identifier",
+                "owl:propertyChainAxiom": {
+                    "@list": [
+                        {"@id": "bf:identifiedBy"},
+                        {"@id": "rdf:value"}
+                    ]
+                }
+            },
+            {
+                "@id": "schema:isbn",
+                "owl:propertyChainAxiom": {
+                    "@list": [
+                        {
+                            "rdfs:subPropertyOf": {"@id": "bf:identifiedBy"},
+                            "rdfs:range": {"@id": "bf:Isbn"}
+                        },
+                        {"@id": "rdf:value"}
+                    ]
+                }
+            }
+        ]
+    }
+    target = {"@vocab": "http://schema.org/"}
+    expect = {
+        "http://id.loc.gov/ontologies/bibframe/identifiedBy": [
+            {
+                "match": {
+                    "@type": "http://id.loc.gov/ontologies/bibframe/Isbn"
+                },
+                "property": "http://schema.org/isbn",
+                "propertyFrom": None,
+                "valueFrom": "http://www.w3.org/1999/02/22-rdf-syntax-ns#value"
+            },
+            {
+                "match": null,
+                "property": "http://schema.org/identifier",
+                "propertyFrom": null,
+                "valueFrom": "http://www.w3.org/1999/02/22-rdf-syntax-ns#value"
+            }
+        ]
+    }
+    vocab = expand(dict(context, **vocab), "")
+    target_map = make_target_map(vocab, {"@context": target})
+    assert_json_equals(target_map, expect)
 
 
 def check(given, target, expect, assuming):
