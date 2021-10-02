@@ -264,40 +264,55 @@ def _extend_candidates(candidates: Candidates, candidate: Dict, rels: List[str])
 
 
 def _process_reified_forms(obj: Dict, vocab_index: Dict, target_map: Dict[str, object]):
-        inverse_of_subject: bool = False
-        invs: List[Dict] = cast(List[Dict], obj.get(OWL_inverseOf))
+    prop = _trace_inverse_of_subject(obj, vocab_index)
 
-        if invs is not None:
-            inverse_of_subject = any(p.get(ID) == RDF_subject for p in invs)
-        else:
-            supers: List[Dict] = cast(List[Dict], obj.get(RDFS_subPropertyOf))
-            if supers is not None:
-                inverse_of_subject = any(OWL_inverseOf in sup and
-                                         any(p.get(ID) == RDF_subject
-                                             for p in cast(List[Dict], sup[OWL_inverseOf]))
-                                         for sup in supers)
+    if prop is not None:
+        ranges: List[Dict] = []
 
-        if inverse_of_subject:
-            ranges: List[Dict] = as_list(obj[RDFS_range])
-            property_from: Optional[str] = None
-            value_from: Optional[str] = None
-            for range in ranges:
-                range_node: Optional[Dict] = vocab_index.get(range[ID])
-                if range_node is None:
-                    continue
-                reverses: Optional[Dict] = cast(Dict, range_node.get(REVERSE))
-                in_domain_of: List[Dict] = cast(List[Dict], reverses.get(RDFS_domain, [])) if reverses is not None else []
-                for prop in in_domain_of:
-                    propdata: Optional[Dict] = cast(Dict, vocab_index.get(prop[ID]))
-                    super_props: List[Dict] = cast(List, propdata.get(RDFS_subPropertyOf, [])) if propdata is not None else []
-                    if any(sprop[ID] == RDF_predicate for sprop in super_props):
-                        property_from = prop[ID]
-                    elif any(sprop[ID] == RDF_object for sprop in super_props):
-                        value_from = prop[ID]
+        prop_id: str = obj[ID]
 
-            id: str = obj[ID]
-            if property_from and value_from and isinstance(id, str):
-                _add_rule(target_map, id, _rule_from(None, property_from, value_from, None))
+        if RDFS_range in obj:
+            ranges += as_list(obj[RDFS_range])
+        if prop is not obj and RDFS_range in prop:
+            ranges += as_list(prop[RDFS_range])
+
+        property_from: Optional[str] = None
+        value_from: Optional[str] = None
+
+        for range in ranges:
+            range_node: Optional[Dict] = vocab_index.get(range[ID])
+            if range_node is None:
+                continue
+            reverses: Optional[Dict] = cast(Dict, range_node.get(REVERSE))
+            in_domain_of: List[Dict] = cast(List[Dict], reverses.get(RDFS_domain, [])) if reverses is not None else []
+            for domain_prop in in_domain_of:
+                if leads_to(domain_prop, vocab_index, RDFS_subPropertyOf, RDF_predicate):
+                    property_from = domain_prop[ID]
+                elif leads_to(domain_prop, vocab_index, RDFS_subPropertyOf, RDF_object):
+                    value_from = domain_prop[ID]
+
+        if property_from and value_from and isinstance(prop_id, str):
+            _add_rule(target_map, prop_id, _rule_from(None, property_from, value_from, None))
+
+
+def _trace_inverse_of_subject(obj: Dict, vocab_index: Dict) -> Optional[Dict]:
+    invs = cast(Optional[List[Dict]], obj.get(OWL_inverseOf))
+
+    if invs is not None:
+        for p in invs:
+            if leads_to(p, vocab_index, RDFS_subPropertyOf, RDF_subject):
+                return p
+
+    supers = cast(Optional[List[Dict]], obj.get(RDFS_subPropertyOf))
+    if supers is None:
+        return None
+
+    for supref in supers:
+        sup = cast(Dict, vocab_index.get(supref[ID], supref) if ID in supref else supref)
+        if _trace_inverse_of_subject(sup, vocab_index):
+            return sup
+
+    return None
 
 
 def _add_rule(target_map: Dict[str, object],
@@ -353,3 +368,17 @@ def _get_target_priority(target: Dict[str, object], id: str) -> int:
         prio -= 1
 
     return 0
+
+
+def leads_to(s: Dict, vocab_index: Dict, rel: str, o) -> bool:
+    if s.get(ID) == o:
+        return True
+
+    data: Optional[Dict] = cast(Dict, vocab_index.get(s[ID], s) if ID in s else s)
+    xs: List[Dict] = cast(List, data.get(rel, [])) if data is not None else []
+
+    for x in xs:
+        if x.get(ID) == o or leads_to(x, vocab_index, rel, o):
+            return True
+
+    return False

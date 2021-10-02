@@ -1,7 +1,9 @@
 import json
+from ..jsonld.base import CONTEXT, GRAPH, ID
 from ..jsonld.expansion import expand
 from ..jsonld.compaction import compact
-from .mapmaker import make_target_map
+from ..jsonld.extras.index import make_index
+from .mapmaker import make_target_map, leads_to
 from .mapper import map_to
 
 
@@ -12,6 +14,7 @@ null = None
 
 context = {
     "@context": {
+        "ex": "http://example.org/ns#",
         "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
         "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
         "xsd": "http://www.w3.org/2001/XMLSchema#",
@@ -55,7 +58,7 @@ def test_make_target_map():
         ]
     }
     vocab = expand(dict(context, **vocab), "")
-    target_map = make_target_map(vocab, {"@context": target})
+    target_map = make_target_map(vocab, {CONTEXT: target})
     assert_json_equals(target_map, expect)
 
 
@@ -77,7 +80,7 @@ def test_cope_with_circular_references():
 
     _to_target_map(target, assuming)
 
-    print('OK', end='')
+    print_ok()
 
 
 def test_reducing_foaf_to_rdfs():
@@ -209,10 +212,10 @@ def test_qualified_relations_as_reifications():
                 "@id": "bf:Contribution",
                 "rdfs:subClassOf": [
                     {"@id": "rdf:Statement"},
-                    {
-                        "owl:onProperty": {"@id": "rdf:predicate"},
-                        "owl:hasValue": {"@id": "dc:contributor"}
-                    }
+                    #{
+                    #    "owl:onProperty": {"@id": "rdf:predicate"},
+                    #    "owl:hasValue": {"@id": "dc:contributor"}
+                    #}
                 ]
             },
             {
@@ -231,6 +234,87 @@ def test_qualified_relations_as_reifications():
                 "@id": "bf:agent",
                 "rdfs:domain": {"@id": "bf:Contribution"},
                 "rdfs:subPropertyOf": {"@id": "rdf:object"}
+            },
+            {
+                "@id": "lcrel:ill",
+                "rdfs:subPropertyOf": {"@id": "dc:contributor"}
+            }
+        ]
+    }
+
+    check(**locals())
+
+
+def test_inferred_qualified_relations_as_reifications():
+    given = {
+        "@id": "/work",
+        "bf:contribution": {
+            "bf:agent": {
+                "@id": "/person/a"
+            },
+            "bf:role": {
+                "@id": "lcrel:ill"
+            }
+        }
+    }
+
+    target = {"@vocab": "http://purl.org/dc/terms/"}
+
+    expect = {
+        "@id": "/work",
+        "dc:contributor": {
+            "@id": "/person/a"
+        }
+    }
+
+    assuming = {
+        "@graph": [
+            {
+                "@id": "ex:QualifiedEvent",
+                "rdfs:subClassOf": [
+                    {"@id": "rdf:Statement"}
+                ]
+            },
+            {
+                "@id": "ex:subject",
+                "rdfs:subPropertyOf": {"@id": "rdf:subject"}
+            },
+            {
+                "@id": "ex:role",
+                "rdfs:subPropertyOf": {"@id": "rdf:predicate"}
+            },
+            {
+                "@id": "ex:object",
+                "rdfs:subPropertyOf": {"@id": "rdf:object"}
+            },
+
+            {
+                "@id": "ex:hasStatement",
+                "rdfs:subPropertyOf": {
+                    "owl:inverseOf": {"@id": "ex:subject"}
+                }
+            },
+
+            {
+                "@id": "bf:Contribution",
+                "rdfs:subClassOf": [
+                    {"@id": "ex:QualifiedEvent"}
+                ]
+            },
+            {
+                "@id": "bf:contribution",
+                "rdfs:range": {"@id": "bf:Contribution"},
+                "rdfs:subPropertyOf": {"@id": "ex:hasStatement"}
+            },
+            {
+                "@id": "bf:role",
+                "rdfs:domain": {"@id": "bf:Contribution"},
+                "rdfs:subPropertyOf": {"@id": "ex:role"}
+            },
+            {
+                "@id": "bf:agent",
+                "rdfs:domain": {"@id": "bf:Contribution"},
+                "rdfs:subPropertyOf": {"@id": "ex:object"}
             },
             {
                 "@id": "lcrel:ill",
@@ -371,6 +455,7 @@ def test_sort_target_rules():
         "@graph": [
             {
                 "@id": "schema:identifier",
+                #"rdfs:subPropertyOf": {"@id": "dc:identifier"},
                 "owl:propertyChainAxiom": {
                     "@list": [
                         {"@id": "bf:identifiedBy"},
@@ -392,7 +477,10 @@ def test_sort_target_rules():
             }
         ]
     }
-    target = {"@vocab": "http://schema.org/"}
+    target = [
+        {"@vocab": "http://schema.org/"},
+        #{"@vocab": "http://purl.org/dc/terms/"}
+    ]
     expect = {
         "http://id.loc.gov/ontologies/bibframe/identifiedBy": [
             {
@@ -412,8 +500,26 @@ def test_sort_target_rules():
         ]
     }
     vocab = expand(dict(context, **vocab), "")
-    target_map = make_target_map(vocab, {"@context": target})
+    target_map = make_target_map(vocab, {CONTEXT: target})
     assert_json_equals(target_map, expect)
+
+
+
+def test_leads_to():
+    r0 = {ID: "urn:x-test:0"}
+    r1 = {ID: "urn:x-test:1"}
+    r2 = {ID: "urn:x-test:2"}
+    rel = "urn:x-test:rel"
+    graph = [
+        r0,
+        dict(r1, **{rel: [r0]}),
+        dict(r2, **{rel: [r1]})
+    ]
+    index = make_index(graph)
+    assert leads_to(r0, index, rel, r0[ID])
+    assert leads_to(r1, index, rel, r0[ID])
+    assert leads_to(r2, index, rel, r0[ID])
+    print_ok()
 
 
 def check(given, target, expect, assuming):
@@ -426,19 +532,27 @@ def check(given, target, expect, assuming):
     assert_json_equals(outdata, expect)
 
 
-def assert_json_equals(given, expect):
-    g = _jsonstr(given)
-    e = _jsonstr(expect)
-    assert g == e, f'Expected:\n{e}\nGot:\n{g}'
+def assert_json_equals(given, expected):
+    gvn = _jsonstr(given)
+    exp = _jsonstr(expected)
+    assert_equals(gvn, exp)
+
+
+def assert_equals(given: str, expected: str):
+    assert given == expected, f'Expected:\n{expected}\nGot:\n{given}'
+    print_ok()
+
+
+def print_ok():
     print('OK', end='')
 
 
-def _to_target_map(target, assuming):
+def _to_target_map(target, assuming) -> dict:
     vocab = expand(dict(context, **assuming), "")
-    return make_target_map(expand(vocab, ""), {"@context": target})
+    return make_target_map(expand(vocab, ""), {CONTEXT: target})
 
 
-def _jsonstr(data):
+def _jsonstr(data) -> str:
     return json.dumps(data, indent=2, sort_keys=True)
 
 
