@@ -106,6 +106,9 @@ class JsTranspiler(CStyleTranspiler):
         self.filename = Path(self.outdir) / fpath
         self.stmt("'use strict'")
         self.outln()
+        rel = '../' * (len(srcpath.parts) - 2) or './'
+        self.outln(f"import {{ sorted }} from '{rel}builtins.js'", self.end_stmt)
+        self.outln()
         yield
 
     def handle_import(self, node: ast.ImportFrom):

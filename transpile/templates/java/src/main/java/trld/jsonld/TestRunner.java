@@ -2,6 +2,7 @@ package trld.jsonld;
 
 import java.util.*;
 
+import trld.Builtins;
 import trld.Common;
 
 import static trld.jsonld.Base.CONTEXT;
@@ -82,7 +83,7 @@ public class TestRunner {
 
     static Object datarepr(Object data) {
         if (data instanceof String)
-            return String.join("\n", Common.sorted(Arrays.asList(((String) data).split("\\n"))));
+            return String.join("\n", Builtins.sorted(Arrays.asList(((String) data).split("\\n"))));
         return data; // Common.dumpJson(data, true);
     }
 

@@ -1,5 +1,5 @@
 from typing import Optional, Dict, List, Set, Union, cast
-from ..common import warning, sorted
+from ..common import warning
 from .base import *
 
 

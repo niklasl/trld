@@ -1,5 +1,5 @@
 from typing import List, Dict, Set, Iterable, Iterator, Union, Optional, NamedTuple, cast
-from ..common import sorted, dump_canonical_json, parse_json
+from ..common import dump_canonical_json, parse_json
 from .base import *
 from .context import InvalidBaseDirectionError
 from .expansion import InvalidLanguageTaggedStringError

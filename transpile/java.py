@@ -69,6 +69,7 @@ class JavaTranspiler(CStyleTranspiler):
         'type': '{0}.getClass()',
         'id': '{0}.hashCode()',
         'print': 'System.out.println({0})',
+        'sorted': ('Builtins.sorted({0})', 'Builtins.sorted({0}, {1})', 'Builtins.sorted({0}, {1}, {2})'),
     }
 
     _current_imports: List[str]
@@ -117,6 +118,8 @@ class JavaTranspiler(CStyleTranspiler):
         self.stmt('import java.util.stream.Collectors')
         self.stmt('import java.io.*')
         self.stmt('import static java.util.AbstractMap.SimpleEntry')
+        self.outln()
+        self.stmt('import trld.Builtins')
         self.outln()
 
     def handle_import(self, node: ast.ImportFrom):
@@ -427,8 +430,7 @@ class JavaTranspiler(CStyleTranspiler):
 
         mtype = f'Map<{ktype}, {vtype}>'
 
-        # TODO: change to trld.Builtins.mapOf ...
-        return f'trld.Common.mapOf({data})', mtype
+        return f'trld.Builtins.mapOf({data})', mtype
 
     def map_set(self, expr: ast.Set):
         l, ltype = self.map_list(expr)

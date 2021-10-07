@@ -1,4 +1,3 @@
-from ..common import sorted
 from .base import *
 from .context import Context, Term
 

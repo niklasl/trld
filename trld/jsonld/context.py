@@ -1,5 +1,5 @@
 from typing import Optional, Dict, List, Set, Tuple, Union, cast
-from ..common import load_json, warning, resolve_iri, sorted
+from ..common import load_json, warning, resolve_iri
 from .base import *
 
 

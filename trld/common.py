@@ -8,8 +8,6 @@ from urllib.request import urlopen
 
 from .builtins import Char
 
-sorted = sorted
-
 
 class Input:
     def __init__(self, source=None):
