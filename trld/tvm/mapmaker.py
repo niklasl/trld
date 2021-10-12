@@ -88,7 +88,7 @@ def make_target_map(vocab: object, target: object) -> Dict:
                 key=lambda it: (
                         cast(int, cast(Tuple, it)[0]),
                         cast(Tuple, it)[1].get('match') is not None
-                        if isinstance(cast(Tuple, it)[1], Dict) else None
+                        if isinstance(cast(Tuple, it)[1], Dict) else False
                     ),
                 reverse=True)
         target_map[key] = [it for priority, it in rules] # keep all
