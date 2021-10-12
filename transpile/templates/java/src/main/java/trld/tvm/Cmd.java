@@ -18,6 +18,11 @@ public class Cmd {
 
         if (target instanceof String && new File((String) target).isFile()) {
             target = Common.loadJson((String) target);
+        } else {
+            Map ctx = new HashMap();
+            ctx.put("@vocab", target);
+            target = new HashMap();
+            ((Map) target).put("@context", ctx);
         }
 
         Map targetMap = Mapmaker.makeTargetMap(vocab, target);
