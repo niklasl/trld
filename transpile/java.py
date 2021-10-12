@@ -117,9 +117,9 @@ class JavaTranspiler(CStyleTranspiler):
         self.stmt('import java.util.stream.Stream')
         self.stmt('import java.util.stream.Collectors')
         self.stmt('import java.io.*')
-        self.stmt('import static java.util.AbstractMap.SimpleEntry')
         self.outln()
         self.stmt('import trld.Builtins')
+        self.stmt('import trld.KeyValue')
         self.outln()
 
     def handle_import(self, node: ast.ImportFrom):
@@ -228,15 +228,20 @@ class JavaTranspiler(CStyleTranspiler):
         elif attr == 'get' and self._is_map(ownertype) and len(callargs) == 2:
             return f'{self._cast(owner, parens=True)}.getOrDefault({callargs[0]}, {callargs[1]})'
 
-        elif not callargs:
-            if attr == 'sort' and self._is_list(ownertype):
-                    return f'Collections.sort({owner})'
+        if attr == 'sort' and self._is_list(ownertype):
+            if not callargs:
+                return f'Collections.sort({owner})'
+            else:
+                by_key = callargs[0]
+                do_reverse = callargs[1] if len(callargs) > 1 else self.constants[False][0]
+                return f'Collections.sort({owner}, Builtins.makeComparator({by_key}, {do_reverse}))'
 
+        elif not callargs:
             if attr == 'reverse' and self._is_list(ownertype):
-                    return f'Collections.reverse({owner})'
+                return f'Collections.reverse({owner})'
 
             if attr == 'copy' and self._is_map(ownertype):
-                    return f'new HashMap({owner})'
+                return f'new HashMap({owner})'
 
         member = under_camelize(attr, self.protected == '_')
         rtype = None
@@ -284,7 +289,7 @@ class JavaTranspiler(CStyleTranspiler):
             }.get(attr)
             # TODO: would be less brittle not to hack up the tuple repr
             # (which might contain checks for ',')...
-            if check and callargs[0].startswith('new SimpleEntry('):
+            if check and callargs[0].startswith('new KeyValue('):
                 alts = ' || '.join(f'{castowner}.{check}({arg})' for arg in
                                    callargs[0][16:-1].split(', '))
                 return f'({alts})'
@@ -430,7 +435,7 @@ class JavaTranspiler(CStyleTranspiler):
 
         mtype = f'Map<{ktype}, {vtype}>'
 
-        return f'trld.Builtins.mapOf({data})', mtype
+        return f'Builtins.mapOf({data})', mtype
 
     def map_set(self, expr: ast.Set):
         l, ltype = self.map_list(expr)
@@ -472,9 +477,16 @@ class JavaTranspiler(CStyleTranspiler):
         return f'{iter}{view}.stream().{method}({item} -> {elt})'
 
     def map_len(self, item: str) -> str:
-        itemcast = self._cast(item, parens=True)
-        itemtypeinfo = self.gettype(item)
-        itemtype = itemtypeinfo[0] if itemtypeinfo else None
+        # TODO: remove string hack! These are wrapped cast calls, we should
+        # store and use the cast type!
+        if item.startswith('((') and item.endswith(')') and ') ' in item:
+            itemcast = item
+            itemtype = item[2:-1].split(') ', 1)[0]
+        else:
+            itemcast = self._cast(item, parens=True)
+            itemtypeinfo = self.gettype(item)
+            itemtype = itemtypeinfo[0] if itemtypeinfo else None
+
         return f"{itemcast}.{'length' if itemtype == 'String' else 'size'}()"
 
     def _is_map(self, typerepr: str) -> bool:
@@ -503,7 +515,7 @@ class JavaTranspiler(CStyleTranspiler):
 
     def map_tuple(self, expr):
         parts = [self.repr_expr(el) for el in expr.elts]
-        return f"new SimpleEntry({', '.join(parts)})"
+        return f"new KeyValue({', '.join(parts)})"
 
     def unpack_tuple(self, expr, assignedto=None):
         parts = [self.repr_expr(el) for el in expr.elts]
@@ -594,10 +606,7 @@ class JavaTranspiler(CStyleTranspiler):
         return f'{iter}.stream(){optfilter}.collect(Collectors.toMap({gkey}, {gval}))'
 
     def map_lambda(self, args, body):
-        # TODO: hardcoded for the simplest case, else just ignoring
-        if ',' not in body:
-            return f"({', '.join(args)}) -> {body}"
-        return self.none
+        return f"({', '.join(args)}) -> {body}"
 
     def new_regexp(self, callargs) -> Tuple[str, str]:
         args = ', '.join(callargs)

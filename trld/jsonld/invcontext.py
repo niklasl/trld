@@ -17,7 +17,7 @@ def create_inverse_context(active_context: Context) -> JsonMap:
 
     # 3)
     term_keys: List[Optional[str]] = list(active_context.terms.keys())
-    term_keys.sort(key=lambda s: (len(s) if s else 0, s))
+    term_keys.sort(key=lambda s: (len(cast(str, s)) if s is not None else 0, s))
     for term_key in term_keys:
         assert isinstance(term_key, str) # TODO: Optional just to allow .get(Optional) ...
         term_dfn: Optional[Term] = active_context.terms[term_key]

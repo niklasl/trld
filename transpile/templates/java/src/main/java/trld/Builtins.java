@@ -16,6 +16,12 @@ public class Builtins {
     public static List sorted(Collection items, Function<Object, Comparable> getKey, boolean reversed) {
         List result = new ArrayList(items.size());
         result.addAll(items);
+        Comparator cmp = makeComparator(getKey, reversed);
+        Collections.sort(result, cmp);
+        return result;
+    }
+
+    public static Comparator makeComparator(Function<Object, Comparable> getKey, boolean reversed) {
         Comparator cmp = null;
         if (getKey != null) {
             cmp = (a, b) -> getKey.apply(a).compareTo(getKey.apply(b));
@@ -23,8 +29,7 @@ public class Builtins {
         if (reversed) {
             cmp = Collections.reverseOrder(cmp);
         }
-        Collections.sort(result, cmp);
-        return result;
+        return cmp;
     }
 
     public static Map mapOf(Object ...pairs) {
