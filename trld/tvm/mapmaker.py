@@ -231,7 +231,7 @@ def _process_property_chain(obj: Dict,
     # OWL_hasValue OR OWL_allValuesFrom
 
     if source_property:
-        if (candidate_prop != source_property and
+        if (source_property != candidate_prop and
             not _get_target_priority(target, source_property)):
             for prio, baseprop in baseprops:
                 rule: Dict = _rule_from(baseprop, None, value_from, match)
