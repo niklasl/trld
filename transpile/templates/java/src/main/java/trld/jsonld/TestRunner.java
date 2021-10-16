@@ -7,7 +7,7 @@ import trld.Common;
 
 import static trld.jsonld.Base.CONTEXT;
 import static trld.jsonld.Base.JSONLD10;
-import static trld.jsonld.Testcase.TESTS_URL;
+import static trld.jsonld.Testbase.TESTS_URL;
 
 public class TestRunner {
 

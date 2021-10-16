@@ -6,7 +6,7 @@ from pathlib import Path
 from ..common import set_source_locator
 from .base import JSONLD10, JSONLD11
 from . import context
-from .testcase import TestCase, TESTS_URL
+from .testbase import TestCase, TESTS_URL
 
 
 realprint = print
