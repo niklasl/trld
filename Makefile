@@ -30,12 +30,10 @@ _javatr: build | cache/json-ld-api cache/trig-tests
 	python3 -m transpile.java $(trld_modules) -o build/java/src/main/java
 	cp -R transpile/templates/java build
 java: _javatr
-	mkdir -p build/java
 	(cd build/java && ./gradlew -q clean uberjar test)
 	java -cp build/java/build/libs/trld-with-deps.jar trld.jsonld.TestRunner cache/json-ld-api/tests 2>&1 | grep '^Ran '
 	java -cp build/java/build/libs/trld-with-deps.jar trld.trig.Test cache/trig-tests 2>&1 | grep '^Ran '
 jar: _javatr
-	mkdir -p build/java
 	(cd build/java && ./gradlew -q test jar)
 
 _jstr: build/js/node_modules
