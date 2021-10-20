@@ -25,17 +25,23 @@ python: | cache/json-ld-api cache/trig-tests
 	python3 -m trld.tvm.test
 	python3 -m trld.trig.test | grep '^Ran '
 
-java: build | cache/json-ld-api cache/trig-tests
+_javatr: build | cache/json-ld-api cache/trig-tests
 	mkdir -p build/java
 	python3 -m transpile.java $(trld_modules) -o build/java/src/main/java
 	cp -R transpile/templates/java build
+java: _javatr
+	mkdir -p build/java
 	(cd build/java && ./gradlew -q clean uberjar test)
 	java -cp build/java/build/libs/trld-with-deps.jar trld.jsonld.TestRunner cache/json-ld-api/tests 2>&1 | grep '^Ran '
 	java -cp build/java/build/libs/trld-with-deps.jar trld.trig.Test cache/trig-tests 2>&1 | grep '^Ran '
+jar: _javatr
+	mkdir -p build/java
+	(cd build/java && ./gradlew -q test jar)
 
-js: build/js/node_modules
+_jstr: build/js/node_modules
 	python3 -m transpile.js $(trld_modules) -o build/js/lib
 	cp -R transpile/templates/js build
+js: _jstr
 	(cd build/js && TRLD_JSONLD_TESTDIR=$(shell pwd)/cache/json-ld-api/tests npm test || true)
 	(cd build/js && node -r esm lib/trig/test.js $(shell pwd)/cache/trig-tests) | grep '^Ran'
 
