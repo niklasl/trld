@@ -2,7 +2,7 @@ import ast
 from typing import List, Tuple, Optional, Union, IO
 from contextlib import contextmanager
 from pathlib import Path
-from .base import camelize, upper_camelize, under_camelize
+from .base import camelize, upper_camelize
 from .cstyle import CStyleTranspiler
 
 
@@ -243,7 +243,7 @@ class JavaTranspiler(CStyleTranspiler):
             if attr == 'copy' and self._is_map(ownertype):
                 return f'new HashMap({owner})'
 
-        member = under_camelize(attr, self.protected == '_')
+        member = self.to_attribute_name(attr)
         rtype = None
 
         if attr == 'items':# and self._is_map(ownertype):

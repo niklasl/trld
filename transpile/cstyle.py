@@ -1,5 +1,5 @@
 from typing import Optional
-from .base import Transpiler #, Casing
+from .base import Transpiler, camelize, under_camelize
 
 
 class CStyleTranspiler(Transpiler):
@@ -17,3 +17,9 @@ class CStyleTranspiler(Transpiler):
     line_comment = '//'
     inline_comment = '/*', '*/'
     indent = '  '
+
+    def to_var_name(self, name):
+        return camelize(name)
+
+    def to_attribute_name(self, attr):
+        return under_camelize(attr, self.protected == '_')

@@ -49,6 +49,8 @@ class Transpiler(ast.NodeVisitor):
     #_visitor: ast.NodeVisitor
     typing: bool # or typecheck_implies_casts...
     classdfn = 'class '
+    if_stmt = 'if (%s)'
+    while_stmt = 'while (%s)'
     inherit_constructor = True
     mknew = ''
     union_surrogate: Optional[str] = None
@@ -59,8 +61,10 @@ class Transpiler(ast.NodeVisitor):
     ctor: Optional[str] = None
     #call_keywords = AsDict
     func_defaults: Optional[str] = None
+    selfarg: Optional[str] = None
     this: str
     protected = ''
+    declaring: Optional[str] = None
     none: str
     constants: Dict
     operators: Dict
@@ -440,7 +444,7 @@ class Transpiler(ast.NodeVisitor):
         if all(c == '_' or c.isupper() or c.isdigit() for c in ownerref):
             prefix = prefix + self.constant
             public = True
-        elif not self.typing and '.' not in ownerref and self.gettype(ownerref) == None:
+        elif self.declaring and '.' not in ownerref and self.gettype(ownerref) == None:
             if not isclassattr:
                 prefix += self.declaring
 
@@ -483,7 +487,7 @@ class Transpiler(ast.NodeVisitor):
                 if self.typing and rvaltype and not isinstance(v, AST_CONSTANTS):
                     knowntypeinfo = self.gettype(rval)
                     if not self.isname(rval) or (knowntypeinfo and rvaltype != knowntypeinfo[0]):
-                        rval = f'({rvaltype}) {rval}'
+                        rval = self.repr_cast(rvaltype, rval)
 
         # TODO: for JS < 7?
         classlevel = self._within and isinstance(self._within[-1].node, ast.ClassDef)
@@ -527,7 +531,7 @@ class Transpiler(ast.NodeVisitor):
         orelse = node.orelse
         node.orelse = None
         test = self._thruthy(self.repr_expr(node.test))
-        self.enter_block(scope, 'if (', test, ')',
+        self.enter_block(scope, self.if_stmt % test,
                 end=' ' if orelse else None,
                 continued=continued)
         if orelse:
@@ -608,7 +612,7 @@ class Transpiler(ast.NodeVisitor):
     def visit_While(self, node):
         test = self._thruthy(self.repr_expr(node.test))
         scope = self.new_scope(node)
-        self.enter_block(scope, 'while (', test, ')')
+        self.enter_block(scope, self.while_stmt % test)
 
     def visit_Break(self, node):
         self.stmt('break', node=node)
@@ -652,9 +656,12 @@ class Transpiler(ast.NodeVisitor):
 
         for i, arg in enumerate(node.args.args):
             if arg.arg == 'self':
-                continue
-
-            aname = camelize(arg.arg)
+                if self.selfarg is None:
+                    continue
+                else:
+                    aname = self.selfarg
+            else:
+                aname = self.to_var_name(arg.arg)
 
             if arg.annotation:
                 atype = self.repr_annot(arg.annotation)
@@ -708,7 +715,7 @@ class Transpiler(ast.NodeVisitor):
         elif node.name == '__eq__':
             name = 'equals'
         elif not name:
-            name = under_camelize(node.name, self.protected == '_')
+            name = self.to_attribute_name(node.name)
 
         #for decorator in node.decorator_list:
         #    if isinstance(decorator, ast.Name) and decorator.id == 'property':
@@ -722,7 +729,7 @@ class Transpiler(ast.NodeVisitor):
             method = f'{self.this}.{name}'
         doreturn = 'return ' if node.returns else ''
         for signature, call in defaultcalls:
-            self.enter_block(None, prefix, self.funcdef(name, signature, ret), stmts=[
+            self.enter_block(None, prefix, self.overload(name, signature, ret), stmts=[
                     f'{doreturn}{method}({call})'
             ])
 
@@ -1025,6 +1032,15 @@ class Transpiler(ast.NodeVisitor):
 
         raise NotImplementedError(f'unhandled: {expr!r}')
 
+    def repr_cast(self, type, expr) -> str:
+        return  f'({type}) {expr}'
+
+    def to_var_name(self, name):
+        return name
+
+    def to_attribute_name(self, attr):
+        return attr
+
     def map_compare(self, left: str, op: ast.cmpop, right: str) -> str:
         if isinstance(op, ast.In):
             return self.map_in(right, left)
@@ -1077,7 +1093,7 @@ class Transpiler(ast.NodeVisitor):
                 arg0typerepr = self.repr_expr(call_args[0], annot=True)
                 arg1repr, arg1typerepr = self.repr_expr_and_type(call_args[1])
                 # TODO: 5f831dc1 (java-specific)
-                castvalue = f'({arg0typerepr}) {arg1repr}'
+                castvalue = self.repr_cast(arg0typerepr, arg1repr)
                 self._last_cast = arg0typerepr
                 if not self.typing:
                     return arg1repr, arg0typerepr
@@ -1168,7 +1184,7 @@ class Transpiler(ast.NodeVisitor):
             return name
         ntype_narrowed = self.gettype(name)
         if ntype_narrowed and ntype_narrowed[1] and ntype_narrowed != lvaltype:
-            result = f'({ntype_narrowed[0]}) {name}'
+            result = self.repr_cast(ntype_narrowed[0], name)
             if parens:
                 result = f'({result})'
             return result
@@ -1231,6 +1247,9 @@ class Transpiler(ast.NodeVisitor):
     def funcdef(self, name: str, args: List[Tuple], ret: Optional[str] = None):
         raise NotImplementedError
 
+    def overload(self, name: str, args: List[Tuple], ret: Optional[str] = None):
+        return self.funcdef(name, args, ret)
+
     def map_assert(self, expr: str, failmsg: str) -> str:
         raise NotImplementedError
 
@@ -1252,7 +1271,7 @@ class Transpiler(ast.NodeVisitor):
                 return map_repr.format(*callargs)
 
         name = self._type_alias.get(name, name)
-        obj = self.types.get(name) or under_camelize(name, self.protected == '_')
+        obj = self.types.get(name) or self.to_attribute_name(name)
 
         if callargs is not None:
             argrepr = ', '.join(callargs)

@@ -2,7 +2,6 @@ from pathlib import Path
 from typing import Union, Optional, List, Tuple
 from contextlib import contextmanager
 import ast
-from .base import camelize, under_camelize
 from .cstyle import CStyleTranspiler
 
 
@@ -117,7 +116,7 @@ class JsTranspiler(CStyleTranspiler):
             names = ', '.join(name for name, ntype in self._modules[modpath].items()
                               if ntype and not name.startswith('__'))
         else:
-            names = ', '.join(camelize(name.name) # type: ignore
+            names = ', '.join(self.to_var_name(name.name) # type: ignore
                     for name in node.names
                     if node.module is not None and name.name not in self._type_alias)
         rel = '.' * node.level
@@ -289,7 +288,7 @@ class JsTranspiler(CStyleTranspiler):
             assert not callargs
             return f'({castowner} % 1 == 0)'
         else:
-            member = under_camelize(attr, self.protected == '_')
+            member = self.to_attribute_name(attr)
 
         if attr == '__init__':
             classdfn = self._within[-2].node
