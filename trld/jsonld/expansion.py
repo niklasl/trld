@@ -264,16 +264,24 @@ def _expand_element(active_context: Context,
         # 13.1)
         if key == CONTEXT:
             continue
+
         # 13.2)
         expanded_property: Optional[str] = active_context.expand_vocab_iri(key)
+
         # 13.3)
         if expanded_property is None or (':' not in expanded_property and expanded_property not in KEYWORDS):
             continue
+
+        # TODO: [61e1e7da] spec errata? To allow index containers for @graph
+        # (The https://json-ld.org/playground/ handles this.)
+        is_not_graph = expanded_property != GRAPH
+
         # 13.4)
-        if expanded_property in KEYWORDS:
+        if is_not_graph and expanded_property in KEYWORDS:
             # 13.4.1)
             if active_property == REVERSE:
                 raise InvalidReversePropertyMapError
+
             # 13.4.2)
             if expanded_property in result and expanded_property not in {INCLUDED, TYPE}:
                 pass # FIXME: expansion TC in06 fails with this on ID! Due to nested recusion?
@@ -325,12 +333,15 @@ def _expand_element(active_context: Context,
                 #else:
                 #    result[TYPE] = expanded_value
 
-            # 13.4.5)
-            elif expanded_property == GRAPH:
-                expanded_value = as_list(expansion(active_context,
-                    GRAPH, value,
-                    base_url, frame_expansion, ordered, from_map,
-                    warn_on_keywordlike_terms, warn_on_empty_keys, warn_on_bnode_properties))
+            # TODO: not needed if [61e1e7da] is correct
+            ## 13.4.5)
+            # SKIPPED (TODO: is any edge case effected by flags when
+            # expanded_value is instead created after 13.4?)
+            #elif expanded_property == GRAPH:
+            #    #expanded_value = as_list(expansion(active_context,
+            #    #    GRAPH, value,
+            #    #    base_url, frame_expansion, ordered, from_map,
+            #    #    warn_on_keywordlike_terms, warn_on_empty_keys, warn_on_bnode_properties))
 
             # 13.4.6)
             elif expanded_property == INCLUDED:
