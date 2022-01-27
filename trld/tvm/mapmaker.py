@@ -64,7 +64,7 @@ def make_target_map(vocab: object, target: object) -> Dict:
         target_dfn[VOCAB] = target
     else:
         if isinstance(target, Dict):
-            target = target['@context']
+            target = target[CONTEXT]
         for dfn in as_list(target):
             target_dfn.update(cast(Dict, dfn))
 

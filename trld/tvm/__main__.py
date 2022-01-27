@@ -1,6 +1,7 @@
 import json
 import sys
 import os
+from ..jsonld.base import CONTEXT
 from ..jsonld.expansion import expand
 from ..jsonld.compaction import compact
 from .mapmaker import make_target_map
@@ -38,6 +39,6 @@ else:
     outdata = map_to(target_map, indata)
     outdata = compact(target, outdata) # type: ignore
     if isinstance(outdata, dict):
-        outdata.update(target)
+        outdata[CONTEXT] = target[CONTEXT]
 
     print(json.dumps(outdata, indent=2))
