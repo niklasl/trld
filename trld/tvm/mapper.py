@@ -7,33 +7,33 @@ ListOrJsonMap = Union[List, Dict[str, object]]
 
 def map_to(target_map: Dict, indata, drop_unmapped=False) -> ListOrJsonMap:
     result: ListOrJsonMap = {} if isinstance(indata, Dict) else []
-    _modify(target_map, indata, result)
+    _modify(target_map, indata, result, drop_unmapped)
     return result
 
 
-def _modify(target_map: Dict, ino: ListOrJsonMap, outo: Union[Dict, List]):
+def _modify(target_map: Dict, ino: ListOrJsonMap, outo: Union[Dict, List], drop_unmapped: bool):
     if isinstance(ino, Dict):
         for k, v in cast(Dict[str, object], ino).items(): # TODO: cast just for transpile
-            _modify_pair(target_map, k, v, outo)
+            _modify_pair(target_map, k, v, outo, drop_unmapped)
     elif isinstance(ino, List):
         i: int = 0
         for v in ino:
-            _modify_pair(target_map, i, v, outo)
+            _modify_pair(target_map, i, v, outo, drop_unmapped)
             i += 1
 
 
-def _modify_pair(target_map: Dict, k: Union[str, int], v: object, outo: Union[Dict, List]):
-    mapo: Dict[Union[str, int], Union[List, Dict, str]] = _map(target_map, k, v)
+def _modify_pair(target_map: Dict, k: Union[str, int], v: object, outo: Union[Dict, List], drop_unmapped: bool):
+    mapo: Dict[Union[str, int], Union[List, Dict, str]] = _map(target_map, k, v, drop_unmapped)
 
     for mapk, mapv in mapo.items():
         outv: Union[List, Dict]
         if isinstance(mapv, List):
             outv = []
-            _modify(target_map, mapv, outv)
+            _modify(target_map, mapv, outv, drop_unmapped)
             mapv = outv
         elif isinstance(mapv, Dict):
             outv = {}
-            _modify(target_map, mapv, outv)
+            _modify(target_map, mapv, outv, drop_unmapped)
             mapv = outv
 
         if isinstance(outo, Dict):

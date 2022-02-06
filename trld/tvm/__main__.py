@@ -16,6 +16,7 @@ if len(args) < 2:
 vocabfile = args.pop(0)
 targetref = args.pop(0)
 infile = args.pop(0) if args else None
+drop_unmapped = '--drop' in args
 
 if os.path.isfile(targetref):
     with open(targetref) as f:
@@ -36,7 +37,7 @@ else:
         indata = json.load(f)
         indata = expand(indata, infile)
 
-    outdata = map_to(target_map, indata)
+    outdata = map_to(target_map, indata, drop_unmapped)
     outdata = compact(target, outdata) # type: ignore
     if isinstance(outdata, dict):
         outdata[CONTEXT] = target[CONTEXT]
