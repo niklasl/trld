@@ -54,3 +54,10 @@ build/js/node_modules: build/js/package.json
 
 build/js/package.json: build
 	cp -R transpile/templates/js build
+
+_rusttr: build | cache/json-ld-api cache/trig-tests
+	mkdir -p build/java
+	python3 -m transpile.rust $(TRFLAGS) $(trld_modules) -o build/rust/src
+	cp -R transpile/templates/rust build
+rust: _rusttr
+	#(cd build/rust && cargo test)
