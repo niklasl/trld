@@ -1047,11 +1047,11 @@ class Transpiler(ast.NodeVisitor):
         elif isinstance(op, ast.NotIn):
             return self.map_in(right, left, negated=True)
         elif isinstance(op, ast.Eq):
-            if right.isnumeric():
+            if right.replace('-', '').isnumeric():
                 return self._fmt_op(ast.Is, left, right)
             return self._fmt_op(ast.Eq, left, right)
         elif isinstance(op, ast.NotEq):
-            if right.isnumeric():
+            if right.replace('-', '').isnumeric():
                 return self._fmt_op(ast.IsNot, left, right)
             return self._fmt_op(ast.NotEq, left, right)
         else:
