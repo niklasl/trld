@@ -2,8 +2,8 @@ from typing import Callable, Dict, List, NamedTuple, Optional, Union, cast
 import re
 
 from ..common import Output, uuid4
-from ..jsonld.base import (BASE, CONTEXT, GRAPH, ID, INDEX, LANGUAGE, LIST,
-                           REVERSE, TYPE, VALUE, VOCAB)
+from ..jsonld.base import (BASE, CONTAINER, CONTEXT, GRAPH, ID, INDEX,
+                           LANGUAGE, LIST, PREFIX, REVERSE, TYPE, VALUE, VOCAB)
 
 StrObject = Dict[str, object]
 StrOrObject = Union[str, StrObject]
@@ -134,7 +134,7 @@ class SerializerState:
         if self.context is not None:
             termdef: object = self.context.get(term)
             if isinstance(termdef, Dict):
-                return termdef['@container'] == '@list'
+                return termdef.get(CONTAINER) == LIST
 
         return False
 
@@ -142,7 +142,7 @@ class SerializerState:
         if self.context is not None:
             termdef: object = self.context.get(term)
             if isinstance(termdef, Dict):
-                return termdef['@container'] == '@language'
+                return termdef.get(CONTAINER) == LANGUAGE
 
         return False
 
@@ -236,7 +236,7 @@ class SerializerState:
             if term is None and rev_key is None:
                 continue
 
-            if term == self.aliases.id or term == "@context":
+            if term == self.aliases.id or term == CONTEXT:
                 continue
 
             if term == self.aliases.index_:
@@ -282,7 +282,7 @@ class SerializerState:
                 if term == self.aliases.type:
                     term = "a"
 
-                if term != '@list':
+                if term != LIST:
                     term = self.to_valid_term(term)
                     self.write(use_indent + term + " ")
 
@@ -359,7 +359,7 @@ class SerializerState:
         if write is None:
             write = lambda s: self._write(s)
         value = obj
-        lang: Optional[object] = self.context.get("@language")
+        lang: Optional[object] = self.context.get(LANGUAGE)
         datatype: Optional[str] = None
         if isinstance(obj, Dict):
             value = obj.get(self.aliases.value)
@@ -370,9 +370,9 @@ class SerializerState:
             if via_key is not None and via_key in self.context:
                 kdef = cast(StrOrObject, self.context[via_key])
             coerce_to: Optional[str] = None
-            if isinstance(kdef, Dict) and "@type" in kdef:
-                coerce_to = cast(str, kdef["@type"])
-            if coerce_to == "@vocab":
+            if isinstance(kdef, Dict) and TYPE in kdef:
+                coerce_to = cast(str, kdef[TYPE])
+            if coerce_to == VOCAB:
                 next = False
                 for v in as_list(value):
                     if next:
@@ -381,7 +381,7 @@ class SerializerState:
                         next = True
                     write(self.ref_repr(v, True) if isinstance(v, str) else str(v))
                 return
-            elif coerce_to == "@id":
+            elif coerce_to == ID:
                 next = False
                 for v in as_list(value):
                     if next:
@@ -393,8 +393,8 @@ class SerializerState:
             elif coerce_to:
                 datatype = coerce_to
             else:
-                if isinstance(kdef, Dict) and "@language" in kdef:
-                    lang = kdef["@language"]
+                if isinstance(kdef, Dict) and LANGUAGE in kdef:
+                    lang = kdef[LANGUAGE]
 
         next = False
         for v in as_list(value):
@@ -435,7 +435,7 @@ class SerializerState:
                 return None
             term = None
             if isinstance(kdef, Dict):
-                term = kdef.get("@id", key)
+                term = kdef.get(ID, key)
             else:
                 term = kdef
             assert isinstance(term, str)
@@ -446,8 +446,8 @@ class SerializerState:
 
     def rev_key_for(self, key: str) -> Optional[str]:
         kdef = self.context[key]
-        if isinstance(kdef, Dict) and "@reverse" in kdef:
-            return cast(str, kdef["@reverse"])
+        if isinstance(kdef, Dict) and REVERSE in kdef:
+            return cast(str, kdef[REVERSE])
         return None
 
     def make_top_object(self, s: Optional[str], rev_key: str, it: Dict) -> StrObject:
@@ -460,7 +460,7 @@ class SerializerState:
         return node
 
     def repr_type(self, t: StrOrObject) -> str:
-        tstr: str = t if isinstance(t, str) else cast(str, cast(Dict, t)['@type']) # assuming annotation form
+        tstr: str = t if isinstance(t, str) else cast(str, cast(Dict, t)[TYPE]) # assuming annotation form
         return self.to_valid_term(cast(str, self.term_for(tstr)))
 
     def ref_repr(self, refobj: Optional[StrOrObject], use_vocab = False) -> str:
@@ -611,7 +611,7 @@ def collect_prefixes(context: Optional[object]) -> Dict[str, str]:
         # TODO: verify JSON-LD 1.1 prefix rules
         if isinstance(value, str) and value[-1] in {'#', '/', ':'}:
             prefixes['' if key == VOCAB else key] = value
-        elif isinstance(value, Dict) and value.get('@prefix') == True:
+        elif isinstance(value, Dict) and value.get(PREFIX) == True:
             prefixes[key] = value[ID]
 
     return prefixes
