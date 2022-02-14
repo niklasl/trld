@@ -1,4 +1,5 @@
 import ast
+import re
 from typing import List, Tuple, Optional, Union, IO
 from contextlib import contextmanager
 from pathlib import Path
@@ -36,7 +37,8 @@ class JavaTranspiler(CStyleTranspiler):
         'Set': 'Set',
         'Iterable': 'Iterable',
         'Tuple': 'Map.Entry',
-        're.Pattern': 'Pattern'
+        'Callable': 'Function',
+        're.Pattern': 'Pattern',
     }
 
     constants = {
@@ -113,6 +115,7 @@ class JavaTranspiler(CStyleTranspiler):
         self.outln()
         self.stmt('//import javax.annotation.Nullable')
         self.stmt('import java.util.*')
+        self.stmt('import java.util.function.Function')
         self.stmt('import java.util.regex.Pattern')
         self.stmt('import java.util.stream.Stream')
         self.stmt('import java.util.stream.Collectors')
@@ -196,8 +199,9 @@ class JavaTranspiler(CStyleTranspiler):
                         f'{parttypes[1]} {parts[1]} = {entry}.getValue()']
                 nametypes = [(parts[0], parttypes[0]), (parts[1], parttypes[1])]
             else:
-                typedentry = f'{parttypes[1]} {part}'
-                nametypes = [(part, parttypes[1])]
+                parttype = parttypes[0 if container.endswith('keySet()') else 1]
+                typedentry = f'{parttype} {part}'
+                nametypes = [(part, parttype)]
         else:
             typedentry = f'{parttype} {part}'
             nametypes = [(part, parttype)]
@@ -282,6 +286,12 @@ class JavaTranspiler(CStyleTranspiler):
             v = callargs.pop()
             assert not callargs
             return f'({castowner}.matcher({v}).matches() ? {v} : null)'
+        elif ownertype and ownertype == 'Pattern' and attr == 'sub':
+            v = callargs.pop()
+            repl = callargs.pop()
+            repl = re.sub(r'\\\\(\d+)', r'$\1', repl)
+            assert not callargs
+            return f'({castowner}.matcher({v}).replaceAll({repl}))'
         elif ownertype and ownertype == 'String':
             check = {
                 'startswith': 'startsWith',

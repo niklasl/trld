@@ -93,6 +93,10 @@ public class Common {
         }
     }
 
+    public static String uuid4() {
+        return java.util.UUID.randomUUID().toString();
+    }
+
     public static void warning(String msg) {
         System.err.println(msg);
     }

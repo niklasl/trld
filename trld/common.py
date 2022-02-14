@@ -1,9 +1,10 @@
 import json
 import sys
-from typing import Iterator, Optional, Callable
+import uuid
 from io import StringIO
 from os.path import expanduser
-from urllib.parse import urlparse, urljoin
+from typing import Callable, Iterator, Optional
+from urllib.parse import urljoin, urlparse
 from urllib.request import urlopen
 
 from .builtins import Char
@@ -65,6 +66,7 @@ class Output:
 
 source_locator: Optional[Callable[[str], str]] = None
 
+
 def set_source_locator(locator: Callable[[str], str]):
     global source_locator
     source_locator = locator
@@ -79,6 +81,7 @@ def remove_file_protocol(ref: str):
 
 
 # TODO: LoadDocumentCallback?
+
 
 def load_json(url: str) -> object:
     url = source_locator(url) if source_locator else url
@@ -99,9 +102,7 @@ def parse_json(s: str) -> object:
 
 
 def dump_json(o: object, pretty=False) -> str:
-    return json.dumps(o,
-            indent=2 if pretty else None,
-            ensure_ascii=not pretty)
+    return json.dumps(o, indent=2 if pretty else None, ensure_ascii=not pretty)
 
 
 def dump_canonical_json(o: object) -> str:
@@ -117,7 +118,12 @@ def resolve_iri(base: str, relative: str) -> str:
         if url.query:
             urlpath += f'?{url.query}'
         return urljoin(base, urljoin(relative, urlpath))
+
     return urljoin(base, relative)
+
+
+def uuid4() -> str:
+    return str(uuid.uuid4())
 
 
 def warning(msg: str):
