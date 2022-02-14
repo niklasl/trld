@@ -71,7 +71,7 @@ class SerializerState:
             self,
             out: Output,
             settings: Settings,
-            context: Optional[Dict],
+            context: Optional[object],
             base_iri: Optional[str] = None,
             parent: 'SerializerState' = None,
     ):
@@ -90,11 +90,10 @@ class SerializerState:
     def _kw(self, s: str) -> str:
         return s.upper() if self.settings.upcase_keywords else s
 
-    def init_context(self, context: Optional[StrObject]):
+    def init_context(self, context: Optional[object]):
         self.aliases = KeyAliases()
-        if context is None:
-            self.context = {}
-        else:
+        self.context = {}
+        if context is not None:
             for key in self.context.keys():
                 raise Exception('context already initialized')
         ctx: StrObject = {}
@@ -108,9 +107,7 @@ class SerializerState:
         self.prefixes = collect_prefixes(context)
 
     def serialize(self, data: Dict):
-        ctx: object = data.get(CONTEXT)
-        if isinstance(ctx, Dict):
-            self.init_context(cast(StrObject, ctx))
+        self.init_context(data.get(CONTEXT))
         self.prelude(self.prefixes)
         graph: object = data if isinstance(data, List) else data.get(GRAPH)
         if graph:
@@ -201,7 +198,7 @@ class SerializerState:
 
         if self.aliases.graph in obj:
             if CONTEXT in obj:
-                self.prelude(collect_prefixes(cast(StrObject, obj[CONTEXT])))
+                self.prelude(collect_prefixes(obj[CONTEXT]))
             self.object_to_trig(s, obj[self.aliases.graph])
             return []
 
@@ -369,9 +366,9 @@ class SerializerState:
             datatype = cast(str, obj.get(self.aliases.type))
             lang = obj.get(self.aliases.lang)
         else:
-            kdef: Optional[StrObject] = None
+            kdef: Optional[StrOrObject] = None
             if via_key is not None and via_key in self.context:
-                kdef = cast(StrObject, self.context[via_key])
+                kdef = cast(StrOrObject, self.context[via_key])
             coerce_to: Optional[str] = None
             if isinstance(kdef, Dict) and "@type" in kdef:
                 coerce_to = cast(str, kdef["@type"])
@@ -441,8 +438,6 @@ class SerializerState:
                 term = kdef.get("@id", key)
             else:
                 term = kdef
-            if term is None:
-                return None
             assert isinstance(term, str)
             ci: int = term.find(":")
             return f":{term}" if ci == -1 else term
@@ -607,7 +602,7 @@ class SerializerState:
         return None
 
 
-def collect_prefixes(context: Optional[Dict]) -> Dict[str, str]:
+def collect_prefixes(context: Optional[object]) -> Dict[str, str]:
     if not isinstance(context, Dict):
         return {}
 
