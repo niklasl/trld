@@ -76,7 +76,7 @@ class JsTranspiler(CStyleTranspiler):
     function_map = {
         'str': '{0}.toString()',
         'chr': 'String.fromCharCode({0})',
-        'int': ('parseInt({0})', 'parseInt({0}, {1})'),
+        'int': ['parseInt({0})', 'parseInt({0}, {1})'],
         'pow': 'Math.pow({0}, {1})',
         'type': 'typeof {0}',
         'id': '{0}',

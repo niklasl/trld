@@ -65,13 +65,13 @@ class JavaTranspiler(CStyleTranspiler):
 
     function_map = {
         'str': '{0}.toString()',
-        'int': ('Integer.valueOf({0})', 'Integer.valueOf({0}, {1}).intValue()'),
+        'int': ['Integer.valueOf({0})', 'Integer.valueOf({0}, {1}).intValue()'],
         'chr': 'Character.toString(((char) {0}))',
         'pow': 'Math.pow({0}, {1})',
         'type': '{0}.getClass()',
         'id': '{0}.hashCode()',
         'print': 'System.out.println({0})',
-        'sorted': ('Builtins.sorted({0})', 'Builtins.sorted({0}, {1})', 'Builtins.sorted({0}, {1}, {2})'),
+        'sorted': ['Builtins.sorted({0})', 'Builtins.sorted({0}, {1})', 'Builtins.sorted({0}, {1}, {2})'],
     }
 
     _current_imports: List[str]

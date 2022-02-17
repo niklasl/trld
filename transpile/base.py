@@ -72,7 +72,7 @@ class Transpiler(ast.NodeVisitor):
     strcmp: Optional[str] = None
     notmissing: Optional[str] = None
     list_concat: Optional[str] = None
-    function_map: Dict[str, Union[Optional[str], Tuple[str, str]]]
+    function_map: Dict[str, Union[Optional[str], List[str]]]
 
     line_comment: str
     inline_comment: Tuple[str, str]
@@ -1266,7 +1266,7 @@ class Transpiler(ast.NodeVisitor):
         if callargs:
             map_repr = self.function_map.get(name)
             if map_repr:
-                if isinstance(map_repr, tuple):
+                if isinstance(map_repr, list):
                     map_repr = map_repr[len(callargs) - 1]
                 return map_repr.format(*callargs)
 
