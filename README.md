@@ -25,7 +25,7 @@ these algorithms. _It is not a generic transpiler_.
 
 ### [TriG](https://www.w3.org/TR/trig/) _(W3C Spec)_
 - [x] Parser
-- [ ] Serializer
+- [x] Serializer
 
 ### [Target Vocabulary Maps](https://github.com/niklasl/ldtvm#target-vocabulary-maps) _(Experimental)_
 - [x] Basic RDFS & OWL
