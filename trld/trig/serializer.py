@@ -15,16 +15,19 @@ PNAME_LOCAL_ESC = re.compile(r"([~!$&'()*+,;=/?#@%]|^[.-]|[.-]$)")
 
 
 class Settings(NamedTuple):
+    turtle_only: bool = False
+    turtle_drop_named: bool = False
+    drop_rdfstar: bool = False
     indent_chars: str = '  '
-    upcase_keywords: bool = False
     use_graph_keyword: bool = True
-    space_before_semicolon: bool = True
+    upcase_keywords: bool = False
+    # space_before_semicolon: bool = True
     predicate_repeat_new_line: bool = True
-    bracket_start_new_line: bool = False
+    # bracket_start_new_line: bool = False
     bracket_end_new_line: bool = False
-    list_item_new_line: bool = True
+    # list_item_new_line: bool = True
     prologue_end_line: int = 1
-    separator_lines: int = 1
+    # separator_lines: int = 1
 
 
 class KeyAliases(NamedTuple):
@@ -50,6 +53,17 @@ def serialize(
     settings = settings if settings is not None else Settings()
     state = SerializerState(out, settings, context, base_iri)
     state.serialize(data)
+
+
+def serialize_turtle(
+    data: StrObject,
+    out: Output = None,
+    context: Optional[Dict] = None,
+    base_iri: Optional[str] = None,
+    union: bool = False,
+):
+    settings = Settings(turtle_only=True, turtle_drop_named=not union)
+    serialize(data, out, context, base_iri, settings)
 
 
 class SerializerState:
@@ -109,7 +123,7 @@ class SerializerState:
     def serialize(self, data: Dict):
         self.init_context(data.get(CONTEXT))
         self.prelude(self.prefixes)
-        graph: object = data if isinstance(data, List) else data.get(GRAPH)
+        graph: object = data if isinstance(data, List) else data.get(self.aliases.graph)
         if graph:
             for node in as_list(graph):
                 self.object_to_turtle(cast(StrObject, node))
@@ -148,16 +162,23 @@ class SerializerState:
 
     def object_to_trig(self, iri: Optional[str], graph: object):
         self.writeln()
-        if iri == None:
-            self.writeln("{")
-        else:
-            if self.graph_keyword:
-                    self.write(f'{self.graph_keyword} ')
-            self.writeln(f'{self.ref_repr(iri)}:')
+        if iri is not None and self.settings.turtle_drop_named:
+            return
+
+        if not self.settings.turtle_only:
+            if iri == None:
+                self.writeln("{")
+            else:
+                if self.graph_keyword:
+                        self.write(f'{self.graph_keyword} ')
+                self.writeln(f'{self.ref_repr(iri)} {{')
+
         for node in as_list(graph):
-            self.object_to_turtle(cast(StrObject, node), 0, GRAPH)
-        self.writeln()
-        self.writeln("}")
+            self.object_to_turtle(cast(StrObject, node), 0, self.aliases.graph)
+
+        if not self.settings.turtle_only:
+            self.writeln()
+            self.writeln("}")
 
     def object_to_turtle(
             self,
@@ -197,6 +218,9 @@ class SerializerState:
         is_bracketed: bool = is_list or via_key == self.aliases.annotation
 
         if self.aliases.graph in obj:
+            if ID in obj and self.settings.turtle_drop_named:
+                return []
+
             if CONTEXT in obj:
                 self.prelude(collect_prefixes(obj[CONTEXT]))
             self.object_to_trig(s, obj[self.aliases.graph])
@@ -205,7 +229,8 @@ class SerializerState:
         if explicit_list:
             self.write('( ')
 
-        in_graph_add: int = 1 if via_key == GRAPH else 0
+        in_graph: bool = via_key == self.aliases.graph and not self.settings.turtle_only
+        in_graph_add: int = 1 if in_graph else 0
 
         if s is not None and self.has_keys(obj, 2):
             if depth == 0:
@@ -344,6 +369,9 @@ class SerializerState:
             return top_objects
 
     def output_annotation(self, v: object, depth: int):
+        if self.settings.drop_rdfstar:
+            return
+
         if isinstance(v, Dict) and self.aliases.annotation in v:
             annotation: StrObject = v[self.aliases.annotation]
             self.write(':|')
@@ -508,6 +536,9 @@ class SerializerState:
         return f'<{ref}>'
 
     def repr_triple(self, ref: StrObject) -> str:
+        if self.settings.drop_rdfstar:
+            raise Exception('Triple nodes disallowed unless in RDF-star mode')
+
         s: str = self.ref_repr(cast(str, ref[self.aliases.id]))
 
         p: str = ''
