@@ -332,7 +332,7 @@ class ReadNumber(ReadTerm):
         value = self.pop()
         if self.whole:
             value = f'{self.whole}{self.dot}{value}'
-            number = float(value)
+            number: float = float(value)
             if number.is_integer():
                 return {VALUE: value, TYPE: XSD_DOUBLE if self.exp else XSD_DECIMAL}
             return number

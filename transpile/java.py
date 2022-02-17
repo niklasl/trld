@@ -65,6 +65,7 @@ class JavaTranspiler(CStyleTranspiler):
 
     function_map = {
         'str': '{0}.toString()',
+        'float': 'Double.parseDouble({0})',
         'int': ['Integer.valueOf({0})', 'Integer.valueOf({0}, {1}).intValue()'],
         'chr': 'Character.toString(((char) {0}))',
         'pow': 'Math.pow({0}, {1})',
