@@ -118,7 +118,7 @@ class SerializerState:
         elif isinstance(context, Dict):
                 ctx.update(context)
         self.context = ctx
-        self.prefixes = collect_prefixes(context)
+        self.prefixes = collect_prefixes(ctx)
 
     def serialize(self, data: Dict):
         self.init_context(data.get(CONTEXT))
