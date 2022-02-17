@@ -650,3 +650,13 @@ def collect_prefixes(context: Optional[object]) -> Dict[str, str]:
 
 def as_list(value) -> List:
     return value if isinstance(value, List) else [value]
+
+
+if __name__ == '__main__':
+    import sys, json
+
+    data = json.load(sys.stdin)
+    if '--turtle' in sys.argv:
+        serialize_turtle(data, union='--union' in sys.argv)
+    else:
+        serialize(data)

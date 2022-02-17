@@ -2,7 +2,8 @@ from typing import Any
 import json
 import sys
 import argparse
-from ..common import load_json
+
+from ..common import load_json, dump_json
 from .expansion import expand
 from .compaction import compact
 from .flattening import flatten
@@ -11,7 +12,7 @@ from .flattening import flatten
 def err(msg): print(msg, file=sys.stderr)
 
 argparser = argparse.ArgumentParser()
-argparser.add_argument('source', nargs='+')
+argparser.add_argument('source', nargs='*')
 argparser.add_argument('-c', '--context', help='Use to compact expanded JSON-LD')
 argparser.add_argument('-e', '--expand-context', help='Use to expand plain JSON to JSON-LD')
 argparser.add_argument('-b', '--base', help='Set the base IRI (default is current source)')
@@ -23,27 +24,29 @@ context_data = None
 if args.context:
     context_data = load_json(args.context)
 
-for doc_path in args.source:
-    if len(args.source) > 1:
+doc_paths = args.source or ['-']
+
+for doc_path in doc_paths:
+    if len(doc_paths) > 1:
         err(f"Parsing file: '{doc_path}'")
+
     if doc_path == '-':
         doc_path = '/dev/stdin'
-        doc_data = json.load(sys.stdin)
+        data = json.load(sys.stdin)
     else:
-        doc_data = load_json(doc_path)
+        data = load_json(doc_path)
 
     ordered = True
     base_iri = args.base if args.base else f'file://{doc_path}'
 
     try:
-        result: Any = expand(doc_data, base_iri, args.expand_context, ordered=ordered)
+        result: Any = expand(data, base_iri, args.expand_context, ordered=ordered)
         if args.flatten:
             result = flatten(result, ordered=ordered)
         if context_data:
             result = compact(context_data, result, base_iri, ordered=ordered)
 
-
-        print(json.dumps(result, indent=2))
+        print(dump_json(result, pretty=True))
     except Exception as e:
         err(f"Error in file '{doc_path}'")
         import traceback
