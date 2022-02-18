@@ -44,12 +44,11 @@ class KeyAliases(NamedTuple):
 
 def serialize(
     data: StrObject,
-    out: Output = None,
+    out: Output,
     context: Optional[Dict] = None,
     base_iri: Optional[str] = None,
     settings: Settings = None,
 ):
-    out = out if out is not None else Output()
     settings = settings if settings is not None else Settings()
     state = SerializerState(out, settings, context, base_iri)
     state.serialize(data)
@@ -57,7 +56,7 @@ def serialize(
 
 def serialize_turtle(
     data: StrObject,
-    out: Output = None,
+    out: Output,
     context: Optional[Dict] = None,
     base_iri: Optional[str] = None,
     union: bool = False,
@@ -656,7 +655,8 @@ if __name__ == '__main__':
     import sys, json
 
     data = json.load(sys.stdin)
+    out = Output(sys.stdout)
     if '--turtle' in sys.argv:
-        serialize_turtle(data, union='--union' in sys.argv)
+        serialize_turtle(data, out, union='--union' in sys.argv)
     else:
-        serialize(data)
+        serialize(data, out)

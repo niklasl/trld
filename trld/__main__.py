@@ -13,18 +13,18 @@ def err(msg): print(msg, file=sys.stderr)
 
 
 def serialize_rdf(result, fmt):
+    out = Output(sys.stdout)
     if fmt in {'trig', 'turtle', 'turtle-union'}:
         from .trig import serializer as trig
         if fmt == 'trig':
-            trig.serialize(result)
+            trig.serialize(result, out)
         else:
-            trig.serialize_turtle(result, union=fmt == 'turtle-union')
+            trig.serialize_turtle(result, out, union=fmt == 'turtle-union')
     else:
         from .jsonld.rdf import to_rdf_dataset
         dataset = to_rdf_dataset(result)
         if fmt == 'nq':
             from .nq import serializer as nq
-            out = Output()
             nq.serialize(dataset, out)
         else:
             print(json.dumps(dataset, indent=2,

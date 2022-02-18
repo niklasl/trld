@@ -3,7 +3,7 @@ import sys
 import uuid
 from io import StringIO
 from os.path import expanduser
-from typing import Callable, Iterator, Optional
+from typing import Callable, Iterator, Optional, TextIO
 from urllib.parse import urljoin, urlparse
 from urllib.request import urlopen
 
@@ -41,10 +41,10 @@ class Input:
 
 
 class Output:
-    def __init__(self, dest=None):
-        if dest is True:
+    def __init__(self, dest: Optional[TextIO] = None):
+        if dest is None:
             dest = StringIO()
-        self._dest = dest or sys.stdout
+        self._dest = dest
 
     def write(self, s: str):
         print(s, file=self._dest, end='')
@@ -52,13 +52,12 @@ class Output:
     def writeln(self, s: str):
         print(s, file=self._dest)
 
+    def get_captured(self):
+        return self._dest
+
     def get_value(self):
         assert isinstance(self._dest, StringIO)
         return self._dest.getvalue()
-
-    def close(self):
-        if self._dest is not sys.stdout:
-            self._dest.close()
 
 
 # TODO: also define RemoteDocument (using Input)...

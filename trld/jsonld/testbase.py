@@ -101,7 +101,7 @@ class TestCase:
                 rdf_direction, use_native_types, use_rdf_type)
 
     def run_to_rdf_test(self) -> object:
-        out: Output = Output(True)
+        out: Output = Output()
         in_data: JsonObject = cast(JsonObject, load_json(self.indoc_path))
         in_data = expand(in_data, self.base_uri,
                 expand_context=self.expand_context, ordered=True)
