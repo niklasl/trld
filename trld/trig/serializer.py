@@ -546,10 +546,10 @@ class SerializerState:
         for k in ref.keys():
             if k == self.aliases.id:
                 continue
-            if p is not None:
+            if p != '':
                 raise Exception('Quoted triples cannot contain multiple statements')
 
-            p = self.term_for(k)
+            p = cast(str, self.term_for(k))
             obj = cast(StrObject, ref[k])
 
         o: str
@@ -569,7 +569,8 @@ class SerializerState:
                 self.to_literal(obj, p, lambda x: l.append(cast(str, x)))
                 o = ''.join(l)
             else:
-                o = self.ref_repr(obj)
+                assert isinstance(obj, Dict) and self.aliases.id in obj
+                o = self.ref_repr(cast(str, obj[self.aliases.id]))
 
         return f'<< {s} {p} {o} >>'
 
