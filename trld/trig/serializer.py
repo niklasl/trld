@@ -225,7 +225,7 @@ class SerializerState:
             if ID in obj and self.settings.turtle_drop_named:
                 return []
 
-            if CONTEXT in obj:
+            if CONTEXT in obj and depth > 0:
                 self.prelude(collect_prefixes(obj[CONTEXT]))
             self.object_to_trig(s, obj[self.aliases.graph], depth)
             return []
