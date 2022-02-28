@@ -125,6 +125,7 @@ class SerializerState:
             self.prelude(self.prefixes)
             self.object_to_turtle(data)
         else:
+            assert isinstance(data, List)
             for item in data:
                 self.object_to_turtle(item)
 
@@ -176,7 +177,7 @@ class SerializerState:
                 self.writeln(f'{self.ref_repr(iri)} {{')
 
         for node in as_list(graph):
-            via = self.aliases.graph if in_graph_block else None
+            via: Optional[str] = self.aliases.graph if in_graph_block else None
             self.object_to_turtle(cast(StrObject, node), depth, via)
 
         if not self.settings.turtle_only:
