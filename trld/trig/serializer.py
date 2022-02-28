@@ -165,7 +165,7 @@ class SerializerState:
         in_graph_block: bool = iri is not None or depth > 0
 
         if not self.settings.turtle_only:
-            if iri == None:
+            if iri is None:
                 if depth > 0:
                     self.writeln()
                     self.writeln("{")
@@ -261,7 +261,7 @@ class SerializerState:
         for key, vo in cast(StrObject, obj).items():
             term = self.term_for(key)
 
-            rev_key: Optional[str] = self.rev_key_for(key) if term == None else None
+            rev_key: Optional[str] = self.rev_key_for(key) if term is None else None
             if term is None and rev_key is None:
                 continue
 
