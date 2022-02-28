@@ -119,15 +119,14 @@ class SerializerState:
         self.context = ctx
         self.prefixes = collect_prefixes(ctx)
 
-    def serialize(self, data: Dict):
-        self.init_context(data.get(CONTEXT))
-        self.prelude(self.prefixes)
-        graph: object = data if isinstance(data, List) else data.get(self.aliases.graph)
-        if graph:
-            for node in as_list(graph):
-                self.object_to_turtle(cast(StrObject, node))
-        else:
+    def serialize(self, data: Union[List, Dict]):
+        if isinstance(data, Dict):
+            self.init_context(data.get(CONTEXT))
+            self.prelude(self.prefixes)
             self.object_to_turtle(data)
+        else:
+            for item in data:
+                self.object_to_turtle(item)
 
     def prelude(self, prefixes: Dict[str, str]):
         for k, v in prefixes.items():
@@ -159,25 +158,31 @@ class SerializerState:
 
         return False
 
-    def object_to_trig(self, iri: Optional[str], graph: object):
-        self.writeln()
+    def object_to_trig(self, iri: Optional[str], graph: object, depth: int = 0):
         if iri is not None and self.settings.turtle_drop_named:
             return
 
+        in_graph_block: bool = iri is not None or depth > 0
+
         if not self.settings.turtle_only:
             if iri == None:
-                self.writeln("{")
+                if depth > 0:
+                    self.writeln()
+                    self.writeln("{")
             else:
+                self.writeln()
                 if self.graph_keyword:
                         self.write(f'{self.graph_keyword} ')
                 self.writeln(f'{self.ref_repr(iri)} {{')
 
         for node in as_list(graph):
-            self.object_to_turtle(cast(StrObject, node), 0, self.aliases.graph)
+            via = self.aliases.graph if in_graph_block else None
+            self.object_to_turtle(cast(StrObject, node), depth, via)
 
         if not self.settings.turtle_only:
-            self.writeln()
-            self.writeln("}")
+            if in_graph_block:
+                self.writeln()
+                self.writeln("}")
 
     def object_to_turtle(
             self,
@@ -222,7 +227,7 @@ class SerializerState:
 
             if CONTEXT in obj:
                 self.prelude(collect_prefixes(obj[CONTEXT]))
-            self.object_to_trig(s, obj[self.aliases.graph])
+            self.object_to_trig(s, obj[self.aliases.graph], depth)
             return []
 
         if explicit_list:
