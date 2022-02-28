@@ -223,7 +223,7 @@ class SerializerState:
         is_bracketed: bool = is_list or via_key == self.aliases.annotation
 
         if self.aliases.graph in obj:
-            if ID in obj and self.settings.turtle_drop_named:
+            if s is not None and self.settings.turtle_drop_named:
                 return []
 
             if CONTEXT in obj and depth > 0:
