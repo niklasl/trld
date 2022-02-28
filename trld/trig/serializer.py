@@ -413,7 +413,7 @@ class SerializerState:
                         write(' , ')
                     else:
                         next = True
-                    write(self.ref_repr(v, True) if isinstance(v, str) else str(v))
+                    write(self.ref_repr(v, True) if isinstance(v, str) else self.to_str(v))
                 return
             elif coerce_to == ID:
                 next = False
@@ -437,24 +437,31 @@ class SerializerState:
             else:
                 next = True
 
-            if isinstance(v, str):
-                escaped = v.replace('\\', '\\\\')
-                quote = '"'
-                if escaped.find('\n') > -1:
-                    quote = '"""'
-                    if escaped.endswith('"'):
-                        escaped = f'{escaped[0 : len(escaped) - 1]}\\"'
-                else:
-                    escaped = escaped.replace('"', '\\"')
-                write(quote)
-                write(escaped)
-                write(quote)
-                if datatype:
-                    write("^^" + self.to_valid_term(cast(str, self.term_for(datatype))))
-                elif isinstance(lang, str):
-                    write(f"@{lang}")
-            else: # boolean or number
-                write(str(v))
+            write(self.to_str(v, datatype, lang))
+
+    def to_str(self, v: object, datatype: Optional[str] = None, lang: Optional[object] = None) -> str:
+        if isinstance(v, str):
+            parts: List[str] = []
+            escaped = v.replace('\\', '\\\\')
+            quote = '"'
+            if escaped.find('\n') > -1:
+                quote = '"""'
+                if escaped.endswith('"'):
+                    escaped = f'{escaped[0 : len(escaped) - 1]}\\"'
+            else:
+                escaped = escaped.replace('"', '\\"')
+            parts.append(quote)
+            parts.append(escaped)
+            parts.append(quote)
+            if datatype:
+                parts.append("^^" + self.to_valid_term(cast(str, self.term_for(datatype))))
+            elif isinstance(lang, str):
+                parts.append(f"@{lang}")
+            return ''.join(parts)
+        elif isinstance(v, bool):
+            return 'true' if v else 'false'
+        else: # int or float
+            return str(v)
 
     def term_for(self, key: str) -> Optional[str]:
         if key.startswith("@"):
