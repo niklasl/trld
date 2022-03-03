@@ -8,7 +8,7 @@ from ..jsonld.base import (BASE, CONTAINER, CONTEXT, GRAPH, ID, INDEX,
 StrObject = Dict[str, object]
 StrOrObject = Union[str, StrObject]
 
-ANNOTATION = '@annotation'
+ANNOTATION: str = '@annotation'
 
 WORD_START = re.compile(r'^\w*$')
 PNAME_LOCAL_ESC = re.compile(r"([~!$&'()*+,;=/?#@%]|^[.-]|[.-]$)")

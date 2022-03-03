@@ -599,7 +599,8 @@ class ReadNode(ReadCompound):
                 last_value = {VALUE: last_value}
             last_value[ANNOTATION] = value[ANNOTATION]
             if isinstance(self.node[self.p], List):
-                self.node[self.p][-1] = last_value
+                l: List = self.node[self.p]
+                l[-1] = last_value
             else:
                 self.node[self.p] = last_value
         else:

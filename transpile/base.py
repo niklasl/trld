@@ -245,10 +245,21 @@ class Transpiler(ast.NodeVisitor):
             self.stmt(stmt)
 
         if isinstance(scope.node, list):
-            for n in scope.node:
-                self.visit(n)
+            for node in scope.node:
+                self.visit(node)
         elif scope.node:
-            self.generic_visit(scope.node)
+            body = scope.node.body
+            if (
+                isinstance(scope.node, (ast.ClassDef, ast.FunctionDef))
+                and isinstance(body[0], ast.Expr)
+                and isinstance(body[0].value, ast.Constant)
+                and isinstance(body[0].value.value, str)
+            ):
+                print("Skipping docstring:", body[0].value.value)
+                for node in body[1:]:
+                    self.visit(node)
+            else:
+                self.generic_visit(scope.node)
 
         if on_exit:
             on_exit()

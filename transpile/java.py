@@ -380,11 +380,19 @@ class JavaTranspiler(CStyleTranspiler):
         return None
 
     def map_setitem(self, owner, key, value):
-        assert self.gettype(owner)[0].startswith('Map')
-        method = 'put' # if ismap else 'add'
+        castowner = self._cast(owner, parens=True)
+        if key.isdigit():
+            method = 'add'
+        elif key.startswith('-') and key[1:].isdigit():
+            method = 'set'
+            key = f'{castowner}.size() - 1'
+        else:
+            assert self.gettype(owner)[0].startswith('Map')
+            method = 'put'
+
         key = self._cast(key)
         value = self._cast(value)
-        return f'{self._cast(owner, parens=True)}.{method}({key}, {value})'
+        return f'{castowner}.{method}({key}, {value})'
 
     def map_op_setitem(self, owner, key, op, value):
         value = self._cast(value)
