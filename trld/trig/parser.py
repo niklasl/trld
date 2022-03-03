@@ -10,6 +10,8 @@ from ..jsonld.base import (
 from ..rdfterms import RDF_TYPE, XSD, XSD_DOUBLE, XSD_INTEGER
 
 
+ANNOTATION = '@annotation' # TODO: move to base (also from serializer)
+
 XSD_DECIMAL: str = f'{XSD}decimal'
 
 AT_KEYWORDS = {PREFIX, BASE}
@@ -563,7 +565,8 @@ class ReadNode(ReadCompound):
 
     node: Optional[Dict]
     p: Optional[str]
-    accept_value: bool
+    last_value: Optional[object]
+    open_brace: bool = False
 
     def fill_node(self, value):
         if self.p is None:
@@ -573,7 +576,7 @@ class ReadNode(ReadCompound):
                 if not isinstance(value, Dict):
                     raise NotationError(f'Unexpected predicate: {value!r}')
                 self.p = self.symbol(value)
-        elif self.accept_value:
+        elif self.last_value is None:
             if self.p == TYPE:
                 assert isinstance(value, Dict)
                 value = cast(str, self.symbol(value))
@@ -587,7 +590,18 @@ class ReadNode(ReadCompound):
                 self.node[self.p] = values
             else:
                 self.node[self.p] = value
-            self.accept_value = False
+            self.last_value = value
+        elif isinstance(value, Dict) and ANNOTATION in value:
+            last_value = self.last_value
+            if self.p == TYPE:
+                last_value = {TYPE: last_value}
+            elif not isinstance(last_value, Dict):
+                last_value = {VALUE: last_value}
+            last_value[ANNOTATION] = value[ANNOTATION]
+            if isinstance(self.node[self.p], List):
+                self.node[self.p][-1] = last_value
+            else:
+                self.node[self.p] = last_value
         else:
             raise NotationError(f'Unexpected: {value!r}')
 
@@ -595,16 +609,24 @@ class ReadNode(ReadCompound):
         readspace = self.read_space(c)
         if readspace:
             return readspace
-        if c == '[':
+
+        if c == '{':
+            self.open_brace = True
+            return self, None
+        elif c == '|':
+            assert self.open_brace
+            self.open_brace = False
+            return ReadAnnotation(self), None
+        elif c == '[':
             return ReadBNode(self), None
         elif c == '(':
             return ReadCollection(self), None
         elif c == ';':
             self.p = None
-            self.accept_value = True
+            self.last_value = None
             return self, None
         elif c == ',':
-            self.accept_value = True
+            self.last_value = None
             return self, None
         elif c in LITERAL_QUOTE_CHARS:
             return ReadLiteral(self, c), None
@@ -620,7 +642,7 @@ class ReadBNode(ReadNode):
     def reset(self):
         self.node = {}
         self.p = None
-        self.accept_value = True
+        self.last_value = None
 
     def consume(self, c: str, prev_value) -> StateResult:
         if prev_value is not None:
@@ -630,6 +652,27 @@ class ReadBNode(ReadNode):
             raise NotationError(f'Unexpected {c!r} in bnode.')
         elif c == ']':
             return self.parent, self.node
+        else:
+            return self.consume_node_char(c)
+
+
+class ReadAnnotation(ReadBNode): # TODO: Factor out ReadNodeBase
+
+    end_started: bool = False
+
+    def consume(self, c: str, prev_value) -> StateResult:
+        if prev_value is not None:
+            self.fill_node(prev_value)
+
+        if c == EOF:
+            raise NotationError(f'Unexpected {c!r} in annotation.')
+        elif not self.open_brace and c == '|':
+            self.end_started = True
+            return self, None
+        elif c == '}':
+            assert self.end_started
+            self.end_started = False
+            return self.parent, {ANNOTATION: self.node}
         else:
             return self.consume_node_char(c)
 
@@ -677,7 +720,7 @@ class ReadNodes(ReadNode):
     def reset(self):
         self.node = None
         self.p = None
-        self.accept_value = True
+        self.last_value = None
         self.expect_graph = False
 
     def consume(self, c: str, prev_value) -> StateResult:
@@ -707,13 +750,16 @@ class ReadNodes(ReadNode):
         if c == EOF:
             result = {CONTEXT: self.context, GRAPH: self.nodes}
             return self.parent, result
-        elif c == '.' and (self.p is None or not self.accept_value):
+        elif c == '.' and (self.p is None or self.last_value is not None):
             self.next_node()
             return self, None
-        elif c == '{':
-            self.expect_graph = False
-            return ReadGraph(self), None
         else:
+            if self.open_brace:
+                if c != '|':
+                    self.open_brace = False
+                    self.expect_graph = False
+                    state = ReadGraph(self)
+                    return state.consume(c, prev_value)
             return self.consume_node_char(c)
 
     def next_node(self):
@@ -733,7 +779,7 @@ class ReadGraph(ReadNodes):
 
         readnodes = cast(ReadNodes, self.parent)
 
-        if self.expect_graph or c == '{':
+        if self.expect_graph or self.open_brace and c != '|':
             raise NotationError('Nested graphs are not allowed in TriG')
 
         if c == '}':

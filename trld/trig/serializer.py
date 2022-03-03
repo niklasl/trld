@@ -380,7 +380,7 @@ class SerializerState:
         if isinstance(v, Dict) and self.aliases.annotation in v:
             annotation: StrObject = v[self.aliases.annotation]
             if annotation is not None:
-                self.write('{|')
+                self.write(' {|')
                 self.object_to_turtle(annotation, depth + 2, self.aliases.annotation)
                 self.write('|}')
 
