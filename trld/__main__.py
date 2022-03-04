@@ -1,20 +1,45 @@
-from typing import Any
+import argparse
 import json
 import sys
-import argparse
+from typing import Any
 
-from .common import load_json, dump_json, Output
-from .jsonld.expansion import expand
+from .common import Input, Output, dump_json, load_json
 from .jsonld.compaction import compact
+from .jsonld.expansion import expand
 from .jsonld.flattening import flatten
+from .mimetypes import SUFFIX_MIME_TYPE_MAP
 
 
-def err(msg): print(msg, file=sys.stderr)
+def eprint(msg):
+    print(msg, file=sys.stderr)
+
+
+def parse_rdf(source, fmt):
+    headers = {}
+    accept = SUFFIX_MIME_TYPE_MAP.get(fmt)
+    if accept:
+        headers['Accept'] = accept
+
+    inp = Input(None if source == '-' else source, headers)
+
+    if fmt in {'trig', 'ttl', 'turtle'}:
+        from .trig import parser as trig
+        return trig.parse(inp)
+
+    if fmt in {'nq', 'nt'}:
+        from .nq import parser as nq
+        return nq.parse(inp)
+
+    return load_json(inp)
 
 
 def serialize_rdf(result, fmt):
+    if fmt is None or fmt == 'jsonld':
+        print(dump_json(result, pretty=True))
+        return
+
     out = Output(sys.stdout)
-    if fmt in {'trig', 'turtle', 'turtle-union'}:
+    if fmt in {'trig', 'ttl', 'turtle', 'turtle-union'}:
         from .trig import serializer as trig
         if fmt == 'trig':
             trig.serialize(result, out)
@@ -31,37 +56,16 @@ def serialize_rdf(result, fmt):
                              default=lambda o: o.__dict__))
 
 
-argparser = argparse.ArgumentParser()
-argparser.add_argument('source', nargs='*')
-argparser.add_argument('-c', '--context', help='Use to compact expanded JSON-LD')
-argparser.add_argument('-e', '--expand-context', const=True, nargs='?', help='Use to expand plain JSON to JSON-LD')
-argparser.add_argument('-b', '--base', help='Set the base IRI (default is current source)')
-argparser.add_argument('-f', '--flatten', action='store_true')
-argparser.add_argument('-o', '--output', help='Set RDF output format')
-argparser.add_argument('-i', '--input', nargs='?', help='Set RDF input format')
-
-args = argparser.parse_args()
-
-context_data = None
-if args.context:
-    context_data = load_json(args.context)
-
-doc_paths = args.source or ['-']
-
-for doc_path in doc_paths:
-    if len(doc_paths) > 1:
-        err(f"Parsing file: '{doc_path}'")
-
-    if doc_path == '-':
-        doc_path = '/dev/stdin'
-        data = json.load(sys.stdin)
-    else:
-        data = load_json(doc_path)
-
-    ordered = True
-    base_iri = args.base if args.base else f'file://{doc_path}'
+def process_source(source, context_data, args, ordered=True):
+    base_iri = (
+        args.base if args.base
+        else f'file:///dev/stdin' if source == '-'
+        else f'file://{source}'
+    )
 
     try:
+        data = parse_rdf(source, args.input)
+
         if args.expand_context:
             expand_context = (
                 None if args.expand_context == True else args.expand_context
@@ -75,12 +79,35 @@ for doc_path in doc_paths:
         if context_data:
             result = compact(context_data, result, base_iri, ordered=ordered)
 
-        if args.output:
-            serialize_rdf(result, args.output)
-        else:
-            print(dump_json(result, pretty=True))
+        serialize_rdf(result, args.output)
 
     except Exception as e:
-        err(f"Error in file '{doc_path}'")
+        eprint(f"Error in file '{source}'")
         import traceback
         traceback.print_exc()
+
+
+argparser = argparse.ArgumentParser()
+argparser.add_argument('source', nargs='*')
+argparser.add_argument('-c', '--context', help='Use to compact expanded JSON-LD')
+argparser.add_argument('-e', '--expand-context', const=True, nargs='?',
+                       help='Use to expand plain JSON to JSON-LD')
+argparser.add_argument('-b', '--base',
+                       help='Set the base IRI (default is current source)')
+argparser.add_argument('-f', '--flatten', action='store_true')
+argparser.add_argument('-o', '--output', help='Set RDF output format')
+argparser.add_argument('-i', '--input', help='Set RDF input format')
+
+args = argparser.parse_args()
+
+context_data = None
+if args.context:
+    context_data = load_json(args.context)
+
+sources = args.source or ['-']
+
+for source in sources:
+    if len(sources) > 1:
+        eprint(f"Parsing file: '{source}'")
+
+    process_source(source, context_data, args)
