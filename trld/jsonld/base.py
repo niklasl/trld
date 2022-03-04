@@ -93,6 +93,8 @@ DIRECTIONS: Set[str] = {'rtl', 'ltr'}
 JSONLD10: str = 'json-ld-1.0'
 JSONLD11: str = 'json-ld-1.1'
 
+JSONLD_CONTEXT_RELATION: str = 'http://www.w3.org/ns/json-ld#context'
+
 
 class JsonLdError(Exception):
     pass

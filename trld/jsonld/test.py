@@ -3,7 +3,7 @@ import sys
 import traceback
 from pathlib import Path
 
-from ..common import set_source_locator
+from ..common import Input, set_document_loader
 from .base import JSONLD10, JSONLD11
 from . import context
 from .testbase import TestCase, TESTS_URL
@@ -28,7 +28,7 @@ def run_testsuite(suitefilepath: str) -> bool:
         testsuite = json.load(fp)
 
     suite_file_dir = _find_suite_file_dir(suitedir)
-    set_source_locator(lambda url: url.replace(TESTS_URL, suite_file_dir))
+    set_document_loader(lambda url: Input(url.replace(TESTS_URL, suite_file_dir)))
 
     runs, oks, fails, errors = 0, 0, 0, 0
 

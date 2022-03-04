@@ -7,8 +7,6 @@ DEFAULT_PROCESSING_MODE: str = JSONLD11
 
 MAX_REMOTE_CONTEXTS: int = 512
 
-LOAD_PROFILE: str = 'http://www.w3.org/ns/json-ld#context'
-
 
 class ProcessingModeConflictError(JsonLdError): pass
 
@@ -223,7 +221,7 @@ class Context:
 
         # 5.2.7) Continue with the next context
 
-    def _load_document(self, href: str, profile: str = LOAD_PROFILE, request_profile: str = LOAD_PROFILE) -> object:
+    def _load_document(self, href: str, profile: str = JSONLD_CONTEXT_RELATION, request_profile: str = JSONLD_CONTEXT_RELATION) -> object:
         # TODO:
         # 5.2.4) If context was previously dereferenced, then the processor MUST NOT do a further dereference, and context is set to the previously established internal representation:
             #set context document to the previously dereferenced document, and set loaded context to the value of the @context entry from the document in context document.

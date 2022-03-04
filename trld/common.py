@@ -1,24 +1,74 @@
 import json
 import sys
 import uuid
-from io import StringIO
-from os.path import expanduser
-from typing import Callable, Iterator, Optional, TextIO
+from http.client import HTTPResponse
+from io import StringIO, TextIOWrapper
+from typing import Callable, Dict, Iterator, Optional, Set, TextIO, Union
 from urllib.parse import urljoin, urlparse
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 from .builtins import Char
+from .jsonld.base import JSONLD_CONTEXT_RELATION
+from .mimetypes import SUFFIX_MIME_TYPE_MAP, guess_mime_type
+
+JSONLD_MIME_TYPE = SUFFIX_MIME_TYPE_MAP['jsonld']
+JSON_MIME_TYPES: Set[str] = {JSONLD_MIME_TYPE, 'application/json'}
+
+ACCEPT_HEADER = 'Accept'
+
+ACCEPTS = ", ".join(
+    mt + (f';q=0.{10 - i}' if i > 0 else '')
+    for i, mt in enumerate(SUFFIX_MIME_TYPE_MAP.values())
+)
 
 
 class Input:
-    def __init__(self, source=None):
-        if isinstance(source, str):
-            self._source = open(remove_file_protocol(source))
-        else:
-            self._source = source or sys.stdin
+    document_url: Optional[str]
+    content_type: Optional[str]
+    context_url: Optional[str]
+    profile: Optional[str]
 
-    def get_header(self, header: str) -> Optional[str]:
-        raise NotImplementedError
+    def __init__(self, source: Optional[str] = None, headers: Optional[Dict] = None):
+        stream: TextIO
+        if isinstance(source, str):
+            self.document_url = source
+            if source.startswith(('http', 'https')):
+                stream = self._open_request(source, headers)
+            else:
+                stream = open(_remove_file_protocol(source))
+                self.content_type = guess_mime_type(source)
+        elif source is None:
+            stream = sys.stdin
+        else:
+            stream = source
+
+        self._source = stream
+
+    def _open_request(self, source: str, headers: Optional[Dict] = None) -> TextIO:
+        req = Request(source)
+
+        if headers is None or ACCEPT_HEADER not in headers:
+            req.add_header(ACCEPT_HEADER, ACCEPTS)
+        if headers is not None:
+            for h, hv in headers.items():
+                req.add_header(h, hv)
+
+        res = urlopen(req)
+
+        self.content_type = res.headers.get_content_type()
+        self.context_url = _get_link_header(
+            res, rel=JSONLD_CONTEXT_RELATION, type=JSONLD_MIME_TYPE
+        )
+        self.profile = _get_link_header(res, rel='profile')
+
+        return TextIOWrapper(res)
+
+    @property
+    def document(self) -> object:
+        if self.content_type in JSON_MIME_TYPES:
+            return load_json(self)
+        else:
+            return self.read()
 
     def read(self) -> str:
         return self._source.read()
@@ -60,39 +110,28 @@ class Output:
         return self._dest.getvalue()
 
 
-# TODO: also define RemoteDocument (using Input)...
+LoadDocumentCallback = Callable[[str], Input]
 
 
-source_locator: Optional[Callable[[str], str]] = None
+document_loader: Optional[LoadDocumentCallback] = None
 
 
-def set_source_locator(locator: Callable[[str], str]):
-    global source_locator
-    source_locator = locator
+def set_document_loader(loader: LoadDocumentCallback):
+    global document_loader
+    document_loader = loader
 
 
-def remove_file_protocol(ref: str):
-    if ref.startswith('file://'):
-        return ref[7:]
-    elif ref.startswith('file:'):
-        return ref[5:]
-    return ref
-
-
-# TODO: LoadDocumentCallback?
-
-
-def load_json(url: str) -> object:
-    url = source_locator(url) if source_locator else url
-
+def load_json(source: Union[str, Input]) -> object:
     stream = None
-    if url.startswith(('http', 'https')):
-        stream = urlopen(url)
-    else:
-        stream = open(expanduser(remove_file_protocol(url)))
 
-    assert stream is not None
-    with stream as fp:
+    if not isinstance(source, Input):
+        assert isinstance(source, str)
+        source = document_loader(source) if document_loader else Input(source)
+
+    if source._source == sys.stdin:
+        return json.load(source._source)
+
+    with source._source as fp:
         return json.load(fp)
 
 
@@ -127,3 +166,26 @@ def uuid4() -> str:
 
 def warning(msg: str):
     print(msg, file=sys.stderr)
+
+
+def _remove_file_protocol(ref: str):
+    if ref.startswith('file://'):
+        return ref[7:]
+    elif ref.startswith('file:'):
+        return ref[5:]
+    return ref
+
+
+def _get_link_header(
+    response: HTTPResponse, rel: str, type: Optional[str] = None
+) -> Optional[str]:
+    links = response.headers.get_all('Link')
+    if links is None:
+        return None
+
+    for link in links:
+        href = link[link.find('<') : link.find('>')]
+        if rel in link and (type is None or type in link):
+            return href
+
+    return None
