@@ -123,11 +123,11 @@ class SerializerState:
         if isinstance(data, Dict):
             self.init_context(data.get(CONTEXT))
             self.prelude(self.prefixes)
-            self.object_to_turtle(data)
+            self.write_object(data)
         else:
             assert isinstance(data, List)
             for item in data:
-                self.object_to_turtle(item)
+                self.write_object(item)
 
     def prelude(self, prefixes: Dict[str, str]):
         for k, v in prefixes.items():
@@ -159,7 +159,7 @@ class SerializerState:
 
         return False
 
-    def object_to_trig(self, iri: Optional[str], graph: object, depth: int = 0):
+    def write_graph(self, iri: Optional[str], graph: object, depth: int = 0):
         if iri is not None and self.settings.turtle_drop_named:
             return
 
@@ -178,14 +178,14 @@ class SerializerState:
 
         for node in as_list(graph):
             via: Optional[str] = self.aliases.graph if in_graph_block else None
-            self.object_to_turtle(cast(StrObject, node), depth, via)
+            self.write_object(cast(StrObject, node), depth, via)
 
         if not self.settings.turtle_only:
             if in_graph_block:
                 self.writeln()
                 self.writeln("}")
 
-    def object_to_turtle(
+    def write_object(
             self,
             obj: object,
             depth: int = 0,
@@ -228,7 +228,7 @@ class SerializerState:
 
             if CONTEXT in obj and depth > 0:
                 self.prelude(collect_prefixes(obj[CONTEXT]))
-            self.object_to_trig(s, obj[self.aliases.graph], depth)
+            self.write_graph(s, obj[self.aliases.graph], depth)
             return []
 
         if explicit_list:
@@ -342,11 +342,11 @@ class SerializerState:
                         top_objects.append(v)
                         self.write(self.ref_repr(v[self.aliases.id]))
                     elif v is not None:
-                        objects = self.object_to_turtle(v, nested_depth, key)
+                        objects = self.write_object(v, nested_depth, key)
                         for it in objects:
                             top_objects.append(it)
 
-                    self.output_annotation(v, depth)
+                    self.write_annotation(v, depth)
 
         if explicit_list or (not is_list and started_list) and not ended_list:
             self.write(" )")
@@ -356,7 +356,7 @@ class SerializerState:
                 self.writeln(" .")
             #self.writeln()
             for it in top_objects:
-                self.object_to_turtle(it, depth, via_key)
+                self.write_object(it, depth, via_key)
             return []
         else:
             indent = self.get_indent(nested_depth - (1 + in_graph_add))
@@ -373,7 +373,7 @@ class SerializerState:
                 self.write("]")
             return top_objects
 
-    def output_annotation(self, v: object, depth: int):
+    def write_annotation(self, v: object, depth: int):
         if self.settings.drop_rdfstar:
             return
 
@@ -381,7 +381,7 @@ class SerializerState:
             annotation: StrObject = v[self.aliases.annotation]
             if annotation is not None:
                 self.write(' {|')
-                self.object_to_turtle(annotation, depth + 2, self.aliases.annotation)
+                self.write_object(annotation, depth + 2, self.aliases.annotation)
                 self.write('|}')
 
     def to_literal(
