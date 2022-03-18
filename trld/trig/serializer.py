@@ -144,18 +144,16 @@ class SerializerState:
         self.writeln(f'{self.base_keyword} <{iri}>')
 
     def is_list_container(self, term: str) -> bool:
-        if self.context is not None:
-            termdef: object = self.context.get(term)
-            if isinstance(termdef, Dict):
-                return termdef.get(CONTAINER) == LIST
-
-        return False
+        return self._is_container(term, LIST)
 
     def is_lang_container(self, term: str) -> bool:
+        return self._is_container(term, LANGUAGE)
+
+    def _is_container(self, term: str, kind: str) -> bool:
         if self.context is not None:
             termdef: object = self.context.get(term)
             if isinstance(termdef, Dict):
-                return termdef.get(CONTAINER) == LANGUAGE
+                return termdef.get(CONTAINER) == kind
 
         return False
 
@@ -260,6 +258,12 @@ class SerializerState:
         ended_list = False
 
         for key, vo in cast(StrObject, obj).items():
+
+            index_key: Optional[str] = self.index_key_for(key)
+            if index_key is not None:
+                key = index_key
+                vo = list(vo.values()) if isinstance(vo, Dict) else vo
+
             term = self.term_for(key)
 
             rev_key: Optional[str] = self.rev_key_for(key) if term is None else None
@@ -489,6 +493,12 @@ class SerializerState:
         kdef = self.context[key]
         if isinstance(kdef, Dict) and REVERSE in kdef:
             return cast(str, kdef[REVERSE])
+        return None
+
+    def index_key_for(self, key: str) -> Optional[str]:
+        kdef: object = self.context.get(key)
+        if isinstance(kdef, Dict) and kdef.get(CONTAINER) == INDEX:
+            return cast(str, kdef.get(ID, key))
         return None
 
     def make_top_object(self, s: Optional[str], rev_key: str, it: Dict) -> StrObject:
