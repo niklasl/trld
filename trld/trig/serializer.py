@@ -127,6 +127,7 @@ class SerializerState:
             self.write_object(data)
         else:
             assert isinstance(data, List)
+            self.prelude(self.prefixes)
             for item in data:
                 self.write_object(item)
 
