@@ -3,7 +3,8 @@ import re
 
 from ..common import Output, uuid4
 from ..jsonld.base import (BASE, CONTAINER, CONTEXT, GRAPH, ID, INDEX,
-                           LANGUAGE, LIST, PREFIX, REVERSE, TYPE, VALUE, VOCAB)
+                           LANGUAGE, LIST, PREFIX, PREFIX_DELIMS, REVERSE,
+                           TYPE, VALUE, VOCAB)
 
 StrObject = Dict[str, object]
 StrOrObject = Union[str, StrObject]
@@ -663,8 +664,7 @@ def collect_prefixes(context: Optional[object]) -> Dict[str, str]:
 
     prefixes = {}
     for key, value in cast(StrObject, context).items():
-        # TODO: verify JSON-LD 1.1 prefix rules
-        if isinstance(value, str) and value[-1] in {'#', '/', ':'}:
+        if isinstance(value, str) and value[-1] in PREFIX_DELIMS:
             prefixes['' if key == VOCAB else key] = value
         elif isinstance(value, Dict) and value.get(PREFIX) == True:
             prefixes[key] = value[ID]
