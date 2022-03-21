@@ -90,7 +90,7 @@ class SerializerState:
             parent: 'SerializerState' = None,
     ):
         self.out = out if out is not None else cast(SerializerState, parent).out
-        self.init_context(context)
+
         self.base_iri = base_iri
         self.parent = parent
         self.settings = parent.settings if parent is not None else settings
@@ -101,24 +101,30 @@ class SerializerState:
         self.unique_bnode_suffix = ''
         self.bnode_counter = 0
 
+        self.aliases = KeyAliases()
+        self.context = {}
+        self.prefixes = {}
+        self.init_context(context)
+
     def _kw(self, s: str) -> str:
         return s.upper() if self.settings.upcase_keywords else s
 
-    def init_context(self, context: Optional[object]):
-        self.aliases = KeyAliases()
-        self.context = {}
-        if context is not None:
-            for key in self.context.keys():
-                raise Exception('context already initialized')
-        ctx: StrObject = {}
-        # TODO: merge arrays, deref uri:s ...
-        if isinstance(context, List):
-            for item in context:
-                ctx.update(cast(StrObject, item))
-        elif isinstance(context, Dict):
-                ctx.update(context)
-        self.context = ctx
-        self.prefixes = collect_prefixes(ctx)
+    def init_context(self, ctx: Optional[object]):
+        # TODO: Only supports limited "Turtle-like" subset. Parse using jsonld?
+        merged: StrObject = {}
+
+        if len(self.context) > 0:
+            merged.update(self.context)
+
+        if isinstance(ctx, List):
+            for item in ctx:
+                merged.update(cast(StrObject, item))
+        elif isinstance(ctx, Dict):
+                merged.update(ctx)
+
+        if len(merged) > 0:
+            self.context = merged
+            self.prefixes = collect_prefixes(merged)
 
     def serialize(self, data: Union[List, Dict]):
         if isinstance(data, Dict):
