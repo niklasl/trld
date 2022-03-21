@@ -28,7 +28,9 @@ class Input:
     context_url: Optional[str]
     profile: Optional[str]
 
-    def __init__(self, source: Optional[str] = None, headers: Optional[Dict] = None):
+    def __init__(
+        self, source: Union[str, TextIO, None] = None, headers: Optional[Dict] = None
+    ):
         stream: TextIO
         if isinstance(source, str):
             self.document_url = source
