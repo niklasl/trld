@@ -9,6 +9,9 @@ build:
 cache:
 	mkdir -p $(shell readlink -f cache)
 
+dist:
+	mkdir -p $(shell readlink -f dist)
+
 cache/json-ld-api: | cache
 	git clone https://github.com/w3c/json-ld-api.git cache/json-ld-api
 
@@ -24,6 +27,9 @@ python: | cache/json-ld-api cache/trig-tests
 	python3 -m trld.jsonld.test cache/json-ld-api/tests/expand-manifest.jsonld cache/json-ld-api/tests/compact-manifest.jsonld cache/json-ld-api/tests/flatten-manifest.jsonld cache/json-ld-api/tests/fromRdf-manifest.jsonld cache/json-ld-api/tests/toRdf-manifest.jsonld 2>&1 | grep '^Running test suite\|^Ran '
 	python3 -m trld.tvm.test
 	python3 -m trld.trig.test | grep '^Ran '
+
+pybuild: dist python
+	python3 -m build
 
 _javatr: build | cache/json-ld-api cache/trig-tests
 	mkdir -p build/java
