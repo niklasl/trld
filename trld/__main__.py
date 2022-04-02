@@ -22,6 +22,11 @@ def parse_rdf(source, fmt):
 
     inp = Input(None if source == '-' else source, headers)
 
+    # TODO: Use inp.content_type (which uses guess_mime_type)?
+    # So instead of using suffixes or "names" below, check mime-type (accept).
+    if fmt is None and isinstance(source, str):
+        fmt = source.rsplit('.', 1)[-1]
+
     if fmt in {'trig', 'ttl', 'turtle'}:
         from .trig import parser as trig
         return trig.parse(inp)
