@@ -27,7 +27,7 @@ python: | cache/json-ld-api cache/trig-tests
 
 _javatr: build | cache/json-ld-api cache/trig-tests
 	mkdir -p build/java
-	python3 -m transpile.java $(trld_modules) -o build/java/src/main/java
+	python3 -m transpile.java $(TRFLAGS) $(trld_modules) -o build/java/src/main/java
 	cp -R transpile/templates/java build
 java: _javatr
 	(cd build/java && ./gradlew -q clean uberjar test)
@@ -37,7 +37,7 @@ jar: _javatr
 	(cd build/java && ./gradlew -q test jar)
 
 _jstr: build/js/node_modules
-	python3 -m transpile.js $(trld_modules) -o build/js/lib
+	python3 -m transpile.js $(TRFLAGS) $(trld_modules) -o build/js/lib
 	cp -R transpile/templates/js build
 js: _jstr
 	(cd build/js && TRLD_JSONLD_TESTDIR=$(shell pwd)/cache/json-ld-api/tests npm test || true)
