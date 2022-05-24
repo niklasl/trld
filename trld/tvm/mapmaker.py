@@ -83,6 +83,8 @@ def make_target_map(vocab: object, target: object) -> Dict:
 
         _process_reified_forms(obj, vocab_index, target_map)
 
+    identity_map: Dict[str, str] = {}
+
     for key, rule in target_map.items():
         rules: List[Tuple[int, Union[Dict, str]]] = sorted(as_list(rule),
                 key=lambda it: (
@@ -92,6 +94,14 @@ def make_target_map(vocab: object, target: object) -> Dict:
                     ),
                 reverse=True)
         target_map[key] = [it for priority, it in rules] # keep all
+
+        # Add identity mappings to keep target terms in source:
+        for priority, it in rules:
+            if isinstance(it, str):
+                identity_map[it] = it
+            break
+
+    target_map.update(identity_map)
 
     return target_map
 

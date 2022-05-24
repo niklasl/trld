@@ -55,7 +55,9 @@ def test_make_target_map():
         ],
         "http://purl.org/dc/terms/title": [
             "http://www.w3.org/2000/01/rdf-schema#label"
-        ]
+        ],
+        "http://www.w3.org/2000/01/rdf-schema#Resource": "http://www.w3.org/2000/01/rdf-schema#Resource",
+        "http://www.w3.org/2000/01/rdf-schema#label": "http://www.w3.org/2000/01/rdf-schema#label",
     }
     vocab = expand(dict(context, **vocab), "")
     target_map = make_target_map(vocab, {CONTEXT: target})
@@ -503,6 +505,33 @@ def test_sort_target_rules():
     target_map = make_target_map(vocab, {CONTEXT: target})
     assert_json_equals(target_map, expect)
 
+
+
+def test_keep_target_terms():
+    given = {
+        "@id": "",
+        "@type": "rdfs:Resource",
+        "rdfs:label": "A"
+    }
+
+    expect = given
+
+    target = {"@vocab": "http://www.w3.org/2000/01/rdf-schema#"}
+
+    assuming = {
+        "@graph": [
+            {
+                "@id": "foaf:Document",
+                "rdfs:subClassOf": {"@id": "rdfs:Resource"}
+            },
+            {
+                "@id": "dc:title",
+                "rdfs:subPropertyOf": {"@id": "rdfs:label"}
+            }
+        ]
+    }
+
+    check(**locals())
 
 
 def test_leads_to():
