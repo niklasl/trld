@@ -243,12 +243,15 @@ class SerializerState:
         in_graph: bool = via_key == self.aliases.graph and not self.settings.turtle_only
         in_graph_add: int = 1 if in_graph else 0
 
-        if s is not None and self.has_keys(obj, 2):
-            if depth == 0:
-                self.writeln()
-            if in_graph_add > 0:
-                self.write(self.get_indent(0))
-            self.write(self.ref_repr(s))
+        if (s is not None or depth == 0) and self.has_keys(obj, 2):
+            if s is None:
+                self.write("[]")
+            else:
+                if depth == 0:
+                    self.writeln()
+                if in_graph_add > 0:
+                    self.write(self.get_indent(0))
+                self.write(self.ref_repr(s))
         elif depth > 0:
             if not is_bracketed:
                 depth += 1
