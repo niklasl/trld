@@ -36,15 +36,11 @@ def test_make_target_map():
         "@graph": [
             {
                 "@id": "foaf:Document",
-                "rdfs:subClassOf": {
-                    "@id": "rdfs:Resource"
-                }
+                "rdfs:subClassOf": {"@id": "rdfs:Resource"}
             },
             {
                 "@id": "dc:title",
-                "rdfs:subPropertyOf": {
-                    "@id": "rdfs:label"
-                }
+                "rdfs:subPropertyOf": {"@id": "rdfs:label"}
             }
         ]
     }
@@ -104,15 +100,11 @@ def test_reducing_foaf_to_rdfs():
         "@graph": [
             {
                 "@id": "foaf:Document",
-                "rdfs:subClassOf": {
-                    "@id": "rdfs:Resource"
-                }
+                "rdfs:subClassOf": {"@id": "rdfs:Resource"}
             },
             {
                 "@id": "dc:title",
-                "rdfs:subPropertyOf": {
-                    "@id": "rdfs:label"
-                }
+                "rdfs:subPropertyOf": {"@id": "rdfs:label"}
             }
         ]
     }
@@ -190,12 +182,8 @@ def test_qualified_relations_as_reifications():
     given = {
         "@id": "/work",
         "bf:contribution": {
-            "bf:agent": {
-                "@id": "/person/a"
-            },
-            "bf:role": {
-                "@id": "lcrel:ill"
-            }
+            "bf:agent": {"@id": "/person/a"},
+            "bf:role": {"@id": "lcrel:ill"}
         }
     }
 
@@ -203,9 +191,7 @@ def test_qualified_relations_as_reifications():
 
     expect = {
         "@id": "/work",
-        "dc:contributor": {
-            "@id": "/person/a"
-        }
+        "dc:contributor": {"@id": "/person/a"}
     }
 
     assuming = {
@@ -251,12 +237,8 @@ def test_inferred_qualified_relations_as_reifications():
     given = {
         "@id": "/work",
         "bf:contribution": {
-            "bf:agent": {
-                "@id": "/person/a"
-            },
-            "bf:role": {
-                "@id": "lcrel:ill"
-            }
+            "bf:agent": {"@id": "/person/a"},
+            "bf:role": {"@id": "lcrel:ill"}
         }
     }
 
@@ -264,9 +246,7 @@ def test_inferred_qualified_relations_as_reifications():
 
     expect = {
         "@id": "/work",
-        "dc:contributor": {
-            "@id": "/person/a"
-        }
+        "dc:contributor": {"@id": "/person/a"}
     }
 
     assuming = {
@@ -399,15 +379,11 @@ def test_add_to_existing_key():
         "@graph": [
             {
                 "@id": "foaf:name",
-                "rdfs:subPropertyOf": {
-                    "@id": "rdfs:label"
-                }
+                "rdfs:subPropertyOf": {"@id": "rdfs:label"}
             },
             {
                 "@id": "dc:title",
-                "rdfs:subPropertyOf": {
-                    "@id": "rdfs:label"
-                }
+                "rdfs:subPropertyOf": {"@id": "rdfs:label"}
             }
         ]
     }
