@@ -69,7 +69,7 @@ def process_source(source, context_data, args, ordered=True):
     )
 
     try:
-        data = parse_rdf(source, args.input)
+        data = parse_rdf(source, args.input_format)
 
         if args.expand_context:
             expand_context = (
@@ -79,12 +79,12 @@ def process_source(source, context_data, args, ordered=True):
         else:
             result = data
 
-        if args.flatten or args.output in {'nq', True}:
+        if args.flatten or args.output_format in {'nq', True}:
             result = flatten(result, ordered=ordered)
         if context_data:
             result = compact(context_data, result, base_iri, ordered=ordered)
 
-        serialize_rdf(result, args.output)
+        serialize_rdf(result, args.output_format)
 
     except Exception as e:
         eprint(f"Error in file '{source}'")

@@ -29,6 +29,7 @@ pytest: | cache/json-ld-api cache/trig-tests
 	python3 -m trld.jsonld.test cache/json-ld-api/tests/expand-manifest.jsonld cache/json-ld-api/tests/compact-manifest.jsonld cache/json-ld-api/tests/flatten-manifest.jsonld cache/json-ld-api/tests/fromRdf-manifest.jsonld cache/json-ld-api/tests/toRdf-manifest.jsonld 2>&1 | grep '^Running test suite\|^Ran '
 	python3 -m trld.tvm.test
 	python3 -m trld.trig.test | grep '^Ran '
+	python3 -m trld test/data/examples/misc.trig | python3 -m trld -i jsonld -o trig | python3 -m trld -i trig > /dev/null
 
 pydev: dev-requirements.txt
 	python -c 'import sys; assert sys.prefix != sys.base_prefix, "Not in a venv"'
