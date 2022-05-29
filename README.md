@@ -19,18 +19,18 @@ algorithms. _It is not a generic transpiler_.
 
 ## Transcribing Linked Data
 
-When parsing [RDF](https://www.w3.org/RDF/) the expressions are transcribed
-verbatim into JSON-LD as an intermediary form, keeping compact forms and
-ordering as much as possible. Conversely, serialization is done by writing the
-JSON-LD shape out as is, using the chosen syntax.
+When parsing RDF, the syntactic statements are transcribed verbatim into
+JSON-LD, keeping compact forms and ordering as much as possible. Conversely,
+serialization is done by writing the JSON-LD shape out as is, using the chosen
+syntax.
 
 In order to control the exact shape of this data, use the JSON-LD algorithms
 for expansion, flattening and compaction.
 
-### Serializing JSON-LD as Turtle and TriG
+### Serializing JSON-LD as Turtle or TriG
 
 At this time, care must be taken to use *simple* JSON-LD contexts in order for
-Turtle and TriG serialization to work. That means that, apart from prefixes and
+Turtle or TriG serialization to work. That means that, apart from prefixes and
 some support for language indexes and type coercion, no advanced compaction
 features of JSON-LD 1.1 will work when transcribing the data out as Turtle or
 TriG. If you process such compacted data, ensure to expand it first, and
