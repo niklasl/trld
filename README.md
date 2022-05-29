@@ -1,15 +1,40 @@
-# TRanspiler for Linked Data
+# TRLD
 
-TRLD is a polyglot implementation of [JSON-LD](https://json-ld.org/)
-algorithms.
+TRLD is a transpilable implementation of algorithms for working with Linked
+Data as [JSON-LD](https://json-ld.org/). This includes translating to and from
+various [RDF](https://www.w3.org/RDF/) syntaxes and mapping of vocabularies.
 
-It is written in Python and transpiled into:
+## Transpiling Linked Data Algorithms
+
+TRLD is written in typed Python, with some extra care taken to support
+[transpilation](https://en.wikipedia.org/wiki/Source-to-source_compiler). The
+implementation can currently be transpiled into:
+
 * Java
 * Javascript
 
 The transpiler is part of the codebase and only supports the small (somewhat
-boring and overly cast) subset of type-annotated Python needed to implement
-these algorithms. _It is not a generic transpiler_.
+redundantly cast) subset of type-annotated Python needed to implement these
+algorithms. _It is not a generic transpiler_.
+
+## Transcribing Linked Data
+
+When parsing [RDF](https://www.w3.org/RDF/) the expressions are transcribed
+verbatim into JSON-LD as an intermediary form, keeping compact forms and
+ordering as much as possible. Conversely, serialization is done by writing the
+JSON-LD shape out as is, using the chosen syntax.
+
+In order to control the exact shape of this data, use the JSON-LD algorithms
+for expansion, flattening and compaction.
+
+### Serializing JSON-LD as Turtle and TriG
+
+At this time, care must be taken to use *simple* JSON-LD contexts in order for
+Turtle and TriG serialization to work. That means that, apart from prefixes and
+some support for language indexes and type coercion, no advanced compaction
+features of JSON-LD 1.1 will work when transcribing the data out as Turtle or
+TriG. If you process such compacted data, ensure to expand it first, and
+preferably re-compact it into a simpler form.
 
 ## Implemented Algorithms
 
@@ -33,9 +58,26 @@ these algorithms. _It is not a generic transpiler_.
 - [x] Reified forms
 - [ ] SKOS matches
 
+## Running
+
+Python-based command-line usage:
+
+    $ python3 -m trld [-h] [-c CONTEXT] [-e [EXPAND_CONTEXT]] [-b BASE] [-f] \
+      [-o OUTPUT] [-i INPUT] [SOURCE ...]
+
+Java-based command-line usage:
+
+    $ java -jar build/java/build/libs/trld-with-deps.jar [-f] [-c CONTEXT] FILE
+
+JS-based command-line usage:
+
+    $ cd build/js
+    $ node -r esm lib/jsonld/cli.js [-f] [-c CONTEXT] FILE
+
 ## Building & Testing (& Status)
 
-Requirements:
+Build requirements:
+
 * Make
 * For Python: Python 3.6+ (and mypy for development)
 * For Java: Java 8+ (uses Gradle Wrapper)
@@ -43,20 +85,20 @@ Requirements:
 
 For Python, this runs mypy and the test suite:
 
-    $ make python
+    $ make pytest
     [...]
 
     python3 -m trld.jsonld.test [...]
     Running test suite: cache/json-ld-api/tests/expand-manifest.jsonld
     Ran 371 test cases. Passed: 366. Failed: 4. Errors: 1.
     Running test suite: cache/json-ld-api/tests/compact-manifest.jsonld
-    Ran 239 test cases. Passed: 238. Failed: 1. Errors: 0.
+    Ran 242 test cases. Passed: 239. Failed: 2. Errors: 1.
     Running test suite: cache/json-ld-api/tests/flatten-manifest.jsonld
     Ran 55 test cases. Passed: 55. Failed: 0. Errors: 0.
     Running test suite: cache/json-ld-api/tests/fromRdf-manifest.jsonld
     Ran 51 test cases. Passed: 51. Failed: 0. Errors: 0.
     Running test suite: cache/json-ld-api/tests/toRdf-manifest.jsonld
-    Ran 451 test cases. Passed: 399. Failed: 51. Errors: 1.
+    Ran 451 test cases. Passed: 400. Failed: 50. Errors: 1.
 
     python3 -m trld.tvm.test
     Running [...]: OK
@@ -84,19 +126,4 @@ build directory, then run their respective test suites:
 
     [...] node [...] lib/trig/test.js [...]
     Ran 335 tests. Passed 270, failed 65
-
-## Running
-
-Python-based command-line usage:
-
-    $ python3 -m trld.jsonld [-f] [-c CONTEXT] FILE
-
-Java-based command-line usage:
-
-    $ java -jar build/java/build/libs/trld-with-deps.jar [-f] [-c CONTEXT] FILE
-
-JS-based command-line usage:
-
-    $ cd build/js
-    $ node -r esm lib/jsonld/cli.js [-f] [-c CONTEXT] FILE
 
