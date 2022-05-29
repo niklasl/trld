@@ -35,7 +35,7 @@ pydev: dev-requirements.txt
 	pip install -r dev-requirements.txt
 
 pypkg: build dist pydev pytest
-	python3 -m build --wheel
+	python3 -m build
 
 javatr: build | cache/json-ld-api cache/trig-tests
 	mkdir -p build/java
