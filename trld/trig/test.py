@@ -100,6 +100,6 @@ if __name__ == '__main__':
     import sys
     args = sys.argv[1:]
 
-    test_suite_dir = args.pop(0) if args else '/tmp/trld-cache/trig-tests'
+    test_suite_dir = args.pop(0) if args else 'cache/trig-tests'
 
     run_tests(test_suite_dir)
