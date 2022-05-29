@@ -94,15 +94,15 @@ def process_source(source, context_data, args, ordered=True):
 
 def main():
     argparser = argparse.ArgumentParser()
-    argparser.add_argument('source', nargs='*')
+    argparser.add_argument('source', metavar='SOURCE', nargs='*')
     argparser.add_argument('-c', '--context', help='Use to compact expanded JSON-LD')
     argparser.add_argument('-e', '--expand-context', const=True, nargs='?',
                         help='Use to expand plain JSON to JSON-LD')
     argparser.add_argument('-b', '--base',
                         help='Set the base IRI (default is current source)')
     argparser.add_argument('-f', '--flatten', action='store_true')
-    argparser.add_argument('-o', '--output', help='Set RDF output format')
-    argparser.add_argument('-i', '--input', help='Set RDF input format')
+    argparser.add_argument('-i', '--input-format', help='Set RDF input format')
+    argparser.add_argument('-o', '--output-format', help='Set RDF output format')
 
     args = argparser.parse_args()
 

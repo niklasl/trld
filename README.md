@@ -63,7 +63,7 @@ preferably re-compact it into a simpler form.
 Python-based command-line usage:
 
     $ python3 -m trld [-h] [-c CONTEXT] [-e [EXPAND_CONTEXT]] [-b BASE] [-f] \
-      [-o OUTPUT] [-i INPUT] [SOURCE ...]
+      [-i INPUT_FORMAT] [-o OUTPUT_FORMAT] [SOURCE ...]
 
 Java-based command-line usage:
 
