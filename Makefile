@@ -24,30 +24,37 @@ cache/trig-tests: cache/trig-tests.tar.gz
 	mkdir -p $@
 	tar -xzf $^ -C $@
 
-python: | cache/json-ld-api cache/trig-tests
+pytest: | cache/json-ld-api cache/trig-tests
 	mypy trld/jsonld/
 	python3 -m trld.jsonld.test cache/json-ld-api/tests/expand-manifest.jsonld cache/json-ld-api/tests/compact-manifest.jsonld cache/json-ld-api/tests/flatten-manifest.jsonld cache/json-ld-api/tests/fromRdf-manifest.jsonld cache/json-ld-api/tests/toRdf-manifest.jsonld 2>&1 | grep '^Running test suite\|^Ran '
 	python3 -m trld.tvm.test
 	python3 -m trld.trig.test | grep '^Ran '
 
-pybuild: dist python
-	python3 -m build
+pydev: dev-requirements.txt
+	python -c 'import sys; assert sys.prefix != sys.base_prefix, "Not in a venv"'
+	pip install -r dev-requirements.txt
 
-_javatr: build | cache/json-ld-api cache/trig-tests
+pypkg: build dist pydev pytest
+	python3 -m build --wheel
+
+javatr: build | cache/json-ld-api cache/trig-tests
 	mkdir -p build/java
 	python3 -m transpile.java $(TRFLAGS) $(trld_modules) -o build/java/src/main/java
 	cp -R transpile/templates/java build
-java: _javatr
+
+java: javatr
 	(cd build/java && ./gradlew -q clean uberjar test)
 	java -cp build/java/build/libs/trld-with-deps.jar trld.jsonld.TestRunner cache/json-ld-api/tests 2>&1 | grep '^Ran '
 	java -cp build/java/build/libs/trld-with-deps.jar trld.trig.Test cache/trig-tests 2>&1 | grep '^Ran '
-jar: _javatr
+
+jar: javatr
 	(cd build/java && ./gradlew -q test jar)
 
-_jstr: build/js/node_modules
+jstr: build/js/node_modules
 	python3 -m transpile.js $(TRFLAGS) $(trld_modules) -o build/js/lib
 	cp -R transpile/templates/js build
-js: _jstr
+
+js: jstr
 	(cd build/js && TRLD_JSONLD_TESTDIR=$(shell pwd)/cache/json-ld-api/tests npm test || true)
 	(cd build/js && node -r esm lib/trig/test.js $(shell pwd)/cache/trig-tests) | grep '^Ran'
 
