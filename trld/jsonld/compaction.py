@@ -25,6 +25,10 @@ def compact(context: object, doc_data: JsonObject,
             context = context.get(CONTEXT)
         active_context = Context(base_iri).get_context(cast(object, context), context_url)
 
+    # TODO: if there is a graph-aliased keyword, ensure:
+    #if isinstance(doc_data, list):
+    #    doc_data = {GRAPH: doc_data}
+
     result: JsonObject = compaction(active_context, None, doc_data, compact_arrays, ordered)
     if isinstance(result, List):
         if len(result) == 0:
