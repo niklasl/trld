@@ -179,6 +179,11 @@ class JsTranspiler(CStyleTranspiler):
         ct = [(counter, 'Number')]
         return f'for (let {counter} = 0; {counter} < {ceiling}; {counter}++)', [], ct
 
+    def map_enumerated_for(self, container, ctype, part, parttype, counter):
+        ct = [(counter, 'int')]
+        stmts = [f'{parttype} {part} = {container}[{counter}]']
+        return f'for (let {counter} = 0; {counter} < {container}.size(); ++{counter})', stmts, ct
+
     def handle_with(self, expr, var):
         vartype = expr.split('(', 1)[0].replace('new ', '')
         self.enter_block(None, 'try',

@@ -578,21 +578,44 @@ class Transpiler(ast.NodeVisitor):
     def visit_For(self, node: ast.For):
         scope = self.new_scope(node)
 
-        if isinstance(node.iter, ast.Call) and isinstance(node.iter.func, ast.Name) \
-                and node.iter.func.id == 'range':
-            counter = self.repr_expr(node.target)
+        if isinstance(node.iter, ast.Call) and isinstance(node.iter.func, ast.Name):
             callargs = [self.repr_expr(arg) for arg in node.iter.args]
-            assert len(callargs) == 1 # TODO: only range(X) for now...
-            ceiling = callargs[0]
-            for_repr, stmts, nametypes = self.map_for_to(counter, ceiling)
-            self.enter_block(scope, for_repr, stmts=stmts, nametypes=nametypes)
-            return
+
+            if node.iter.func.id == 'range':
+                counter = self.repr_expr(node.target)
+                assert len(callargs) == 1, "Only 1-ary range is supported"
+                ceiling = callargs[0]
+                for_repr, stmts, nametypes = self.map_for_to(counter, ceiling)
+                self.enter_block(scope, for_repr, stmts=stmts, nametypes=nametypes)
+                return
+
+            if node.iter.func.id == 'enumerate':
+                assert isinstance(node.target, ast.Tuple)
+                counter, part = [self.repr_expr(el) for el in node.target.elts]
+                assert len(callargs) == 1, "Only 1-ary enumerate is supported"
+                container = callargs[0]
+                ctype, parttype = self._get_containertype(container)
+
+                for_repr, stmts, nametypes = self.map_enumerated_for(container, ctype, part, parttype, counter)
+                self.enter_block(scope, for_repr, stmts=stmts, nametypes=nametypes)
+                return
 
         container = self.repr_expr(node.iter)
+        ctype, parttype = self._get_containertype(container)
 
-        ctypeinfo = self.gettype(container.rsplit('.', 1)[0] if container.endswith(')')
-                                 else container)
+        if isinstance(node.target, ast.Tuple):
+            part = ', '.join(self.repr_expr(el) for el in node.target.elts)
+        else:
+            part = self.repr_expr(node.target)
 
+        for_repr, stmts, nametypes = self.map_for(container, ctype, part, parttype)
+
+        self.enter_block(scope, for_repr, stmts=stmts, nametypes=nametypes)
+
+    def _get_containertype(self, container):
+        ctypeinfo = self.gettype(
+            container.rsplit('.', 1)[0] if container.endswith(')') else container
+        )
         ctype = ctypeinfo[0] if ctypeinfo else self._last_cast
         containertype = self.container_type(ctype)
         # TODO: hacked this fix to let transpile.js further along, but really
@@ -611,14 +634,7 @@ class Transpiler(ast.NodeVisitor):
             parttype = self._iterables[ctype]
             ctype = self.types.get('Iterable', 'Iterable')
 
-        if isinstance(node.target, ast.Tuple):
-            part = ', '.join(self.repr_expr(el) for el in node.target.elts)
-        else:
-            part = self.repr_expr(node.target)
-
-        for_repr, stmts, nametypes = self.map_for(container, ctype, part, parttype)
-
-        self.enter_block(scope, for_repr, stmts=stmts, nametypes=nametypes)
+        return ctype, parttype
 
     def visit_While(self, node):
         test = self._thruthy(self.repr_expr(node.test))
@@ -1265,6 +1281,9 @@ class Transpiler(ast.NodeVisitor):
         raise NotImplementedError
 
     def map_for(self, container: str, ctype: str, part: str, parttype: str) -> Tuple[str, List[str], List[Tuple[str, str]]]:
+        raise NotImplementedError
+
+    def map_enumerated_for(self, container: str, ctype: str, part: str, parttype: str, counter: str) -> Tuple[str, List[str], List[Tuple[str, str]]]:
         raise NotImplementedError
 
     def map_for_to(self, counter: str, ceiling: str) -> Tuple[str, List[str], List[Tuple[str, str]]]:

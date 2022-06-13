@@ -218,6 +218,12 @@ class JavaTranspiler(CStyleTranspiler):
         ct = [(counter, 'int')]
         return f'for (int {counter} = 0; {counter} < {ceiling}; {counter}++)', [], ct
 
+    def map_enumerated_for(self, container, ctype, part, parttype, counter):
+        ct = [(counter, 'int')]
+        castcontainer = f'(({ctype}) {container})'
+        stmts = [f'{parttype} {part} = {castcontainer}.get({counter})']
+        return f'for (int {counter} = 0; {counter} < {castcontainer}.size(); ++{counter})', stmts, ct
+
     def handle_with(self, expr, var):
         vartype = expr.split('(', 1)[0].replace('new ', '')
         self.enter_block(None, f'try ({vartype} {var} = {expr})', nametypes=[(var, vartype)])
