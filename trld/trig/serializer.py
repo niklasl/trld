@@ -5,11 +5,11 @@ from ..common import Output, uuid4
 from ..jsonld.base import (BASE, CONTAINER, CONTEXT, GRAPH, ID, INDEX,
                            LANGUAGE, LIST, PREFIX, PREFIX_DELIMS, REVERSE,
                            TYPE, VALUE, VOCAB)
+from ..jsonld.star import ANNOTATION, ANNOTATED_TYPE_KEY
+
 
 StrObject = Dict[str, object]
 StrOrObject = Union[str, StrObject]
-
-ANNOTATION: str = '@annotation'
 
 WORD_START = re.compile(r'^\w*$')
 PNAME_LOCAL_ESC = re.compile(r"([~!$&'()*+,;=/?#@%]|^[.-]|[.-]$)")
@@ -522,7 +522,7 @@ class SerializerState:
         return node
 
     def repr_type(self, t: StrOrObject) -> str:
-        tstr: str = t if isinstance(t, str) else cast(str, cast(Dict, t)[TYPE]) # assuming annotation form
+        tstr: str = t if isinstance(t, str) else cast(str, cast(Dict, t)[ANNOTATED_TYPE_KEY]) # assuming annotation form
         return self.to_valid_term(cast(str, self.term_for(tstr)))
 
     def ref_repr(self, refobj: Optional[StrOrObject], use_vocab = False) -> str:

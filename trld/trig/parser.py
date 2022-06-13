@@ -7,10 +7,9 @@ from ..jsonld.base import (
         ID, LIST, GRAPH,
         CONTEXT, VOCAB, BASE,
         PREFIX, PREFIX_DELIMS)
+from ..jsonld.star import ANNOTATION, ANNOTATED_TYPE_KEY
 from ..rdfterms import RDF_TYPE, XSD, XSD_DOUBLE, XSD_INTEGER
 
-
-ANNOTATION = '@annotation' # TODO: move to base (also from serializer)
 
 XSD_DECIMAL: str = f'{XSD}decimal'
 
@@ -594,7 +593,7 @@ class ReadNode(ReadCompound):
         elif isinstance(value, Dict) and ANNOTATION in value:
             last_value = self.last_value
             if self.p == TYPE:
-                last_value = {TYPE: last_value}
+                last_value = {ANNOTATED_TYPE_KEY: last_value}
             elif not isinstance(last_value, Dict):
                 last_value = {VALUE: last_value}
             last_value[ANNOTATION] = value[ANNOTATION]
