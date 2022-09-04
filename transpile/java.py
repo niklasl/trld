@@ -242,10 +242,12 @@ class JavaTranspiler(CStyleTranspiler):
 
         castowner = self._cast(owner, parens=True)
 
+        is_map = self._is_map(ownertype) or 'Map' in castowner
+
         if attr == 'join':# and ownertype == 'String':
             return f'String.join({owner}, {callargs[0]})', 'String'
 
-        elif attr == 'get' and self._is_map(ownertype) and len(callargs) == 2:
+        elif attr == 'get' and is_map and len(callargs) == 2:
             return f'{self._cast(owner, parens=True)}.getOrDefault({callargs[0]}, {callargs[1]})'
 
         if attr == 'sort' and self._is_list(ownertype):
@@ -260,26 +262,26 @@ class JavaTranspiler(CStyleTranspiler):
             if attr == 'reverse' and self._is_list(ownertype):
                 return f'Collections.reverse({owner})'
 
-            if attr == 'copy' and self._is_map(ownertype):
+            if attr == 'copy' and is_map:
                 return f'new HashMap({owner})'
 
         member = self.to_attribute_name(attr)
         rtype = None
 
-        if attr == 'items':# and self._is_map(ownertype):
+        if attr == 'items' and is_map:
             member = 'entrySet'
-        elif attr == 'keys':# and self._is_map(ownertype):
+        elif attr == 'keys' and is_map:
             member = 'keySet'
-        elif attr == 'update' and self._is_map(ownertype):
+        elif attr == 'update' and is_map:
             member = 'putAll'
         elif attr == 'pop':
-            if self._is_map(ownertype):
+            if is_map:
                 if len(callargs) == 2 and callargs[1] == 'null':
                     callargs.pop(1)
                 member = 'remove'
             elif self._is_list(ownertype):
                 member = 'remove'
-        elif attr == 'setdefault' and self._is_map(ownertype):
+        elif attr == 'setdefault' and is_map:
             self._pre_stmts = [
                 f'if (!{castowner}.containsKey({callargs[0]})) '
                 f'{castowner}.put({callargs[0]}, {callargs.pop(1)})'
