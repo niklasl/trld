@@ -1,0 +1,12 @@
+{
+  "@id": "/item/1",
+  "@type": "Item",
+  "hasTitle": {
+    "mainTitle": "Item One - an item"
+  },
+  "references": {"@id": "/item/2"},
+  "relatedTo": [
+    {"@id": "/item/3"},
+    {"@id": "/item/4"}
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "@id": "/item/1",
+  "@type": "Thing",
+  "hasTitle": {
+    "mainTitle": "Item 1"
+  }
+}
