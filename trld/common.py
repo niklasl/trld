@@ -3,23 +3,17 @@ import sys
 import uuid
 from http.client import HTTPResponse
 from io import StringIO, TextIOWrapper
-from typing import Callable, Dict, Iterator, Optional, Set, TextIO, Union
+from typing import (Dict, Iterator, List, NamedTuple, Optional, Protocol, Set,
+                    TextIO, Union)
 from urllib.parse import urljoin, urlparse
 from urllib.request import Request, urlopen
 
 from .builtins import Char
-from .jsonld.base import JSONLD_CONTEXT_RELATION
-from .mimetypes import SUFFIX_MIME_TYPE_MAP, guess_mime_type
-
-JSONLD_MIME_TYPE = SUFFIX_MIME_TYPE_MAP['jsonld']
-JSON_MIME_TYPES: Set[str] = {JSONLD_MIME_TYPE, 'application/json'}
+from .jsonld.base import JSONLD_CONTEXT_RELATION, JsonLdError, JsonObject
+from .mimetypes import (ACCEPTS, JSON_MIME_TYPES, JSONLD_MIME_TYPE,
+                        get_first_mime_type, guess_mime_type)
 
 ACCEPT_HEADER = 'Accept'
-
-ACCEPTS = ", ".join(
-    mt + (f';q=0.{10 - i}' if i > 0 else '')
-    for i, mt in enumerate(SUFFIX_MIME_TYPE_MAP.values())
-)
 
 
 class Input:
@@ -28,23 +22,40 @@ class Input:
     context_url: Optional[str]
     profile: Optional[str]
 
+    _source: TextIO
+
     def __init__(
         self, source: Union[str, TextIO, None] = None, headers: Optional[Dict] = None
     ):
-        stream: TextIO
-        if isinstance(source, str):
-            self.document_url = source
-            if source.startswith(('http', 'https')):
-                stream = self._open_request(source, headers)
-            else:
-                stream = open(_remove_file_protocol(source))
-                self.content_type = guess_mime_type(source)
-        elif source is None:
-            stream = sys.stdin
-        else:
-            stream = source
+        self.document_url = None
+        self.content_type = None
+        self.context_url = None
+        self.profile = None
 
-        self._source = stream
+        if isinstance(source, str):
+            self._source = self._open_stream(source, headers)
+        elif source is None:
+            self._source = sys.stdin
+        else:
+            self._source = source
+
+        if (
+            self.content_type is None
+            and headers is not None
+            and ACCEPT_HEADER in headers
+        ):
+            accepts = headers[ACCEPT_HEADER]
+            first_accept = get_first_mime_type(accepts)
+            if first_accept == accepts:
+                self.content_type = first_accept
+
+    def _open_stream(self, source: str, headers: Optional[Dict] = None) -> TextIO:
+        self.document_url = source
+        if is_http_url(source):
+            return self._open_request(source, headers)
+        else:
+            self.content_type = guess_mime_type(source)
+            return open(_remove_file_protocol(source))
 
     def _open_request(self, source: str, headers: Optional[Dict] = None) -> TextIO:
         req = Request(source)
@@ -68,9 +79,16 @@ class Input:
     @property
     def document(self) -> object:
         if self.content_type in JSON_MIME_TYPES:
-            return load_json(self)
+            return self.load_json()
         else:
             return self.read()
+
+    def load_json(self) -> JsonObject:
+        if self._source == sys.stdin:
+            return json.load(self._source)
+        else:
+            with self._source as fp:
+                return json.load(fp)
 
     def read(self) -> str:
         return self._source.read()
@@ -112,29 +130,54 @@ class Output:
         return self._dest.getvalue()
 
 
-LoadDocumentCallback = Callable[[str], Input]
+class LoadDocumentOptions(NamedTuple):
+    profile: str
+    request_profile: Union[str, List[str]]
 
 
-document_loader: Optional[LoadDocumentCallback] = None
+class LoadingDocumentNotAllowedError(JsonLdError):
+    pass
+
+
+class LoadDocumentCallback(Protocol):
+    def __call__(self, url: str, options: Optional[LoadDocumentOptions] = None) -> Input:
+        ...
+
+
+def any_document_loader(url: str, options: Optional[LoadDocumentOptions] = None) -> Input:
+    return Input(url)
+
+
+def http_document_loader(url: str, options: Optional[LoadDocumentOptions] = None) -> Input:
+    if not is_http_url(url):
+        raise LoadingDocumentNotAllowedError(f"Not allowed to load non-HTTP URL: {url}")
+    return Input(url)
+
+
+def https_document_loader(url: str, options: Optional[LoadDocumentOptions] = None) -> Input:
+    if not url.startswith('https:'):
+        raise LoadingDocumentNotAllowedError(f"Not allowed to load non-HTTPS URL: {url}")
+    return Input(url)
+
+
+_custom_document_loader: Optional[LoadDocumentCallback] = None
 
 
 def set_document_loader(loader: LoadDocumentCallback):
-    global document_loader
-    document_loader = loader
+    global _custom_document_loader
+    _custom_document_loader = loader
 
 
-def load_json(source: Union[str, Input]) -> object:
-    stream = None
+def get_document_loader(start_url: Optional[str] = None) -> LoadDocumentCallback:
+    if _custom_document_loader is not None:
+        return _custom_document_loader
 
-    if not isinstance(source, Input):
-        assert isinstance(source, str)
-        source = document_loader(source) if document_loader else Input(source)
+    if start_url is not None and is_http_url(start_url):
+        if start_url.startswith('https:'):
+            return https_document_loader
+        return http_document_loader
 
-    if source._source == sys.stdin:
-        return json.load(source._source)
-
-    with source._source as fp:
-        return json.load(fp)
+    return any_document_loader
 
 
 def parse_json(s: str) -> object:
@@ -147,6 +190,10 @@ def dump_json(o: object, pretty=False) -> str:
 
 def dump_canonical_json(o: object) -> str:
     return json.dumps(o, indent=None, separators=(',', ':'), sort_keys=True)
+
+
+def is_http_url(url: str) -> bool:
+    return url.startswith(('http:', 'https:'))
 
 
 def resolve_iri(base: str, relative: str) -> str:

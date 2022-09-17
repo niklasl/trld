@@ -28,7 +28,11 @@ def run_testsuite(suitefilepath: str) -> bool:
         testsuite = json.load(fp)
 
     suite_file_dir = _find_suite_file_dir(suitedir)
-    set_document_loader(lambda url: Input(url.replace(TESTS_URL, suite_file_dir)))
+
+    def local_testsuite_loader(url, options=None):
+        return Input(url.replace(TESTS_URL, suite_file_dir))
+
+    set_document_loader(local_testsuite_loader)
 
     runs, oks, fails, errors = 0, 0, 0, 0
 

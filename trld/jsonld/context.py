@@ -1,5 +1,7 @@
-from typing import Optional, Dict, List, Set, Tuple, Union, cast
-from ..common import load_json, warning, resolve_iri
+from typing import Dict, List, Optional, Set, Tuple, Union, cast
+
+from ..common import (LoadDocumentCallback, LoadDocumentOptions,
+                      get_document_loader, resolve_iri, warning)
 from .base import *
 
 
@@ -31,6 +33,8 @@ class InvalidContextNullificationError(JsonLdError): pass
 class InvalidLocalContextError(JsonLdError): pass
 
 class LoadingDocumentFailedError(JsonLdError): pass
+
+class LoadingRemoteContextFailedError(JsonLdError): pass
 
 class ContextOverflowError(JsonLdError): pass
 
@@ -83,9 +87,20 @@ class Context:
     _processing_mode: str
     _version: Optional[float]
 
+    document_loader: LoadDocumentCallback
+
     #_keyword_aliases: Dict[str, List[str]]
 
-    def __init__(self, base_iri: Optional[str], original_base_url: Optional[str] = None):
+    def __init__(
+        self,
+        base_iri: Optional[str],
+        original_base_url: Optional[str] = None,
+        document_loader: Optional[LoadDocumentCallback] = None,
+    ):
+        # TODO: SPEC improvement? Document loader logic determined by original url.
+        self.document_loader = document_loader or get_document_loader(
+            original_base_url or base_iri
+        )
         self.initialize(base_iri, original_base_url)
 
     def initialize(self, base_iri: Optional[str], original_base_url: Optional[str] = None):
@@ -231,9 +246,12 @@ class Context:
         # 5.2.5) Otherwise, set context document to the RemoteDocument obtained by dereferencing context using the LoadDocumentCallback, passing context for url, and http://www.w3.org/ns/json-ld#context for profile and for requestProfile.
             # 5.2.5.1) If context cannot be dereferenced, or the document from context document cannot be transformed into the internal representation:
                 #a loading remote context failed error has been detected and processing is aborted.
-        ...
-        #return remote_document.json
-        return load_json(href)
+
+        try:
+            options = LoadDocumentOptions(profile=profile, request_profile=request_profile)
+            return self.document_loader(href, options).document
+        except Exception as e:
+            raise LoadingRemoteContextFailedError(f"Could not load remote context: {href}. Cause: {e}")
 
     def _read_context_definition(self,
             context: Dict[str, Union[str, Dict]],
@@ -352,6 +370,7 @@ class Context:
         context_document: object = self._load_document(import_value)
         # 5.6.5)
         # TODO: LoadingDocumentFailedError
+        # intead of thrown LoadingRemoteContextFailedError?
         # 5.6.6)
         if not isinstance(context_document, Dict) or CONTEXT not in context_document:
             raise InvalidRemoteContextError

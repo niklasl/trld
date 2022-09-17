@@ -3,7 +3,7 @@ import json
 import sys
 import argparse
 
-from ..common import load_json, dump_json
+from ..common import any_document_loader, dump_json
 from .expansion import expand
 from .compaction import compact
 from .flattening import flatten
@@ -20,9 +20,7 @@ argparser.add_argument('-f', '--flatten', action='store_true')
 
 args = argparser.parse_args()
 
-context_data = None
-if args.context:
-    context_data = load_json(args.context)
+context_url = args.context
 
 doc_paths = args.source or ['-']
 
@@ -34,7 +32,7 @@ for doc_path in doc_paths:
         doc_path = '/dev/stdin'
         data = json.load(sys.stdin)
     else:
-        data = load_json(doc_path)
+        data = any_document_loader(doc_path).load_json()
 
     ordered = True
     base_iri = args.base if args.base else f'file://{doc_path}'
@@ -43,8 +41,8 @@ for doc_path in doc_paths:
         result: Any = expand(data, base_iri, args.expand_context, ordered=ordered)
         if args.flatten:
             result = flatten(result, ordered=ordered)
-        if context_data:
-            result = compact(context_data, result, base_iri, ordered=ordered)
+        if context_url:
+            result = compact(context_url, result, base_iri, ordered=ordered)
 
         print(dump_json(result, pretty=True))
     except Exception as e:

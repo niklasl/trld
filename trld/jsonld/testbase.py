@@ -1,6 +1,6 @@
 from typing import Dict, List, Tuple, Optional, cast
 
-from ..common import Input, Output, load_json
+from ..common import Input, Output, get_document_loader
 from .base import *
 from . import context
 from .expansion import expand
@@ -11,8 +11,12 @@ from .rdf import RdfDataset, to_jsonld, to_rdf_dataset
 from ..nq.parser import load
 from ..nq.serializer import serialize
 
-
 TESTS_URL: str = 'https://w3c.github.io/json-ld-api/tests'
+
+
+def load_json(source: str) -> object:
+    loader = get_document_loader()
+    return loader(source).load_json()
 
 
 class TestCase:

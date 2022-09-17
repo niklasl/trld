@@ -3,39 +3,38 @@ import json
 import sys
 from typing import Any
 
-from .common import Input, Output, dump_json, load_json
+from .common import Input, Output, dump_json
 from .jsonld.compaction import compact
 from .jsonld.expansion import expand
 from .jsonld.flattening import flatten
 from .mimetypes import SUFFIX_MIME_TYPE_MAP
 
 
-def eprint(msg):
+TURTLE_OR_TRIG = {SUFFIX_MIME_TYPE_MAP[s] for s in ['trig', 'ttl']}
+NT_OR_NQ = {SUFFIX_MIME_TYPE_MAP[s] for s in ['nt', 'nq']}
+
+
+def printerr(msg):
     print(msg, file=sys.stderr)
 
 
 def parse_rdf(source, fmt):
     headers = {}
-    accept = SUFFIX_MIME_TYPE_MAP.get(fmt)
+    accept = SUFFIX_MIME_TYPE_MAP.get(fmt, fmt)
     if accept:
         headers['Accept'] = accept
 
     inp = Input(None if source == '-' else source, headers)
 
-    # TODO: Use inp.content_type (which uses guess_mime_type)?
-    # So instead of using suffixes or "names" below, check mime-type (accept).
-    if fmt is None and isinstance(source, str):
-        fmt = source.rsplit('.', 1)[-1]
-
-    if fmt in {'trig', 'ttl', 'turtle'}:
+    if inp.content_type in TURTLE_OR_TRIG:
         from .trig import parser as trig
         return trig.parse(inp)
 
-    if fmt in {'nq', 'nt'}:
+    if inp.content_type in NT_OR_NQ:
         from .nq import parser as nq
         return nq.parse(inp)
 
-    return load_json(inp)
+    return inp.document
 
 
 def serialize_rdf(result, fmt):
@@ -61,11 +60,12 @@ def serialize_rdf(result, fmt):
                              default=lambda o: o.__dict__))
 
 
-def process_source(source, context_data, args, ordered=True):
+def process_source(source, context_ref, args, ordered=True):
     base_iri = (
         args.base if args.base
         else f'file:///dev/stdin' if source == '-'
-        else f'file://{source}'
+        else f'file://{source}' if '://' not in source
+        else source
     )
 
     try:
@@ -81,13 +81,14 @@ def process_source(source, context_data, args, ordered=True):
 
         if args.flatten or args.output_format in {'nq', True}:
             result = flatten(result, ordered=ordered)
-        if context_data:
-            result = compact(context_data, result, base_iri, ordered=ordered)
+
+        if context_ref:
+            result = compact(context_ref, result, base_iri, ordered=ordered)
 
         serialize_rdf(result, args.output_format)
 
     except Exception as e:
-        eprint(f"Error in file '{source}'")
+        printerr(f"Error in file '{source}'")
         import traceback
         traceback.print_exc()
 
@@ -106,17 +107,15 @@ def main():
 
     args = argparser.parse_args()
 
-    context_data = None
-    if args.context:
-        context_data = load_json(args.context)
+    context_ref = args.context
 
     sources = args.source or ['-']
 
     for source in sources:
         if len(sources) > 1:
-            eprint(f"Parsing file: '{source}'")
+            printerr(f"Parsing file: '{source}'")
 
-        process_source(source, context_data, args)
+        process_source(source, context_ref, args)
 
 
 if __name__ == '__main__':
