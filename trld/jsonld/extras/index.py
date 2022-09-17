@@ -20,7 +20,7 @@ def _index_reverses(index: Dict[str, JsonMap]):
     for item in index.values():
         if ID not in item:
             continue
-        for link in item.keys():
+        for link in list(item.keys()):
             refs: List = as_list(item[link])
             for ref in refs:
                 if not isinstance(ref, Dict):
