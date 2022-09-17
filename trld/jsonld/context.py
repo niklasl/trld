@@ -335,7 +335,7 @@ class Context:
             # override protected,
             # and a copy of remote contexts.
             #self.terms[key] = # TODO: set in Term (move that up here if obscure...)
-            isprotected: bool = cast(bool, context.get(PROTECTED))
+            isprotected: bool = cast(bool, context.get(PROTECTED, False))
             Term(self, context, key, value, defined, base_url, isprotected, override_protected)
 
     def _handle_import(self, context: Dict[str, Union[str, Dict]], base_url: str) -> Dict:
