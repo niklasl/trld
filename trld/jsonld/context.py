@@ -98,8 +98,13 @@ class Context:
         document_loader: Optional[LoadDocumentCallback] = None,
     ):
         # TODO: SPEC improvement? Document loader logic determined by original url.
-        self.document_loader = document_loader or get_document_loader(
-            original_base_url or base_iri
+        # TODO: improve transpile so we can go back to using `or` here...
+        self.document_loader = (
+            document_loader
+            if document_loader is not None
+            else get_document_loader(
+                original_base_url if original_base_url is not None else base_iri
+            )
         )
         self.initialize(base_iri, original_base_url)
 
@@ -249,7 +254,7 @@ class Context:
 
         try:
             options = LoadDocumentOptions(profile=profile, request_profile=request_profile)
-            return self.document_loader(href, options).document
+            return self.document_loader.__call__(href, options).document  # transpiler workaround
         except Exception as e:
             raise LoadingRemoteContextFailedError(f"Could not load remote context: {href}. Cause: {e}")
 

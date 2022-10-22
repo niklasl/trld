@@ -736,11 +736,6 @@ class Transpiler(ast.NodeVisitor):
             in_ctor = True
         elif node.name == '__repr__':
             return # IMPROVE:just drop these "debug innards"?
-        # TODO: 5f831dc1 (java-specific)
-        elif node.name == '__str__':
-            name = 'toString'
-        elif node.name == '__eq__':
-            name = 'equals'
         elif not name:
             name = self.to_attribute_name(node.name)
 
@@ -814,10 +809,7 @@ class Transpiler(ast.NodeVisitor):
             base = ''
             def on_exit():
                 classdfn = self.classes[classname]
-                ctor = self.ctor or classname
-                # TODO: use different self.export (for e.g. js!)
-                public = self.public if self.typing else ''
-                ctor = f'{public}{self.ctor or classname}'
+                ctor = self._ctor_callable(classname)
 
                 defaults = [self.repr_expr(ann.value) for ann in node.body
                             if isinstance(ann, ast.AnnAssign) and ann.value]
@@ -845,6 +837,9 @@ class Transpiler(ast.NodeVisitor):
                                 for i, (aname, atypeinfo) in enumerate(classdfn.items()))
                 assigns = (f'{self.this}.{aname} = {aname}' for aname in classdfn)
                 self.enter_block(None, ctor, f'({signature})', stmts=assigns)
+        elif base == 'Protocol':
+            base = ' implements java.util.function.Function'
+            pass  # TODO: multi-arg callables (may be too costly for e.g. java...)
         elif base:
             if base == 'Exception':
                 base = self.types.get(base, base)
@@ -868,7 +863,7 @@ class Transpiler(ast.NodeVisitor):
         # TODO: if derived from an Exception...
         if not self.inherit_constructor and node.name.endswith('Error'):
             msgdecl = self.typed('msg', 'String')
-            ctor = self.ctor or classname
+            ctor = self._ctor_callable(classname)
             if self.func_defaults:
                 key_val = self.func_defaults.format(key=msgdecl,
                                                     value=self.none)
@@ -878,7 +873,7 @@ class Transpiler(ast.NodeVisitor):
                 stmts.append(f'{ctor}({msgdecl}) {{ super(msg); }}')
         elif not self.inherit_constructor:
             classinfo = self._getdef(classname)
-            ctor = self.ctor or classname
+            ctor = self._ctor_callable(classname)
             if classinfo and 'Init' not in classinfo.members and classinfo.base:
                 while True:
                     classinfo = self._getdef(classinfo.base)
@@ -895,6 +890,11 @@ class Transpiler(ast.NodeVisitor):
                         break
 
         self.enter_block(node, classdecl, classname, base, stmts=stmts, on_exit=on_exit)
+
+    def _ctor_callable(self, classname):
+        # TODO: use different self.export (for e.g. js!)
+        public = self.public if self.typing else ''
+        return f'{public}{self.ctor or classname}'
 
     def repr_annot(self, expr) -> str:
         return self.repr_expr(expr, annot=True)
@@ -1018,6 +1018,7 @@ class Transpiler(ast.NodeVisitor):
         elif isinstance(expr, ast.GeneratorExp):
             # TODO: just support GeneratorExp with any/all
             #raise NotImplementedError(ast.dump(expr))
+            #return self.map_generator(expr), None
             return ast.dump(expr), None
 
         elif isinstance(expr, ast.ListComp):
