@@ -1,7 +1,8 @@
 from typing import List, Dict, Set, Optional, Iterable, Union, Tuple, ClassVar, cast
 import re
 from ..builtins import Char
-from ..common import Input, dump_json
+from ..platform.common import json_encode
+from ..platform.io import Input
 from ..jsonld.base import (
         VALUE, TYPE, LANGUAGE,
         ID, LIST, GRAPH,
@@ -835,4 +836,4 @@ if __name__ == '__main__':
     except ParserError as e:
         print(e, file=sys.stderr)
     else:
-        print(dump_json(result, pretty=True))
+        print(json_encode(result, pretty=True))

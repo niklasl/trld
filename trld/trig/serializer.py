@@ -1,7 +1,8 @@
 from typing import Callable, Dict, List, NamedTuple, Optional, Union, cast
 import re
 
-from ..common import Output, uuid4
+from ..platform.common import uuid4
+from ..platform.io import Output
 from ..jsonld.base import (BASE, CONTAINER, CONTEXT, GRAPH, ID, INDEX,
                            LANGUAGE, LIST, PREFIX, PREFIX_DELIMS, REVERSE,
                            TYPE, VALUE, VOCAB)

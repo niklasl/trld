@@ -3,7 +3,8 @@
 # - Some `if ...: if ....:` could be just `and`
 
 from typing import Optional, Dict, List, Set, Union, cast
-from ..common import warning
+from .docloader import LoadDocumentCallback
+from ..platform.common import warning
 from .base import *
 from .context import Context, Term, InvalidBaseDirectionError, InvalidNestValueError
 
@@ -50,8 +51,9 @@ class InvalidLanguageMapValueError(JsonLdError): pass
 def expand(doc_data: JsonObject,
            base_iri: str,
            expand_context: str = None,
-           ordered = False) -> List:
-    ctx: Context = Context(base_iri)
+           ordered = False,
+           document_loader: LoadDocumentCallback = None) -> List:
+    ctx: Context = Context(base_iri, None, document_loader)
     if expand_context is not None:
         ctx = ctx.get_context(expand_context, expand_context)
     result: Optional[JsonObject] = expansion(ctx, None, doc_data, base_iri,

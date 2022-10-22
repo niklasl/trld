@@ -1,7 +1,7 @@
 from typing import Dict, List, Optional, Set, Tuple, Union, cast
 
-from ..common import (LoadDocumentCallback, LoadDocumentOptions,
-                      get_document_loader, resolve_iri, warning)
+from .docloader import LoadDocumentCallback, LoadDocumentOptions, get_document_loader
+from ..platform.common import resolve_iri, warning
 from .base import *
 
 

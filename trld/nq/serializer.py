@@ -1,5 +1,5 @@
 from typing import Optional
-from ..common import Output
+from ..platform.io import Output
 from ..jsonld.base import is_blank
 from ..jsonld.rdf import RdfDataset, RdfGraph, RdfTriple, RdfLiteral
 from ..rdfterms import XSD_STRING

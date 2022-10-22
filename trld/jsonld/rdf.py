@@ -1,5 +1,5 @@
 from typing import List, Dict, Set, Iterable, Iterator, Union, Optional, NamedTuple, cast
-from ..common import dump_canonical_json, parse_json
+from ..platform.common import json_encode_canonical, json_decode
 from .base import *
 from .context import InvalidBaseDirectionError
 from .expansion import InvalidLanguageTaggedStringError
@@ -177,7 +177,7 @@ def object_to_rdf_data(item: JsonMap, list_triples: List, bnodes: BNodes,
         return None
     # 8)
     if datatype == JSON:
-        value = dump_canonical_json(value)
+        value = json_encode_canonical(value)
         datatype = RDF_JSON
     # 9)
     if isinstance(value, bool):
@@ -491,7 +491,7 @@ def to_jsonld_object(value: RdfObject,
     # 2.5)
     elif literal.datatype == RDF_JSON and processing_mode != JSONLD10:
         try:
-            converted_value = cast(JsonObject, parse_json(literal.value))
+            converted_value = cast(JsonObject, json_decode(literal.value))
         except:# json.decoder.JSONDecodeError
             pass
         rtype = JSON

@@ -1,6 +1,7 @@
 from typing import List, Optional, Iterable, Union, cast
 from ..builtins import Char
-from ..common import Input, dump_json
+from ..platform.common import json_encode
+from ..platform.io import Input
 from ..jsonld.rdf import (
         RdfDataset, RdfGraph, RdfTriple, RdfLiteral, RdfObject, to_jsonld)
 
@@ -167,4 +168,4 @@ def parse(inp: Input) -> object:
 if __name__ == '__main__':
     inp = Input()
     result = parse(inp)
-    print(dump_json(result, pretty=True))
+    print(json_encode(result, pretty=True))

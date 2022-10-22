@@ -3,7 +3,8 @@ import json
 import sys
 from typing import Any
 
-from .common import Input, Output, dump_json
+from .platform.common import json_encode
+from .platform.io import Input, Output
 from .jsonld.compaction import compact
 from .jsonld.expansion import expand
 from .jsonld.flattening import flatten
@@ -34,12 +35,12 @@ def parse_rdf(source, fmt):
         from .nq import parser as nq
         return nq.parse(inp)
 
-    return inp.document
+    return inp.load_json()
 
 
 def serialize_rdf(result, fmt):
     if fmt is None or fmt == 'jsonld':
-        print(dump_json(result, pretty=True))
+        print(json_encode(result, pretty=True))
         return
 
     out = Output(sys.stdout)

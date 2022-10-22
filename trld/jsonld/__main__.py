@@ -3,7 +3,8 @@ import json
 import sys
 import argparse
 
-from ..common import any_document_loader, dump_json
+from ..platform.common import json_encode
+from .docloader import any_document_loader
 from .expansion import expand
 from .compaction import compact
 from .flattening import flatten
@@ -32,7 +33,7 @@ for doc_path in doc_paths:
         doc_path = '/dev/stdin'
         data = json.load(sys.stdin)
     else:
-        data = any_document_loader(doc_path).load_json()
+        data = any_document_loader(doc_path).document
 
     ordered = True
     base_iri = args.base if args.base else f'file://{doc_path}'
@@ -44,7 +45,7 @@ for doc_path in doc_paths:
         if context_url:
             result = compact(context_url, result, base_iri, ordered=ordered)
 
-        print(dump_json(result, pretty=True))
+        print(json_encode(result, pretty=True))
     except Exception as e:
         err(f"Error in file '{doc_path}'")
         import traceback

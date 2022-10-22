@@ -1,6 +1,7 @@
 from typing import Iterator, List, Dict, Union, NamedTuple, cast
 from pathlib import Path
-from ..common import Input, dump_canonical_json
+from ..platform.common import json_encode_canonical
+from ..platform.io import Input
 from ..jsonld.base import CONTEXT, GRAPH, ID, TYPE, LIST
 from ..jsonld.expansion import expand
 from ..jsonld.compaction import compact
@@ -93,7 +94,7 @@ def datarepr(data, context, base_uri) -> str:
     dataset = to_rdf_dataset(data)
     data = to_jsonld(dataset)
     data = compact(context, data, '', ordered=True)
-    return dump_canonical_json(data)
+    return json_encode_canonical(data)
 
 
 if __name__ == '__main__':

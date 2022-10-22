@@ -3,7 +3,8 @@ import sys
 import traceback
 from pathlib import Path
 
-from ..common import Input, set_document_loader
+from ..platform.io import Input
+from .docloader import set_document_loader
 from .base import JSONLD10, JSONLD11
 from . import context
 from .testbase import TestCase, TESTS_URL

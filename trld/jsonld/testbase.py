@@ -1,22 +1,21 @@
-from typing import Dict, List, Tuple, Optional, cast
+from typing import Dict, List, Optional, Tuple, cast
 
-from ..common import Input, Output, get_document_loader
-from .base import *
-from . import context
-from .expansion import expand
-from .compaction import compact
-from .flattening import flatten
-from .rdf import RdfDataset, to_jsonld, to_rdf_dataset
-#from ..nq import parser as nq_parser, serializer as nq_serializer
 from ..nq.parser import load
 from ..nq.serializer import serialize
+from ..platform.io import Input, Output
+from .base import CONTEXT, ID, TYPE, JsonObject
+from .compaction import compact
+from .docloader import LoadDocumentCallback, get_document_loader
+from .expansion import expand
+from .flattening import flatten
+from .rdf import RdfDataset, to_jsonld, to_rdf_dataset
 
 TESTS_URL: str = 'https://w3c.github.io/json-ld-api/tests'
 
 
 def load_json(source: str) -> object:
-    loader = get_document_loader()
-    return loader(source).load_json()
+    loader: LoadDocumentCallback = get_document_loader()
+    return loader.__call__(source).document  # transpiler workaround
 
 
 class TestCase:
