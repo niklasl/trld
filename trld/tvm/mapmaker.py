@@ -74,6 +74,8 @@ def make_target_map(vocab: object, target: object) -> Dict:
 
     target_map: Dict[str, object] = {}
 
+    identity_map: Dict[str, str] = {}
+
     for obj in graph:
         id: Optional[str] = cast(Optional[str], obj[ID])
 
@@ -83,7 +85,9 @@ def make_target_map(vocab: object, target: object) -> Dict:
 
         _process_reified_forms(obj, vocab_index, target_map)
 
-    identity_map: Dict[str, str] = {}
+        if id and id not in target_map:
+            if _get_target_priority(target_dfn, id) > 0:
+                identity_map[id] = id
 
     for key, rule in target_map.items():
         rules: List[Tuple[int, Union[Dict, str]]] = sorted(as_list(rule),

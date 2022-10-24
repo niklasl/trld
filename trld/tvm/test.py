@@ -60,6 +60,33 @@ def test_make_target_map():
     assert_json_equals(target_map, expect)
 
 
+def test_make_target_map_from_target_terms():
+    vocab = {
+        "@graph": [
+            {
+                "@id": "rdfs:Resource",
+                "@type": "rdfs:Class"
+            },
+            {
+                "@id": "rdfs:label",
+                "@type": "rdf:Property"
+            },
+            {
+                "@id": "ex:other",
+                "@type": "rdf:Property"
+            }
+        ]
+    }
+    target = {"@vocab": "http://www.w3.org/2000/01/rdf-schema#"}
+    expect = {
+        "http://www.w3.org/2000/01/rdf-schema#Resource": "http://www.w3.org/2000/01/rdf-schema#Resource",
+        "http://www.w3.org/2000/01/rdf-schema#label": "http://www.w3.org/2000/01/rdf-schema#label",
+    }
+    vocab = expand(dict(context, **vocab), "")
+    target_map = make_target_map(vocab, {CONTEXT: target})
+    assert_json_equals(target_map, expect)
+
+
 def test_cope_with_circular_references():
     target = {"@vocab": "http://www.w3.org/2000/01/rdf-schema#"}
 
@@ -475,7 +502,9 @@ def test_sort_target_rules():
                 "propertyFrom": null,
                 "valueFrom": "http://www.w3.org/1999/02/22-rdf-syntax-ns#value"
             }
-        ]
+        ],
+        "http://schema.org/isbn": "http://schema.org/isbn",
+        "http://schema.org/identifier": "http://schema.org/identifier",
     }
     vocab = expand(dict(context, **vocab), "")
     target_map = make_target_map(vocab, {CONTEXT: target})
