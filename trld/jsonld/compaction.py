@@ -273,11 +273,13 @@ def compaction(
                         compacted_item[iri_compaction(active_context, INDEX)] = expanded_item[INDEX]
                     # 12.8.7.2.3)
                     add_value(nest_result, item_active_property, compacted_item, as_array)
-                    # TODO: spec problem; does not continue here (thus adding twice!)
+                    # TODO: spec problem [637a8c3c]; does not continue here (thus adding twice!)
                     continue
                 # 12.8.7.3)
                 elif active_property:
-                    nest_result[active_property] = compacted_item
+                    # TODO: [see 637a8c3c]
+                    nest_result[item_active_property] = compacted_item
+                    continue
 
             # 12.8.8)
             map_object: JsonMap
