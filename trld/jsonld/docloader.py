@@ -1,8 +1,10 @@
 from typing import List, NamedTuple, Optional, Protocol, Union
 
-from ..mimetypes import JSON_MIME_TYPES
+from ..mimetypes import JSON_MIME_TYPES, JSONLD_MIME_TYPE
 from ..platform.io import Input, _is_http_url
 from .base import JsonLdError
+
+REQUEST_HEADERS = {'Accept': f'{JSONLD_MIME_TYPE}, application/json;q=0.9'}
 
 
 class RemoteDocument(NamedTuple):
@@ -65,7 +67,7 @@ def https_document_loader(url: str, options: Optional[LoadDocumentOptions] = Non
 
 def load_any_document(url: str) -> RemoteDocument:
     document: object
-    with Input(url) as inp:
+    with Input(url, REQUEST_HEADERS) as inp:
         if inp.content_type in JSON_MIME_TYPES:
             document = inp.load_json()
         else:
