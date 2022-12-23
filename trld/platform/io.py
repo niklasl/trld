@@ -31,8 +31,8 @@ class Input:
     ):
         self.document_url = None
         self.content_type = None
-        self.context_url = None
         self.profile = None
+        self.context_url = None
 
         if isinstance(source, str):
             self._stream = self._open_stream(source, headers)
@@ -74,8 +74,10 @@ class Input:
         self.context_url = _get_link_header(
             res, rel=JSONLD_CONTEXT_RELATION, type=JSONLD_MIME_TYPE
         )
-        # FIXME: wrong; this should be the profile *parameter* of the content_type!
-        self.profile = _get_link_header(res, rel='profile')
+        # The profile *parameter* of the content type:
+        for param, value in res.headers.get_params():
+            if param == 'profile':
+                self.profile = value
 
         return TextIOWrapper(res)
 
