@@ -1,5 +1,10 @@
 from typing import Dict, List, Optional, cast
 
+from ..jsonld.base import (BASE, CONTEXT, GRAPH, ID, INDEX,
+                           LANGUAGE, LIST, TYPE, VALUE, VOCAB)
+
+from ..jsonld.star import ANNOTATION
+
 from .xmlcompat import XmlAttribute, XmlElement, XmlReader
 
 NodeObject = Dict[str, object]
@@ -40,7 +45,7 @@ class RdfAttrs:
             if nsUri == XMLNSNS:
                 pfx = lname
                 if pfx == 'xmlns':
-                    pfx = '@vocab'
+                    pfx = VOCAB
                 self.ns[pfx] = value
             elif nsUri == XMLNS:
                 if lname == 'lang':
@@ -51,7 +56,7 @@ class RdfAttrs:
                 if lname == 'about':
                     self.about = value
                 elif lname == 'ID':
-                    self.rdf_id = value
+                    self.rdf_id = '#' + value
                 elif lname == 'nodeID':
                     self.nodeID = value
                 elif lname == 'resource':
@@ -71,7 +76,7 @@ def parse(source: object) -> NodeObject:
     root: XmlElement = reader.get_root(source)
     context: NodeObject = {}
     graph: List[NodeObject] = []
-    result: NodeObject = {'@context': context, '@graph': graph}
+    result: NodeObject = {CONTEXT: context, GRAPH: graph}
     walk(root, result)
 
     return result
@@ -80,18 +85,18 @@ def parse(source: object) -> NodeObject:
 def walk(elem: XmlElement, result: NodeObject, node: NodeObject = None):
     attrs = RdfAttrs(elem.get_attributes())
 
-    ctx = cast(Dict, result['@context'])
+    ctx = cast(Dict, result[CONTEXT])
     if attrs.ns:
         # TODO: if node add local context
         ctx.update(attrs.ns)
 
     if attrs.base:
-        ctx['@base'] = attrs.base
+        ctx[BASE] = attrs.base
 
     # TODO: if node add local context
     if node is None:
         if attrs.lang:
-            ctx['@language'] = attrs.lang
+            ctx[LANGUAGE] = attrs.lang
 
     childNode = None
     consumed = False
@@ -104,16 +109,16 @@ def walk(elem: XmlElement, result: NodeObject, node: NodeObject = None):
     else:
         if node is None:
             node = {}
-            cast(List, result['@graph']).append(node)
+            cast(List, result[GRAPH]).append(node)
             if elem.namespaceURI != RDFNS or elem.localName != 'Description':
-                node['@type'] = elem.tagName
+                node[TYPE] = elem.tagName
 
             if attrs.about is not None:
-                node['@id'] = attrs.about
+                node[ID] = attrs.about
             elif attrs.rdf_id is not None:
-                node['@id'] = '#' + attrs.rdf_id
+                node[ID] = attrs.rdf_id
             elif attrs.nodeID:
-                node['@id'] = '_:' + attrs.nodeID
+                node[ID] = '_:' + attrs.nodeID
             childNode = node
 
             node.update(attrs.values)
@@ -123,25 +128,25 @@ def walk(elem: XmlElement, result: NodeObject, node: NodeObject = None):
                 value = childNode
             elif attrs.parseType == 'Collection':
                 coll: List[object] = []
-                value = {'@list': coll}
-                result = {'@context': {}, '@graph': coll}
+                value = {LIST: coll}
+                result = {CONTEXT: {}, GRAPH: coll}
             elif attrs.parseType == 'Literal':
                 xml = elem.get_inner_xml()
-                value = {'@type': 'rdf:XMLLiteral', '@value': xml}
+                value = {TYPE: 'rdf:XMLLiteral', VALUE: xml}
                 consumed = True
             elif attrs.resource:
-                value = {'@id': attrs.resource}
+                value = {ID: attrs.resource}
             elif attrs.nodeID:
-                value = {'@id': '_:' + attrs.nodeID}
+                value = {ID: '_:' + attrs.nodeID}
             elif len(elem.get_child_elements()):
                 value = []
-                result = {'@context': {}, '@graph': value}
+                result = {CONTEXT: {}, GRAPH: value}
             else:
                 value = elem.get_text()
                 if attrs.lang:
-                    value = {'@value': value, '@language': attrs.lang}
+                    value = {VALUE: value, LANGUAGE: attrs.lang}
                 elif attrs.datatype:
-                    value = {'@value': value, '@type': attrs.datatype}
+                    value = {VALUE: value, TYPE: attrs.datatype}
             props = node.get(elem.tagName)
             if props is None:
                 node[elem.tagName] = value
