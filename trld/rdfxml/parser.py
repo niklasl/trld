@@ -154,7 +154,7 @@ def walk(
                     value = {VALUE: value, TYPE: attrs.datatype}
 
             if attrs.rdf_id:
-                if not isinstance(value, dict):
+                if not isinstance(value, Dict):
                     value = {VALUE: value}
                 annot: NodeObject = {ID: attrs.rdf_id}
                 value[ANNOTATION] = annot

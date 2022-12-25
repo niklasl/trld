@@ -16,6 +16,8 @@ def serialize(data, outstream):
 
 class RDFXMLSerializer:
 
+    context: Dict[str, object]
+
     # NOTE: RDF/XML has no full RDF-star annotation support, but allows
     # reification by using rdf:ID on arc (predicate) elements:
     # <https://www.w3.org/TR/rdf-syntax-grammar/#section-Syntax-reifying>
@@ -34,7 +36,7 @@ class RDFXMLSerializer:
         self.nodes = self._get_nodes(data)
 
     @staticmethod
-    def _get_nodes(data):
+    def _get_nodes(data) -> List[Dict]:
         nodes = data
         if not isinstance(nodes, List):
             nodes = data[GRAPH] or data
@@ -68,7 +70,7 @@ class RDFXMLSerializer:
             #    return resolve_iri(self.context[BASE] + qname)
             return qname
 
-        return self.context[pfx] + lname
+        return cast(str, self.context[pfx]) + lname
 
     def contextAttrs(self, context: Dict[str, object]) -> Dict[str, str]:
         if not isinstance(context, Dict):
@@ -115,6 +117,8 @@ class RDFXMLSerializer:
             types = []
         if not isinstance(types, List):
             types = [types]
+
+        assert isinstance(types, List)
 
         firstType = types[0] if len(types) > 0 else None
         annot_first_type = False
@@ -191,10 +195,10 @@ class RDFXMLSerializer:
             self.handleAnnotation(id, TYPE, attrs, {ID: type_uri, ANNOTATION: annot})
             self.builder.addElement('rdf:type', attrs)
 
-    def handleContents(self, node):
-        id = node.get(ID)
+    def handleContents(self, node: Dict[str, object], _tag = None): # TODO: use _tag?
+        id = cast(Optional[str], node.get(ID))
 
-        for key in node:
+        for key in node.keys():
             if key.startswith('@'):
                 continue
 
@@ -225,7 +229,7 @@ class RDFXMLSerializer:
                     if key:
                         self.builder.closeElement()
 
-    def isLiteral(self, value):
+    def isLiteral(self, value) -> bool:
         if isinstance(value, Dict) and VALUE in value:
             return True
         return (
@@ -263,8 +267,7 @@ class RDFXMLSerializer:
             self.builder.addElement(key, attrs, literal)
 
     def handleRef(self, key, node):
-        id = node[ID]
-        id = self.expand(id)
+        id = self.expand(node[ID])
 
         if isinstance(id, Dict):
             self.builder.openElement(key)
@@ -290,23 +293,21 @@ class RDFXMLSerializer:
         # self.builder.writeln('-->')
         pass
 
-    def handleAnnotation(self, s, p, arc_attrs, node):
-        if not isinstance(node, dict) or ANNOTATION not in node:
+    def handleAnnotation(self, s: Optional[str], p: str, arc_attrs: Dict, node: Dict):
+        if ANNOTATION not in node:
             return
 
         annot = node[ANNOTATION]
         if annot:
             notannot: Dict = dict(node)
             del notannot[ANNOTATION]
-            triplenode = {ID: s, p: notannot}
+            triplenode: Dict[str, object] = {ID: s, p: notannot}
             qid = make_qid(self, triplenode)
 
             if self.use_arc_ids:
                 arc_attrs['rdf:ID'] = qid
 
             self._deferreds.append((annot, triplenode, qid))
-
-        return None
 
     def handleQuotedTriple(self, triplenode, annot: Dict = None):
         qid = make_qid(self, triplenode)
@@ -403,16 +404,17 @@ def _nonspecial(node: Dict[str, object]) -> bool:
     return any(key for key in node if not key.startswith('@'))
 
 
-def make_qid(ctx, triplenode):
+def make_qid(ctx, triplenode: Dict[str, object]) -> str:
     s: Optional[str] = None
     p: Optional[str] = None
     o: Optional[object] = None
     for k, v in triplenode.items():
         if k == ID:
-            s = v
+            s = cast(str, v)
         else:
             p, o = k, v
-            o: Dict = dict(o)
+            assert isinstance(o, Dict)
+            o = dict(o)
             if ID in o:
                 o[ID] = ctx.resolve(o[ID])
             if TYPE in o:
@@ -423,7 +425,7 @@ def make_qid(ctx, triplenode):
     orepr: str
     if isinstance(o, str):
         orepr = o
-    elif isinstance(o, dict):
+    elif isinstance(o, Dict):
         if ID in o:
             orepr = o[ID]
         else:
