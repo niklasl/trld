@@ -77,12 +77,28 @@ def parse(source: object) -> NodeObject:
     context: NodeObject = {}
     graph: List[NodeObject] = []
     result: NodeObject = {CONTEXT: context, GRAPH: graph}
-    walk(root, result)
+    annots: List[NodeObject] = []
+    walk(root, result, None, annots)
+
+    # inline_annotations
+    if len(annots) > 0:
+        index = {o[ID]: o for o in cast(list, result[GRAPH]) if ID in o}
+        for annot in annots:
+            desc = index.pop(annot[ID], None)
+            if desc is not None:
+                annot.update(desc)
+                del annot[ID]
+        result[GRAPH] = list(index.values())
 
     return result
 
 
-def walk(elem: XmlElement, result: NodeObject, node: NodeObject = None):
+def walk(
+    elem: XmlElement,
+    result: NodeObject,
+    node: Optional[NodeObject],
+    annots: List[NodeObject],
+):
     attrs = RdfAttrs(elem.get_attributes())
 
     ctx = cast(Dict, result[CONTEXT])
@@ -147,6 +163,14 @@ def walk(elem: XmlElement, result: NodeObject, node: NodeObject = None):
                     value = {VALUE: value, LANGUAGE: attrs.lang}
                 elif attrs.datatype:
                     value = {VALUE: value, TYPE: attrs.datatype}
+
+            if attrs.rdf_id:
+                if not isinstance(value, dict):
+                    value = {VALUE: value}
+                annot: NodeObject = {ID: attrs.rdf_id}
+                value[ANNOTATION] = annot
+                annots.append(annot)
+
             props = node.get(elem.tagName)
             if props is None:
                 node[elem.tagName] = value
@@ -162,7 +186,7 @@ def walk(elem: XmlElement, result: NodeObject, node: NodeObject = None):
         return
 
     for child in elem.get_child_elements():
-        walk(child, result, childNode)
+        walk(child, result, childNode, annots)
 
     if isinstance(props, List) and isinstance(value, List):
         props += value
