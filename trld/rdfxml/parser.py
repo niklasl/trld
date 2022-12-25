@@ -1,17 +1,14 @@
-from typing import Dict, List, Optional, cast
+from typing import Dict, List, Tuple, Optional, cast
 
 from ..jsonld.base import (BASE, CONTEXT, GRAPH, ID, INDEX,
                            LANGUAGE, LIST, TYPE, VALUE, VOCAB)
 
-from ..jsonld.star import ANNOTATION
+from ..jsonld.star import ANNOTATION, ANNOTATED_TYPE_KEY
 
+from .terms import RDFNS, RDFGNS, XMLNS, XMLNSNS
 from .xmlcompat import XmlAttribute, XmlElement, XmlReader
 
 NodeObject = Dict[str, object]
-
-RDFNS = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#'
-XMLNS = 'http://www.w3.org/XML/1998/namespace'
-XMLNSNS = 'http://www.w3.org/2000/xmlns/'
 
 
 class RdfAttrs:
@@ -80,15 +77,7 @@ def parse(source: object) -> NodeObject:
     annots: List[NodeObject] = []
     walk(root, result, None, annots)
 
-    # inline_annotations
-    if len(annots) > 0:
-        index = {o[ID]: o for o in cast(list, result[GRAPH]) if ID in o}
-        for annot in annots:
-            desc = index.pop(annot[ID], None)
-            if desc is not None:
-                annot.update(desc)
-                del annot[ID]
-        result[GRAPH] = list(index.values())
+    _inline_annotations(result, annots)
 
     return result
 
@@ -171,12 +160,37 @@ def walk(
                 value[ANNOTATION] = annot
                 annots.append(annot)
 
-            props = node.get(elem.tagName)
+            key: str
+            if elem.namespaceURI == RDFNS and elem.localName == 'type':
+                key = TYPE
+                assert isinstance(value, Dict)
+                if ANNOTATION in value:
+                    typeid = value[ID]
+                    # TODO: compact typeid
+                    value = {
+                        ANNOTATED_TYPE_KEY: typeid,
+                        ANNOTATION: value.get(ANNOTATION),
+                    }
+                else:
+                    value = value[ID]
+            elif (
+                elem.namespaceURI == RDFGNS
+                and elem.localName == 'isGraph'
+                and attrs.parseType == 'GraphLiteral'
+            ):
+                    key = GRAPH
+                    if node[TYPE] == 'rdfg:Graph':
+                        del node[TYPE]
+            else:
+                key = elem.tagName
+
+            props = node.get(key)
             if props is None:
-                node[elem.tagName] = value
+                node[key] = value
             else:
                 if not isinstance(props, List):
-                    node[elem.tagName] = props = [props]
+                    props = [props]
+                    node[key] = props
                 if not isinstance(value, List):
                     props.append(value)
                 else:
@@ -190,6 +204,34 @@ def walk(
 
     if isinstance(props, List) and isinstance(value, List):
         props += value
+
+
+NodeGraphPair = Tuple[NodeObject, List]
+GraphIndex = Dict[str, NodeGraphPair]
+
+
+def _inline_annotations(result: NodeObject, annots: List[NodeObject]):
+    if len(annots) > 0:
+        index: GraphIndex = {}
+        _add_to_index(index, result)
+
+        for annot in annots:
+            desc, ownergraph = index.pop(cast(str, annot[ID]), [])
+            if desc is not None:
+                annot.update(desc)
+                del annot[ID]
+                #desc.clear()
+                ownergraph.remove(desc)
+
+def _add_to_index(index: GraphIndex, graph: object):
+    if not isinstance(graph, List):
+        graph = [graph]
+    for node in graph:
+        assert isinstance(node, Dict)
+        if ID in node:
+            index[node[ID]] = (node, graph)
+        if GRAPH in node:
+            _add_to_index(index, node[GRAPH])
 
 
 if __name__ == '__main__':
