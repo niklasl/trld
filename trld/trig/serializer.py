@@ -216,17 +216,10 @@ class SerializerState:
             self.to_literal(cast(object, obj), via_key)
             return []
 
-        explicit_list: bool = self.aliases.list_ in obj
-
         if via_key and self.is_list_container(via_key):
             obj = { self.aliases.list_: obj }
 
         s = cast(Optional[str], obj.get(self.aliases.id))
-
-        is_list: bool = self.aliases.list_ in obj
-        started_list: bool = is_list
-
-        is_bracketed: bool = is_list or via_key == self.aliases.annotation
 
         if self.aliases.graph in obj:
             if s is not None and self.settings.turtle_drop_named:
@@ -237,28 +230,31 @@ class SerializerState:
             self.write_graph(s, obj[self.aliases.graph], depth)
             return []
 
-        if explicit_list:
-            self.write('( ')
+        return self._emit_contents(via_key, depth, obj, s)
 
+    def _emit_contents(
+        self, via_key: Optional[str], depth: int, obj: Dict, s: Optional[str]
+    ) -> List[StrObject]:
         in_graph: bool = via_key == self.aliases.graph and not self.settings.turtle_only
         in_graph_add: int = 1 if in_graph else 0
         at_top: bool = depth == 0
+        not_linked: bool = at_top or in_graph
 
-        max_keys = 2 if ID in obj else 1
-        if (s is not None or at_top or in_graph) and self.has_keys(obj, max_keys):
-            if depth == 0:
-                self.writeln()
-            if s is None:
-                self.write(self.get_indent(depth - (0 if in_graph else 1)))
-                self.write("[]")
-            else:
-                if in_graph_add > 0:
-                    self.write(self.get_indent(0))
-                self.write(self.ref_repr(s))
+        is_list: bool = self.aliases.list_ in obj
+        started_list: bool = is_list
+
+        is_bracketed: bool = is_list or via_key == self.aliases.annotation
+
+        subject_started: bool = False
+
+        max_keys: int = 2 if ID in obj else 1
+        if (s is not None or not_linked) and self.has_keys(obj, max_keys):
+            pass
         elif depth > 0:
             if not is_bracketed:
                 depth += 1
                 self.write("[")
+                subject_started = True
         else:
             return []
 
@@ -303,6 +299,26 @@ class SerializerState:
                 if isinstance(vo, Dict) and len(vo) == 0:
                     continue
                 vs = [x for x in vs if not isinstance(x, Dict) or len(x) > 0]
+
+            if not subject_started:
+                subject_started = True
+                if depth == 0:
+                    self.writeln()
+                if is_list:
+                    if not_linked:
+                        self.write('()')
+                        is_list = False
+                        started_list = False
+                    else:
+                        self.write('(')
+                else:
+                    if s is None:
+                        self.write(self.get_indent(depth - (0 if in_graph else 1)))
+                        self.write("[]")
+                    else:
+                        if in_graph_add > 0:
+                            self.write(self.get_indent(0))
+                        self.write(self.ref_repr(s))
 
             in_list: bool = is_list or self.is_list_container(key)
 
@@ -371,7 +387,7 @@ class SerializerState:
 
                     self.write_annotation(v, depth)
 
-        if explicit_list or (not is_list and started_list) and not ended_list:
+        if (is_list or started_list) and not ended_list:
             self.write(" )")
 
         if depth == 0:
@@ -389,11 +405,8 @@ class SerializerState:
             else:
                 self.write(' ')
             if not is_bracketed:
-                # NOTE: hack for e.g. BlazeGraph
-                #if not self.has_keys(obj) and self.settings.mark_empty_bnode:
-                #    self.writeln(f'a {self.settings.empty_marker}')
-                #    self.write(indent)
                 self.write("]")
+
             return top_objects
 
     def write_annotation(self, v: object, depth: int):
