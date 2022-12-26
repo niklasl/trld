@@ -53,7 +53,7 @@ class Input:
 
     def _open_stream(self, source: str, headers: Optional[Dict] = None) -> TextIO:
         self.document_url = source
-        if _is_http_url(source):
+        if source.startswith(('http:', 'https:')):
             return self._open_request(source, headers)
         else:
             self.content_type = guess_mime_type(source)
@@ -126,10 +126,6 @@ class Output:
     def get_value(self):
         assert isinstance(self._dest, StringIO)
         return self._dest.getvalue()
-
-
-def _is_http_url(url: str) -> bool:
-    return url.startswith(('http:', 'https:'))
 
 
 def _remove_file_protocol(ref: str):
