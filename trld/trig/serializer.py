@@ -242,13 +242,16 @@ class SerializerState:
 
         in_graph: bool = via_key == self.aliases.graph and not self.settings.turtle_only
         in_graph_add: int = 1 if in_graph else 0
+        at_top: bool = depth == 0
 
-        if (s is not None or depth == 0) and self.has_keys(obj, 2):
+        max_keys = 2 if ID in obj else 1
+        if (s is not None or at_top or in_graph) and self.has_keys(obj, max_keys):
+            if depth == 0:
+                self.writeln()
             if s is None:
+                self.write(self.get_indent(depth - (0 if in_graph else 1)))
                 self.write("[]")
             else:
-                if depth == 0:
-                    self.writeln()
                 if in_graph_add > 0:
                     self.write(self.get_indent(0))
                 self.write(self.ref_repr(s))
