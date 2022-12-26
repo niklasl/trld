@@ -351,11 +351,7 @@ class JavaTranspiler(CStyleTranspiler):
         return obj, rtype
 
     def to_attribute_name(self, attr):
-        if attr == '__str__':
-            return 'toString'
-        elif attr == '__eq__':
-            return 'equals'
-        elif attr == '__call__':
+        if attr == '__call__':
             return 'apply'
         return super().to_attribute_name(attr)
 

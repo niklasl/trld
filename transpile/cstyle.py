@@ -23,4 +23,8 @@ class CStyleTranspiler(Transpiler):
         return camelize(name)
 
     def to_attribute_name(self, attr):
+        if attr == '__str__':
+            return 'toString'
+        elif attr == '__eq__':
+            return 'equals'
         return under_camelize(attr, self.protected == '_')

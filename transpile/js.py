@@ -303,6 +303,8 @@ class JsTranspiler(CStyleTranspiler):
             classdfn = self._within[-2].node
             assert isinstance(classdfn, ast.ClassDef) and owner == 'super()'
             obj = 'super'
+        elif attr == '__call__':
+            obj = castowner
         else:
             if owner == 'super()':
                 castowner = 'super'
@@ -334,6 +336,11 @@ class JsTranspiler(CStyleTranspiler):
             if ltypeinfo and ltypeinfo[0].startswith('Set'):
                 return f'((l, r) => l === r || l !== null && r !== null && l.size === r.size && !Array.from(l).find(it => !r.has(it)))({left}, {right})'
         return super().map_compare(left, op, right)
+
+    def to_attribute_name(self, attr):
+        if attr == '__call__':
+            return 'call'
+        return super().to_attribute_name(attr)
 
     def map_getitem(self, owner, key):
         ownertype = self.gettype(owner)
