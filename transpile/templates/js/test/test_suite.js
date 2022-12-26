@@ -1,7 +1,8 @@
 import tape from 'tape'
 import os from 'os'
 
-import * as common from '../lib/common.js'
+import { Input } from '../lib/platform/io.js'
+import { setDocumentLoader } from '../lib/jsonld/docloader.js'
 import * as context from '../lib/jsonld/context.js'
 import { JSONLD10, CONTEXT, ID, TYPE } from '../lib/jsonld/base.js'
 import { expand } from '../lib/jsonld/expansion.js'
@@ -11,15 +12,20 @@ import { flatten } from '../lib/jsonld/flattening.js'
 const TESTSUITE_DIR = `file://${process.env.TRLD_JSONLD_TESTDIR}/`
 const TESTSUITE_BASE_URL = 'https://w3c.github.io/json-ld-api/tests/'
 
-let loadJson = common.loadJson
-function loadLocalJson(url) {
-    return loadJson(url.replace(TESTSUITE_BASE_URL, TESTSUITE_DIR))
+function localTestsuiteLoader(url) {
+    return new Input(url.replace(TESTSUITE_BASE_URL, TESTSUITE_DIR))
 }
-common.loadJson = loadLocalJson
+
+function loadJson(url) {
+  let data = localTestsuiteLoader(url).document
+  return data
+}
+
+setDocumentLoader(localTestsuiteLoader)
 
 function testCaseRunner(category) {
   let manifestFile = `${TESTSUITE_DIR}${category}-manifest.jsonld`
-  let manifest = common.loadJson(manifestFile);
+  let manifest = loadJson(manifestFile);
   for (let tc of manifest.sequence) {
     if (tc[TYPE].indexOf('jld:PositiveEvaluationTest') === -1) {
       continue
@@ -41,17 +47,17 @@ function testCaseRunner(category) {
 
       let ordered = true
 
-      let sourceData = common.loadJson(src)
+      let sourceData = loadJson(src)
 
       let contextData
       if (tc.context) {
         let contextSrc = TESTSUITE_DIR + tc.context
-        contextData = common.loadJson(contextSrc)
+        contextData = loadJson(contextSrc)
         sourceData = expand(sourceData, baseUri, null, ordered)
       }
 
       let expectedSrc = TESTSUITE_DIR + tc.expect
-      let expectedData = common.loadJson(expectedSrc)
+      let expectedData = loadJson(expectedSrc)
       if (CONTEXT in expectedData) {
         delete expectedData[CONTEXT]
       }

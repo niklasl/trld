@@ -1,7 +1,5 @@
 'use(strict)'
-
 import fs from 'fs'
-import url from 'url'
 import http from 'http'
 import https from 'https'
 import process from 'process'
@@ -10,14 +8,37 @@ export class Input {
 
   constructor(source = null) {
     if (typeof source === 'string') {
-      this._source = fs.createReadStream(removeFileProtocol(source))
+      this._source = this._openStream(source)
     } else {
       this._source = (source != null || process.stdin)
     }
   }
 
-  getHeader(header) {
-    throw new Error("NotImplemented")
+  _openStream(ref) {
+      this.documentUrl = ref
+
+    if (ref.endsWith('.jsonld')) {
+      this.contentType = 'application/ld+json'
+      this.document = this.loadJson()
+    } else if (ref.endsWith('.json')) {
+      this.contentType = 'application/json'
+      this.document = this.loadJson()
+    } else if (ref.endsWith('.trig')) {
+      this.contentType = 'application/trig'
+      this.document = this.read()
+    } else if (ref.endsWith('.ttl')) {
+      this.contentType = 'text/turtle'
+      this.document = this.read()
+    } else if (ref.endsWith('.rdf')) {
+      this.contentType = 'application/rdf+xml'
+      this.document = this.read()
+    }
+
+    return fs.createReadStream(removeFileProtocol(ref))
+  }
+
+  loadJson() {
+    return loadJson(this.documentUrl)
   }
 
   read() {
@@ -103,25 +124,4 @@ export function loadJson(uri) {
     buf = fs.readFileSync(location)
   }
   return JSON.parse(buf.toString('utf-8'))
-}
-
-export function parseJson(s) {
-  return JSON.parse(s)
-}
-
-export function dumpJson(o, pretty=false) {
-  return JSON.stringify(o, null, pretty ? 2 : undefined);
-}
-
-export function dumpCanonicalJson(o) {
-  // TODO: sort keys, no space after ',' nor ':'
-  return JSON.stringify(o, null);
-}
-
-export function resolveIri(base, relative) {
-  return url.resolve(base, relative)
-}
-
-export function warning(msg) {
-  console.warn(msg)
 }
