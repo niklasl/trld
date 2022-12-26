@@ -155,9 +155,9 @@ class JsTranspiler(CStyleTranspiler):
     def map_isinstance(self, vrepr: str, classname: str):
         if classname in {'String', 'Number', 'Boolean'}:
             return f"typeof {vrepr} === '{classname.lower()}'"
-        if classname == 'Map':
+        if classname in {'Map', '{}'}:
             return f"{vrepr} !== null && typeof {vrepr} === 'object' && !Array.isArray({vrepr})"
-        if classname == 'Array':
+        if classname in {'Array', '[]'}:
             return f"Array.isArray({vrepr})"
         return f'{vrepr} instanceof {classname}'
 
@@ -224,7 +224,9 @@ class JsTranspiler(CStyleTranspiler):
 
         castowner = self._cast(owner, parens=True)
 
-        ismaplike = 'Map' in ownertype.split('<', 1)[0]
+        ownertypebase = ownertype.split('<', 1)[0]
+        ismap = 'Map' in ownertypebase
+        ismaplike = ismap or ownertypebase.startswith('{}')
 
         if attr == 'join':# and ownertype == 'String':
             return f'{callargs[0]}.join({owner})'
@@ -253,7 +255,7 @@ class JsTranspiler(CStyleTranspiler):
         if attr == 'isspace':# and ownertype == 'String':
             return fr'!!({castowner}.match(/^\s+$/))'
 
-        if attr == 'items' and ismaplike:
+        if attr == 'items' and ismap:
             member = 'entrySet'
         elif attr == 'keys' and (ismaplike or ownertype == 'Object'):
             return f'Object.keys({castowner})'
@@ -388,7 +390,7 @@ class JsTranspiler(CStyleTranspiler):
         return None
 
     def map_delitem(self, owner, key):
-        assert self.gettype(owner)[0].startswith('Map')
+        assert self.gettype(owner)[0].startswith(('Map', '{}'))
         return f'delete {owner}[{key}]'
 
     def map_in(self, container, contained, negated=False):
@@ -407,7 +409,7 @@ class JsTranspiler(CStyleTranspiler):
             containertype = None
 
         if containertype:
-            if containertype.startswith(('Map', 'Object')):
+            if containertype.startswith(('Map', 'Object', '{}')):
                 result = f'Object.hasOwnProperty.call({container}, {contained})'
             elif containertype.startswith('Set'):
                 result = f'{container}.has({contained})'
