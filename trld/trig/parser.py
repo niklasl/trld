@@ -622,6 +622,8 @@ class ReadNode(ReadCompound):
         elif c == '(':
             return ReadCollection(self), None
         elif c == ';':
+            if self.node is None:
+                raise NotationError(f'Unexpected: {c!r}')
             self.p = None
             self.last_value = None
             return self, None
@@ -812,7 +814,7 @@ def parse(inp: Input) -> object:
         try:
             next_state, value = state.consume(c, value)
         except NotationError as e:
-            raise ParserError(e, lno, cno)
+            raise ParserError(e, lno, cno) from None
 
         cno += 1
 
