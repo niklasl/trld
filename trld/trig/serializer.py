@@ -299,6 +299,11 @@ class SerializerState:
             if len(vs) == 0: # TODO: and not @list
                 continue
 
+            if self.is_lang_container(key):
+                if isinstance(vo, Dict) and len(vo) == 0:
+                    continue
+                vs = [x for x in vs if not isinstance(x, Dict) or len(x) > 0]
+
             in_list: bool = is_list or self.is_list_container(key)
 
             rev_container: Optional[StrObject] = None
