@@ -8,6 +8,7 @@ class CStyleTranspiler(Transpiler):
     #method_casing = Casing.lowerCamelCase
     #name_casing = Casing.lowerCamelCase
     mknew = 'new '
+    extends_keyword = 'extends'
     begin_block = ' {'
     end_block = '}'
     end_stmt = ';'

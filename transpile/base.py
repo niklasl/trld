@@ -53,6 +53,8 @@ class Transpiler(ast.NodeVisitor):
     while_stmt = 'while (%s)'
     inherit_constructor = True
     mknew = ''
+    extends_keyword: Optional[str] = None
+    implements_keyword: Optional[str] = None
     union_surrogate: Optional[str] = None
     optional_type_form: Optional[str] = None
     static_annotation_form: Optional[str] = None
@@ -69,6 +71,7 @@ class Transpiler(ast.NodeVisitor):
     constants: Dict
     operators: Dict
     types: Dict
+    interfaces: Optional[Dict] = None
     strcmp: Optional[str] = None
     notmissing: Optional[str] = None
     list_concat: Optional[str] = None
@@ -837,14 +840,15 @@ class Transpiler(ast.NodeVisitor):
                                 for i, (aname, atypeinfo) in enumerate(classdfn.items()))
                 assigns = (f'{self.this}.{aname} = {aname}' for aname in classdfn)
                 self.enter_block(None, ctor, f'({signature})', stmts=assigns)
-        elif base == 'Protocol':
-            base = ' implements java.util.function.Function'
-            pass  # TODO: multi-arg callables (may be too costly for e.g. java...)
         elif base:
-            if base == 'Exception':
+            # TODO: 5f831dc1 (still too java-specific?)
+            if self.interfaces and base in self.interfaces:
+                base = self.interfaces[base]
+                if base and self.implements_keyword:
+                    base = f' {self.implements_keyword} {base}'
+            else:
                 base = self.types.get(base, base)
-            # TODO: 5f831dc1 (java-specific)
-            base = f' extends {base}'
+                base = f' {self.extends_keyword} {base}'
 
         # TODO:
         for member in node.body:
@@ -852,10 +856,10 @@ class Transpiler(ast.NodeVisitor):
                     member.name == '__iter__'):
                 continue
             iterated_type = self.repr_expr(_get_slice(member.returns.slice))
-            # TODO: 5f831dc1 (java-specific)
+            # TODO: 5f831dc1 (still too java-specific?)
             iterable_type = self.types.get('Iterable', 'Iterable')
             if self.typing:
-                base += f' implements {iterable_type}<{iterated_type}>'
+                base += f'  {self.implements_keyword} {iterable_type}<{iterated_type}>'
             self._iterables[classname] = iterated_type
             break
 

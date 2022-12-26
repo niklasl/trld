@@ -50,6 +50,10 @@ class JsTranspiler(CStyleTranspiler):
         're.Pattern': 'RegExp',
     }
 
+    interfaces = {
+        'Protocol': '',
+    }
+
     constants = {
         None: ('null', None),
         True: ('true', 'Boolean'),

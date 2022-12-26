@@ -11,8 +11,9 @@ class JavaTranspiler(CStyleTranspiler):
     has_static = True
     typing = True
     inherit_constructor = False
+    implements_keyword: Optional[str] = 'implements'
     union_surrogate = 'Object'
-    optional_type_form = '/*@Nullable*/ {0}'
+    optional_type_form = '/*@Nullable*/ {0}'  # Use "the inverse", Objects.requireNonNull(o) everywhere else?
     static_annotation_form = '/*@Static*/ {0}'
     public = 'public '
     constant = 'final '
@@ -39,6 +40,10 @@ class JavaTranspiler(CStyleTranspiler):
         'Tuple': 'Map.Entry',
         'Callable': 'Function',
         're.Pattern': 'Pattern',
+    }
+    interfaces = {
+        # TODO: multi-arg callables (may be too costly...)
+        'Protocol': 'java.util.function.Function',
     }
 
     constants = {
