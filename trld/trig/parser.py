@@ -249,31 +249,29 @@ class ReadSymbol(ReadTerm):
             self.collect(c)
             return self, None
 
-        value: Union[str, bool, Dict] = self.pop()
-        assert isinstance(value, str)
-
+        v: str = self.pop()
         last_dot = False
-        if not just_escaped and value.endswith('.'):
-            value = value[:-1]
+        if not just_escaped and v.endswith('.'):
+            v = v[:-1]
             last_dot = True
 
-        if value in {'true', 'false'}:
-            value = cast(bool, value == 'true')
-        elif value == 'a':
+        value: Union[str, bool, Dict] = v
+
+        if v in {'true', 'false'}:
+            value = cast(bool, v == 'true')
+        elif v == 'a':
             value = TYPE
-        elif value not in AT_KEYWORDS:
-            lowered = value.lower()
+        elif v not in AT_KEYWORDS:
+            lowered = v.lower()
             if lowered in RQ_KEYWORDS:
                 value = lowered
             else:
-                if value != '':
-                    if ':' not in value:
-                        raise NotationError(f'Expected PNname, got {value!r}')
-                    elif value[0] == ':':
-                        value = value[1:]
-                value = cast(Dict, {SYMBOL: value})
-
-        assert isinstance(value, object)
+                if v != '':
+                    if ':' not in v:
+                        raise NotationError(f'Expected PNname, got {v!r}')
+                    elif v[0] == ':':
+                        v = v[1:]
+                value = cast(Dict, {SYMBOL: v})
 
         if last_dot:
             return self.backtrack('.', c, value)
@@ -729,17 +727,21 @@ class ReadNodes(ReadNode):
     def consume(self, c: str, prev_value) -> StateResult:
         if prev_value is not None:
             if isinstance(prev_value, str):
+                prev_str: str = prev_value
                 final_dot = False
-                if prev_value in AT_KEYWORDS:
-                    prev_value = prev_value[1:]
+                if prev_str in AT_KEYWORDS:
+                    prev_str = prev_str[1:]
                     final_dot = True
-                if prev_value == RQ_PREFIX:
+
+                if prev_str == RQ_PREFIX:
                     return ReadPrefix(self, final_dot).consume(c, None)
-                elif prev_value == RQ_BASE:
+                elif prev_str == RQ_BASE:
                     return ReadBase(self, final_dot).consume(c, None)
-                elif prev_value == RQ_GRAPH:
+                elif prev_str == RQ_GRAPH:
                     self.expect_graph = True
                     return self, None
+
+                prev_value = prev_str
 
             if self.node is None:
                 assert isinstance(prev_value, Dict)
