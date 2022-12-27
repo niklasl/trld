@@ -20,6 +20,10 @@ public class Input implements Closeable {
     }
 
     public Input(String path) {
+        this(path, null);
+    }
+
+    public Input(String path, /*@Nullable*/ Map<String, String> headers) {
         this(sneakyFileInputStream(path));
         this.documentUrl = path;
         this.contentType = Mimetypes.guessMimeType(path);
