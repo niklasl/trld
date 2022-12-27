@@ -655,7 +655,7 @@ class Transpiler(ast.NodeVisitor):
         withitem = node.items[0]
         expr = self.repr_expr(withitem.context_expr)
         var = self.repr_expr(withitem.optional_vars)
-        self.handle_with(expr, var)
+        self.handle_with(expr, var, node.body)
 
     def visit_FunctionDef(self, node):
         prefix = ''
@@ -1406,7 +1406,7 @@ class Transpiler(ast.NodeVisitor):
     def map_lambda(self, args: List[str], body: str) -> str:
         raise NotImplementedError
 
-    def handle_with(self, expr: str, var: str) -> Tuple[str, List]:
+    def handle_with(self, expr: str, var: str, body: List[ast.stmt]) -> Tuple[str, List]:
         raise NotImplementedError
 
     def new_regexp(self, callargs) -> Tuple[str, str]:

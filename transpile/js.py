@@ -188,13 +188,14 @@ class JsTranspiler(CStyleTranspiler):
         stmts = [f'{parttype} {part} = {container}[{counter}]']
         return f'for (let {counter} = 0; {counter} < {container}.size(); ++{counter})', stmts, ct
 
-    def handle_with(self, expr, var):
+    def handle_with(self, expr, var, body):
         vartype = expr.split('(', 1)[0].replace('new ', '')
-        self.enter_block(None, 'try',
-                         stmts=[f'let {var} = {expr}'],
+        self.stmt(f"let {var}")
+        self.enter_block(body, 'try',
+                         stmts=[f'{var} = {expr}'],
                          nametypes=[(var, vartype)],
                          end=' ')
-        self.enter_block(None, f'catch (e)', stmts=[f'{var}.close()'])
+        self.enter_block(None, f'finally', stmts=[f'{var}.close()'], continued=True)
 
     def map_name(self, name, callargs=None):
         if name == 'list':

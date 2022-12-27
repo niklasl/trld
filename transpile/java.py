@@ -229,9 +229,9 @@ class JavaTranspiler(CStyleTranspiler):
         stmts = [f'{parttype} {part} = {castcontainer}.get({counter})']
         return f'for (int {counter} = 0; {counter} < {castcontainer}.size(); ++{counter})', stmts, ct
 
-    def handle_with(self, expr, var):
+    def handle_with(self, expr, var, body):
         vartype = expr.split('(', 1)[0].replace('new ', '')
-        self.enter_block(None, f'try ({vartype} {var} = {expr})', nametypes=[(var, vartype)])
+        self.enter_block(body, f'try ({vartype} {var} = {expr})', nametypes=[(var, vartype)])
 
     # TODO:
     #def map_name(self, name, callargs=None): ...
