@@ -375,8 +375,8 @@ class JavaTranspiler(CStyleTranspiler):
             lower = '0'
         if upper:
             upper = self._get_upper_key(upper, owner)
-            return f'{owner}.substring({lower}, {upper})'
-        return f'{owner}.substring({lower})'
+            return f'({owner}.length() >= {lower} ? {owner}.substring({lower}, {upper}) : "")'
+        return f'({owner}.length() >= {lower} ? {owner}.substring({lower}) : "")'
 
     def _get_upper_key(self, key, owner, ownertype=None):
         ownertype = ownertype or self.gettype(owner)
