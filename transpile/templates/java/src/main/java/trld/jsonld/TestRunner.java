@@ -4,10 +4,10 @@ import java.util.*;
 
 import trld.Builtins;
 import trld.platform.Common;
-import trld.platform.Io;
 
 import static trld.jsonld.Base.CONTEXT;
 import static trld.jsonld.Base.JSONLD10;
+import static trld.jsonld.Docloader.setDocumentLoader;
 import static trld.jsonld.Docloader.loadAnyDocument;
 import static trld.jsonld.Testbase.TESTS_URL;
 
@@ -18,8 +18,9 @@ public class TestRunner {
     static void runManifest(String manifestFile) {
         report("Running test suite: " + manifestFile);
 
-        Io.setDocumentLoader(new LoadDocumentCallback() {
+        setDocumentLoader(new LoadDocumentCallback() {
             public RemoteDocument apply(String url, LoadDocumentOptions options) {
+                System.out.println("DEBUG: " + url.replace(TESTS_URL, testsuiteDir));
                 return loadAnyDocument(url.replace(TESTS_URL, testsuiteDir));
             }
         });
