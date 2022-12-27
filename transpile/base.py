@@ -784,12 +784,14 @@ class Transpiler(ast.NodeVisitor):
     def visit_Try(self, node):
         handlers = node.handlers
         node.handlers = None
-        self.enter_block(node, 'try', end='')
+        self.enter_block(node.body, 'try', end='')
         for handler in handlers:
             # TODO: 5f831dc1 (java-specific)
             etype = self.repr_annot(handler.type) if handler.type else 'Exception'
             etypevar = self.typed('e', etype)
             self.enter_block(handler, f' catch ({etypevar})', continued=True)
+        if node.finalbody:
+            self.enter_block(node.finalbody, f'finally')
 
     def visit_ClassDef(self, node):
         self.outln()

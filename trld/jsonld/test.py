@@ -3,7 +3,7 @@ import sys
 import traceback
 from pathlib import Path
 
-from .docloader import load_any_document, set_document_loader
+from .docloader import any_document_loader, set_document_loader
 from .base import JSONLD10, JSONLD11
 from . import context
 from .testbase import TestCase, TESTS_URL
@@ -30,7 +30,7 @@ def run_testsuite(suitefilepath: str) -> bool:
     suite_file_dir = _find_suite_file_dir(suitedir)
 
     def local_testsuite_loader(url, options=None):
-        return load_any_document(url.replace(TESTS_URL, suite_file_dir))
+        return any_document_loader(url.replace(TESTS_URL, suite_file_dir))
 
     set_document_loader(local_testsuite_loader)
 

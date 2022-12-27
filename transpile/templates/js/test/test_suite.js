@@ -1,8 +1,7 @@
 import tape from 'tape'
 import os from 'os'
 
-import { Input } from '../lib/platform/io.js'
-import { setDocumentLoader } from '../lib/jsonld/docloader.js'
+import { anyDocumentLoader, setDocumentLoader } from '../lib/jsonld/docloader.js'
 import * as context from '../lib/jsonld/context.js'
 import { JSONLD10, CONTEXT, ID, TYPE } from '../lib/jsonld/base.js'
 import { expand } from '../lib/jsonld/expansion.js'
@@ -13,15 +12,15 @@ const TESTSUITE_DIR = `file://${process.env.TRLD_JSONLD_TESTDIR}/`
 const TESTSUITE_BASE_URL = 'https://w3c.github.io/json-ld-api/tests/'
 
 function localTestsuiteLoader(url) {
-    return new Input(url.replace(TESTSUITE_BASE_URL, TESTSUITE_DIR))
+  return anyDocumentLoader(url.replace(TESTSUITE_BASE_URL, TESTSUITE_DIR))
 }
+
+setDocumentLoader(localTestsuiteLoader)
 
 function loadJson(url) {
   let data = localTestsuiteLoader(url).document
   return data
 }
-
-setDocumentLoader(localTestsuiteLoader)
 
 function testCaseRunner(category) {
   let manifestFile = `${TESTSUITE_DIR}${category}-manifest.jsonld`

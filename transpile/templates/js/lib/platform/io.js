@@ -4,6 +4,8 @@ import http from 'http'
 import https from 'https'
 import process from 'process'
 
+import { guessMimeType } from '../mimetypes'
+
 export class Input {
 
   constructor(source = null) {
@@ -15,24 +17,8 @@ export class Input {
   }
 
   _openStream(ref) {
-      this.documentUrl = ref
-
-    if (ref.endsWith('.jsonld')) {
-      this.contentType = 'application/ld+json'
-      this.document = this.loadJson()
-    } else if (ref.endsWith('.json')) {
-      this.contentType = 'application/json'
-      this.document = this.loadJson()
-    } else if (ref.endsWith('.trig')) {
-      this.contentType = 'application/trig'
-      this.document = this.read()
-    } else if (ref.endsWith('.ttl')) {
-      this.contentType = 'text/turtle'
-      this.document = this.read()
-    } else if (ref.endsWith('.rdf')) {
-      this.contentType = 'application/rdf+xml'
-      this.document = this.read()
-    }
+    this.documentUrl = ref
+    this.contentType = guessMimeType(ref)
 
     return fs.createReadStream(removeFileProtocol(ref))
   }

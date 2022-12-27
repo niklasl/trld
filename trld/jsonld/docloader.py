@@ -51,27 +51,30 @@ def get_document_loader(start_url: Optional[str] = None) -> LoadDocumentCallback
 
 
 def any_document_loader(url: str, options: Optional[LoadDocumentOptions] = None) -> RemoteDocument:
-    return load_any_document(url)
+    return _load_any_document(url)
 
 
 def http_document_loader(url: str, options: Optional[LoadDocumentOptions] = None) -> RemoteDocument:
     if not url.startswith('https:') or not url.startswith('http:'):
         raise LoadingDocumentNotAllowedError(f"Not allowed to load non-HTTP URL: {url}")
-    return load_any_document(url)
+    return _load_any_document(url)
 
 
 def https_document_loader(url: str, options: Optional[LoadDocumentOptions] = None) -> RemoteDocument:
     if not url.startswith('https:'):
         raise LoadingDocumentNotAllowedError(f"Not allowed to load non-HTTPS URL: {url}")
-    return load_any_document(url)
+    return _load_any_document(url)
 
 
-def load_any_document(url: str) -> RemoteDocument:
+def _load_any_document(url: str) -> RemoteDocument:
     document: object
-    with Input(url, REQUEST_HEADERS) as inp:
+    inp = Input(url, REQUEST_HEADERS)
+    try:
         if inp.content_type in JSON_MIME_TYPES:
             document = inp.load_json()
         else:
             document = inp.read()
+    finally:
+        inp.close()
 
     return RemoteDocument(inp.document_url, inp.content_type, inp.context_url, inp.profile, document)
