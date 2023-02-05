@@ -6,6 +6,7 @@ from typing import Any
 from .platform.common import json_encode
 from .platform.io import Input, Output
 from .jsonld.compaction import compact
+from .jsonld.docloader import set_document_loader, any_document_loader
 from .jsonld.expansion import expand
 from .jsonld.flattening import flatten
 from .mimetypes import SUFFIX_MIME_TYPE_MAP
@@ -13,6 +14,8 @@ from .mimetypes import SUFFIX_MIME_TYPE_MAP
 
 TURTLE_OR_TRIG = {SUFFIX_MIME_TYPE_MAP[s] for s in ['trig', 'ttl']}
 NT_OR_NQ = {SUFFIX_MIME_TYPE_MAP[s] for s in ['nt', 'nq']}
+
+set_document_loader(any_document_loader)
 
 
 def printerr(msg):
