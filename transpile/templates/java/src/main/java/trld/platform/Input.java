@@ -30,11 +30,24 @@ public class Input implements Closeable {
     }
 
     public Input(InputStream ins) {
+        this(ins, null);
+    }
+
+    public Input(InputStream ins, /*@Nullable*/ Map<String, String> headers) {
         this.ins = ins;
         try {
             reader = new BufferedReader(new InputStreamReader(ins, "utf-8"));
         } catch (IOException e) {
             throw new RuntimeException(e);
+        }
+        if (this.contentType == null && headers != null) {
+            String accepts = headers.get("Accept");
+            if (accepts != null) {
+                String firstAccept = Mimetypes.getFirstMimeType(accepts);
+                if (firstAccept.equals(accepts)) {
+                    this.contentType = firstAccept;
+                }
+            }
         }
     }
 
