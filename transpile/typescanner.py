@@ -7,6 +7,7 @@ import os
 
 
 class ClassType(NamedTuple):
+    name: str
     members: OrderedDict[str, str]
     base: Optional[str] = None
 
@@ -14,6 +15,7 @@ class ClassType(NamedTuple):
 class FuncType(NamedTuple):
     args: OrderedDict[str, str]
     returns: str
+    protocol: Optional[ClassType] = None
 
 
 Type = Union[str, ClassType, FuncType]
@@ -23,6 +25,7 @@ class TypeScanner(ast.NodeVisitor):
 
     def __init__(self, transpiler = None):
         self.modules: Dict[str, Dict[str, Type]] = {}
+        self._protocols = {}
         self._in_src: List[Path] = []
         self._within: List[str] = []
         if transpiler:
@@ -85,16 +88,23 @@ class TypeScanner(ast.NodeVisitor):
             aname = self.map_name(arg.arg)
             args[aname] = self.repr_annot(arg.annotation)
         ret = self.repr_annot(node.returns) if node.returns else None
-        self.addtype(name, FuncType(args, ret))
+        signature = tuple(arg for arg in args.items())
+        protocol = self._protocols.get(signature)
+        self.addtype(name, FuncType(args, ret, protocol))
 
     def visit_ClassDef(self, node):
         name = self.map_name(node.name)
         self._within.append(name)
-        self.module[name] = ClassType(
-                OrderedDict(),
-                self.repr_annot(node.bases[0]) if node.bases else None)
+        base_repr = self.repr_annot(node.bases[0]) if node.bases else None
+        clstype = ClassType(name, OrderedDict(), base_repr)
+        self.module[name] = clstype
         self.generic_visit(node)
         self._within.pop()
+        if base_repr == 'Protocol':
+            callname = self.map_name('__call__')
+            proto_args = (self.module[name].members[callname].args)
+            proto_args = tuple(arg for arg in list(proto_args.items())[1:])
+            self._protocols[proto_args] = clstype
 
     def addtype(self, name: str, typename: str, narrowed=False):
         ns = self.module[self._within[-1]] if self._within else self.module

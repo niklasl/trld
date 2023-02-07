@@ -254,7 +254,7 @@ class Context:
 
         try:
             options = LoadDocumentOptions(profile=profile, request_profile=request_profile)
-            return self.document_loader.__call__(href, options).document  # transpiler workaround
+            return self.document_loader(href, options).document
         except Exception as e:
             raise LoadingRemoteContextFailedError(f"Could not load remote context: {href}. Cause: {e}")
 

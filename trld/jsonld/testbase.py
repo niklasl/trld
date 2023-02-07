@@ -15,7 +15,7 @@ TESTS_URL: str = 'https://w3c.github.io/json-ld-api/tests'
 
 def load_json(source: str) -> object:
     loader: LoadDocumentCallback = get_document_loader()
-    return loader.__call__(source).document  # transpiler workaround
+    return loader(source).document
 
 
 class TestCase:

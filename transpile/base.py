@@ -62,6 +62,7 @@ class Transpiler(ast.NodeVisitor):
     end_block: str
     ctor: Optional[str] = None
     #call_keywords = AsDict
+    protocol_call: Optional[str] = None
     func_defaults: Optional[str] = None
     selfarg: Optional[str] = None
     this: str
@@ -658,21 +659,6 @@ class Transpiler(ast.NodeVisitor):
         self.handle_with(expr, var, node.body)
 
     def visit_FunctionDef(self, node):
-        prefix = ''
-        if self.typing or len(self._within) < 1:
-            prefix = self.public
-
-        if node.name.startswith('_') and not node.name.endswith('__'):
-            if self.protected.endswith(' '):
-                prefix = f'{self.protected}'
-            else:
-                prefix = ''
-
-        if not self._within or not isinstance(self._within[0].node, ast.ClassDef):
-            self.in_static = self.has_static
-            if self.has_static:
-                prefix += 'static '
-
         self.outln()
 
         scope = self.new_scope(node)
@@ -746,19 +732,52 @@ class Transpiler(ast.NodeVisitor):
         #    if isinstance(decorator, ast.Name) and decorator.id == 'property':
         #        name = f'get{name[0].upper()}{name[1:]}'
 
-        if self.in_static:
-            method = name
-        elif in_ctor:
-            method = self.this
-        else:
-            method = f'{self.this}.{name}'
-        doreturn = 'return ' if node.returns else ''
-        for signature, call in defaultcalls:
-            self.enter_block(None, prefix, self.overload(name, signature, ret), stmts=[
-                    f'{doreturn}{method}({call})'
-            ])
+        access = ''
+        if self.typing or len(self._within) < 1:
+            access = self.public
 
-        self.enter_block(scope, prefix, self.funcdef(name, argdecls, ret), nametypes=nametypes, stmts=stmts, on_exit=on_exit)
+        if node.name.startswith('_') and not node.name.endswith('__'):
+            if self.protected.endswith(' '):
+                access = f'{self.protected}'
+            else:
+                access = ''
+
+        method_scope = access
+
+        if not self._within or not isinstance(self._within[0].node, ast.ClassDef):
+            self.in_static = self.has_static
+            if self.has_static:
+                method_scope += 'static '
+
+        def output_funcs(method_scope, name):
+            if self.in_static:
+                method = name
+            elif in_ctor:
+                method = self.this
+            else:
+                method = f'{self.this}.{name}'
+            doreturn = 'return ' if node.returns else ''
+
+            for signature, call in defaultcalls:
+                overloaded = self.overload(name, signature, ret)
+                self.enter_block(None, method_scope, overloaded, stmts=[
+                        f'{doreturn}{method}({call})'
+                ])
+
+            self.enter_block(scope, method_scope, self.funcdef(name, argdecls, ret),
+                             nametypes=nametypes, stmts=stmts, on_exit=on_exit)
+
+        funcdfn = self._getdef(name)
+        if ret and isinstance(funcdfn, FuncType) and funcdfn.protocol:
+            ptype = funcdfn.protocol.name
+            self.outln(f'{method_scope}{ptype} {name} = new {ptype}()', ' {')
+            self._level += 1
+            output_funcs(access, self.protocol_call)
+            self._level -= 1
+            self.outln('};')
+        else:
+            output_funcs(method_scope, name)
+
         self.in_static = False
 
     #def map_function(self, node: ast.AST, method):
@@ -960,7 +979,12 @@ class Transpiler(ast.NodeVisitor):
             owner = self.repr_expr(expr.value, isowner=True)
             if (owner, expr.attr) == ('re', 'compile'):
                 return self.new_regexp(callargs)
+
+            # TODO: complete_call must be handled in within map_attr, since
+            # it handles both calls and return types of various kinds. It
+            # probably does too much...
             rt = self.map_attr(owner, expr.attr, callargs=callargs)
+
             return repr_and_type(rt)
 
         elif isinstance(expr, ast.Call):
@@ -1105,8 +1129,6 @@ class Transpiler(ast.NodeVisitor):
         return fmt.format(*args)
 
     def _map_call(self, expr: ast.Call, isowner=False) -> ReprAndType:
-        gt = self.types.get
-
         call_args: list = expr.args
         if expr.keywords:
             # FIXME: [5f55548d] handle order of kwargs and transpile Lambdas
@@ -1116,6 +1138,8 @@ class Transpiler(ast.NodeVisitor):
         callargs = [self._cast(self.repr_expr(arg)) for arg in call_args]
 
         self._last_cast = None
+
+        gt = self.types.get
 
         if isinstance(expr.func, ast.Name):
             funcname = expr.func.id
@@ -1145,6 +1169,19 @@ class Transpiler(ast.NodeVisitor):
                 return self.map_len(self.repr_expr(call_args[0])), gt('int')
 
         return self.repr_expr_and_type(expr.func, callargs=callargs)
+
+    def _get_protocol_call(self, funcname) -> Optional[Tuple[str, str]]:
+        if not self._modules:
+            return None
+
+        ftype = self.gettype(funcname)
+        dfn = self._getdef(ftype[0]) if ftype else None
+        if self.protocol_call and isinstance(dfn, ClassType) and dfn.base == 'Protocol':
+            callname = self.protocol_call
+            rettype = dfn.members[callname].returns
+            return f'{funcname}.{callname}', rettype
+
+        return None
 
     def _map_isinstance(self, expr):
         v = self.repr_expr(expr.args[0])
@@ -1311,13 +1348,24 @@ class Transpiler(ast.NodeVisitor):
         obj = self.types.get(name) or self.to_attribute_name(name)
 
         if callargs is not None:
-            argrepr = ', '.join(callargs)
-            if obj in self.classes or obj[0].isupper():
-                return f'{self.mknew}{obj}({argrepr})'
-            else:
-                return f'{obj}({argrepr})'
+            obj, rtype = self.complete_call(name, obj, callargs)
+            return obj
+
+        if name == '__call__' and self.protocol_call:
+            obj = self.protocol_call
 
         return obj
+
+    def complete_call(self, name, obj, callargs, rtype=None):
+        call_ret = self._get_protocol_call(name)
+        if call_ret:
+            obj, rtype = call_ret
+
+        argrepr = ', '.join(callargs)
+        if obj in self.classes or obj[0].isupper() and '_' not in obj:
+            return f'{self.mknew}{obj}({argrepr})', None
+        else:
+            return f'{obj}({argrepr})', rtype
 
     def handle_import(self, node: ast.ImportFrom):
         raise NotImplementedError

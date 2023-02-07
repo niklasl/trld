@@ -15,6 +15,7 @@ class JavaTranspiler(CStyleTranspiler):
     union_surrogate = 'Object'
     optional_type_form = '/*@Nullable*/ {0}'  # Use "the inverse", Objects.requireNonNull(o) everywhere else?
     static_annotation_form = '/*@Static*/ {0}'
+    protocol_call: Optional[str] = 'apply'
     public = 'public '
     constant = 'final '
     protected = 'protected '
@@ -346,14 +347,9 @@ class JavaTranspiler(CStyleTranspiler):
             obj = f'{castowner}.{member}'
 
         if callargs is not None:
-            return f"{obj}({', '.join(callargs)})", rtype
+            obj, rtype = self.complete_call(obj, obj, callargs, rtype)
 
         return obj, rtype
-
-    def to_attribute_name(self, attr):
-        if attr == '__call__':
-            return 'apply'
-        return super().to_attribute_name(attr)
 
     def map_getitem(self, owner, key):
         ownertype = self.gettype(owner)
