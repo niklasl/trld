@@ -42,10 +42,7 @@ class JavaTranspiler(CStyleTranspiler):
         'Callable': 'Function',
         're.Pattern': 'Pattern',
     }
-    interfaces = {
-        # TODO: multi-arg callables (may be too costly...)
-        'Protocol': 'java.util.function.Function',
-    }
+    protocol_interfaces = ['java.util.function.Function', 'java.util.function.BiFunction']
 
     constants = {
         None: ('null', 'Object'),

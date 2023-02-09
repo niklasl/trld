@@ -49,6 +49,7 @@ class Transpiler(ast.NodeVisitor):
     #_visitor: ast.NodeVisitor
     typing: bool # or typecheck_implies_casts...
     classdfn = 'class '
+    abstract = 'abstract '
     if_stmt = 'if (%s)'
     while_stmt = 'while (%s)'
     inherit_constructor = True
@@ -63,6 +64,7 @@ class Transpiler(ast.NodeVisitor):
     ctor: Optional[str] = None
     #call_keywords = AsDict
     protocol_call: Optional[str] = None
+    protocol_interfaces: Optional[List] = None
     func_defaults: Optional[str] = None
     selfarg: Optional[str] = None
     this: str
@@ -72,7 +74,6 @@ class Transpiler(ast.NodeVisitor):
     constants: Dict
     operators: Dict
     types: Dict
-    interfaces: Optional[Dict] = None
     strcmp: Optional[str] = None
     notmissing: Optional[str] = None
     list_concat: Optional[str] = None
@@ -725,6 +726,8 @@ class Transpiler(ast.NodeVisitor):
             in_ctor = True
         elif node.name == '__repr__':
             return # IMPROVE:just drop these "debug innards"?
+        elif node.name == '__call__':
+            name = self.protocol_call
         elif not name:
             name = self.to_attribute_name(node.name)
 
@@ -749,6 +752,13 @@ class Transpiler(ast.NodeVisitor):
             if self.has_static:
                 method_scope += 'static '
 
+        is_abstract = all(
+            isinstance(part, ast.Expr) and
+            isinstance(part.value, ast.Constant) and
+            part.value.value is Ellipsis
+            for part in node.body
+        )
+
         def output_funcs(method_scope, name):
             if self.in_static:
                 method = name
@@ -763,6 +773,11 @@ class Transpiler(ast.NodeVisitor):
                 self.enter_block(None, method_scope, overloaded, stmts=[
                         f'{doreturn}{method}({call})'
                 ])
+
+            if is_abstract and name == self.protocol_call:
+                self.outln(f'{method_scope}{self.abstract}{self.funcdef(name, argdecls, ret)};')
+                self.exit_scope()
+                return
 
             self.enter_block(scope, method_scope, self.funcdef(name, argdecls, ret),
                              nametypes=nametypes, stmts=stmts, on_exit=on_exit)
@@ -829,6 +844,8 @@ class Transpiler(ast.NodeVisitor):
 
         # TODO: 5f831dc1 (java-specific)
         base = self.repr_expr(node.bases[0]) if node.bases else ''
+        is_protocol = False
+
         if base == 'NamedTuple':
             base = ''
             def on_exit():
@@ -862,16 +879,21 @@ class Transpiler(ast.NodeVisitor):
                 assigns = (f'{self.this}.{aname} = {aname}' for aname in classdfn)
                 self.enter_block(None, ctor, f'({signature})', stmts=assigns)
         elif base:
-            # TODO: 5f831dc1 (still too java-specific?)
-            if self.interfaces and base in self.interfaces:
-                base = self.interfaces[base]
-                if base and self.implements_keyword:
-                    base = f' {self.implements_keyword} {base}'
+            if base == 'Protocol' and self.protocol_interfaces:
+                is_protocol = True
+                base = ''
             else:
                 base = self.types.get(base, base)
                 base = f' {self.extends_keyword} {base}'
 
-        # TODO:
+        protocol_argtypes = None
+        for member in node.body:
+            protocol_argtypes = []
+            if isinstance(member, ast.FunctionDef) and member.name == '__call__':
+                for arg in member.args.args[1:]:
+                    protocol_argtypes.append(self.repr_annot(arg.annotation))
+                protocol_argtypes.append(self.repr_annot(member.returns))
+
         for member in node.body:
             if not (isinstance(member, ast.FunctionDef) and
                     member.name == '__iter__'):
@@ -883,6 +905,15 @@ class Transpiler(ast.NodeVisitor):
                 base += f'  {self.implements_keyword} {iterable_type}<{iterated_type}>'
             self._iterables[classname] = iterated_type
             break
+
+        if is_protocol:
+            proto_base = (
+                self.protocol_interfaces[len(protocol_argtypes) - 2] +
+                f"<{', '.join(protocol_argtypes)}>"
+            )
+            if self.implements_keyword:
+                base = f' {self.implements_keyword} {proto_base}'
+            classdecl = f'{self.public}{self.abstract}{self.classdfn}'
 
         stmts = []
         # TODO: if derived from an Exception...
