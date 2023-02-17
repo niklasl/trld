@@ -50,9 +50,9 @@ class InvalidLanguageMapValueError(JsonLdError): pass
 
 def expand(doc_data: JsonObject,
            base_iri: str,
-           expand_context: str = None,
+           expand_context: Optional[str] = None,
            ordered = False,
-           document_loader: LoadDocumentCallback = None) -> List:
+           document_loader: Optional[LoadDocumentCallback] = None) -> List:
     ctx: Context = Context(base_iri, None, document_loader)
     if expand_context is not None:
         ctx = ctx.get_context(expand_context, expand_context)

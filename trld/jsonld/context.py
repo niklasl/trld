@@ -137,8 +137,8 @@ class Context:
         return cloned
 
     def get_context(self, context_data: object,
-            base_url: str = None,
-            remote_contexts: Set[str] = None,
+            base_url: Optional[str] = None,
+            remote_contexts: Optional[Set[str]] = None,
             override_protected=False,
             validate_scoped=True) -> 'Context':
         if remote_contexts is None:
@@ -500,10 +500,10 @@ class Term:
         term: str,
         value: Union[str, Dict[str, object]],
         defined: Dict[str, bool],
-        base_url: str = None,
+        base_url: Optional[str] = None,
         isprotected=False, # NOTE: 'protected' in spec; but a common reserved keyword
         override_protected=False, # which is used to allow changes to protected terms
-        remote_contexts: Set = None, # which is used to detect cyclical context inclusions
+        remote_contexts: Optional[Set] = None, # which is used to detect cyclical context inclusions
         validate_scoped=True # which is used to limit recursion when validating possibly recursive scoped contexts
         ):
         # TODO: check redundancies of these and conditional initialization below

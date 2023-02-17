@@ -49,7 +49,7 @@ def serialize(
     out: Output,
     context: Optional[Dict] = None,
     base_iri: Optional[str] = None,
-    settings: Settings = None,
+    settings: Optional[Settings] = None,
 ):
     settings = settings if settings is not None else Settings()
     state = SerializerState(out, settings, context, base_iri)
@@ -88,7 +88,7 @@ class SerializerState:
             settings: Settings,
             context: Optional[object],
             base_iri: Optional[str] = None,
-            parent: 'SerializerState' = None,
+            parent: Optional['SerializerState'] = None,
     ):
         self.out = out if out is not None else cast(SerializerState, parent).out
 
@@ -425,7 +425,7 @@ class SerializerState:
         self,
         obj: object,
         via_key: Optional[str] = None,
-        write: Callable = None, # [[str], None]
+        write: Optional[Callable] = None, # [[str], None]
     ):
         if write is None:
             write = lambda s: self._write(s)
