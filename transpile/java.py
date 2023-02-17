@@ -11,11 +11,12 @@ class JavaTranspiler(CStyleTranspiler):
     has_static = True
     typing = True
     inherit_constructor = False
-    implements_keyword: Optional[str] = 'implements'
+    abstract = 'abstract '
+    implements_keyword = 'implements'
     union_surrogate = 'Object'
     optional_type_form = '/*@Nullable*/ {0}'  # Use "the inverse", Objects.requireNonNull(o) everywhere else?
     static_annotation_form = '/*@Static*/ {0}'
-    protocol_call: Optional[str] = 'apply'
+    protocol_call = 'apply'
     public = 'public '
     constant = 'final '
     protected = 'protected '

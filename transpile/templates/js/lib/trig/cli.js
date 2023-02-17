@@ -1,5 +1,6 @@
 import { parse, ParserError } from './parser.js'
-import { Input, dumpJson } from '../common.js'
+import { dumpJson } from '../platform/common.js'
+import { Input } from '../platform/io.js'
 
 export default async function main () {
   let args = process.argv.slice(2)

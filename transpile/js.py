@@ -11,7 +11,7 @@ class JsTranspiler(CStyleTranspiler):
     typing = False
     optional_type_form = '{0}'
     static_annotation_form = '/*@Static*/ {0}'
-
+    protocol_call = 'call'
     public = 'export ' # FIXME: top_level_export
     constant = 'const '
     declaring = 'let '

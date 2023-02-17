@@ -1,5 +1,5 @@
 import fs from 'fs'
-import { loadJson, dumpJson } from '../common.js'
+import { loadJson, dumpJson } from '../platform/common.js'
 import { expand } from '../jsonld/expansion.js'
 import { compact } from '../jsonld/compaction.js'
 import { makeTargetMap } from './mapmaker.js'

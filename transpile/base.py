@@ -49,7 +49,7 @@ class Transpiler(ast.NodeVisitor):
     #_visitor: ast.NodeVisitor
     typing: bool # or typecheck_implies_casts...
     classdfn = 'class '
-    abstract = 'abstract '
+    abstract = ''
     if_stmt = 'if (%s)'
     while_stmt = 'while (%s)'
     inherit_constructor = True
@@ -736,7 +736,7 @@ class Transpiler(ast.NodeVisitor):
         #        name = f'get{name[0].upper()}{name[1:]}'
 
         access = ''
-        if self.typing or len(self._within) < 1:
+        if self.typing or len(self._within) <= 1:
             access = self.public
 
         if node.name.startswith('_') and not node.name.endswith('__'):
@@ -774,7 +774,7 @@ class Transpiler(ast.NodeVisitor):
                         f'{doreturn}{method}({call})'
                 ])
 
-            if is_abstract and name == self.protocol_call:
+            if is_abstract and self.abstract and name == self.protocol_call:
                 self.outln(f'{method_scope}{self.abstract}{self.funcdef(name, argdecls, ret)};')
                 self.exit_scope()
                 return
@@ -783,7 +783,12 @@ class Transpiler(ast.NodeVisitor):
                              nametypes=nametypes, stmts=stmts, on_exit=on_exit)
 
         funcdfn = self._getdef(name)
-        if ret and isinstance(funcdfn, FuncType) and funcdfn.protocol:
+        if (
+            self.protocol_interfaces
+            and isinstance(funcdfn, FuncType)
+            and funcdfn.protocol
+            and ret
+        ):
             ptype = funcdfn.protocol.name
             self.outln(f'{method_scope}{ptype} {name} = new {ptype}()', ' {')
             self._level += 1
@@ -879,7 +884,7 @@ class Transpiler(ast.NodeVisitor):
                 assigns = (f'{self.this}.{aname} = {aname}' for aname in classdfn)
                 self.enter_block(None, ctor, f'({signature})', stmts=assigns)
         elif base:
-            if base == 'Protocol' and self.protocol_interfaces:
+            if base == 'Protocol':
                 is_protocol = True
                 base = ''
             else:
@@ -907,11 +912,11 @@ class Transpiler(ast.NodeVisitor):
             break
 
         if is_protocol:
-            proto_base = (
-                self.protocol_interfaces[len(protocol_argtypes) - 2] +
-                f"<{', '.join(protocol_argtypes)}>"
-            )
-            if self.implements_keyword:
+            if self.implements_keyword and self.protocol_interfaces:
+                proto_base = (
+                    self.protocol_interfaces[len(protocol_argtypes) - 2] +
+                    f"<{', '.join(protocol_argtypes)}>"
+                )
                 base = f' {self.implements_keyword} {proto_base}'
             classdecl = f'{self.public}{self.abstract}{self.classdfn}'
 

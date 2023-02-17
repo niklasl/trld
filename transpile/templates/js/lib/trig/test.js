@@ -1,6 +1,7 @@
 'use strict'
 
-import { Input, dumpCanonicalJson } from '../common.js'
+import { jsonEncodeCanonical } from '../platform/common.js'
+import { Input } from '../platform/io.js'
 import { CONTEXT, GRAPH, ID, TYPE, LIST } from '../jsonld/base.js'
 import { expand } from '../jsonld/expansion.js'
 import { compact } from '../jsonld/compaction.js'
@@ -83,7 +84,7 @@ export function datarepr (data, context, baseUri) {
   let dataset = toRdfDataset(data)
   data = toJsonld(dataset)
   data = compact(context, data, "", true)
-  return dumpCanonicalJson(data)
+  return jsonEncodeCanonical(data)
 }
 
 export default async function main () {
