@@ -703,7 +703,7 @@ class Transpiler(ast.NodeVisitor):
             argdecls.append((aname_val, aname, atype))
             nametypes.append((aname, atype))
 
-        ret = self.repr_annot(node.returns) if node.returns else None
+        ret = self.repr_annot(node.returns) if node.returns and not (isinstance(node.returns, ast.Constant) and node.returns.value is None) else None
         # TODO: 5f831dc1 (java-specific)
         if ret == 'Boolean':
             ret = 'boolean'
