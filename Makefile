@@ -26,7 +26,7 @@ cache/trig-tests: cache/trig-tests.tar.gz
 
 pytest: | cache/json-ld-api cache/trig-tests
 	mypy trld/
-	find trld -name '*.py' | xargs grep -l '^\s*>>> ' | xargs python3 -m doctest
+	find trld -name '*.py' | xargs grep -l '^\s*>>> ' | sed 's/\.py\>//; s!/!.!g'| xargs -n1 python3 -m
 	python3 -m trld.jsonld.test cache/json-ld-api/tests/expand-manifest.jsonld cache/json-ld-api/tests/compact-manifest.jsonld cache/json-ld-api/tests/flatten-manifest.jsonld cache/json-ld-api/tests/fromRdf-manifest.jsonld cache/json-ld-api/tests/toRdf-manifest.jsonld 2>&1 | grep '^Running test suite\|^Ran '
 	python3 -m trld.tvm.test
 	python3 -m trld.trig.test | grep '^Ran '
