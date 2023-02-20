@@ -25,6 +25,8 @@ from ..platform.common import resolve_iri
 from ..platform.io import Output
 from ..rdfterms import RDF_LANGSTRING, RDF_TYPE, XSD, XSD_STRING
 
+A = TypeVar('A', bound='About')
+
 
 class Id:
     """
@@ -56,7 +58,7 @@ class Link(Id):
 
 class Blank(Id):
     """
-    A mark on a surface. Local and not ussable for linking, or any
+    A mark on a surface. Local and not usable for linking, nor any reliable
     identification beyond the surface it belongs to.
     """
 
@@ -64,7 +66,7 @@ class Blank(Id):
         super().__init__(f"_:{s}" if not s.startswith('_:') else s)
 
 
-class Literal(NamedTuple):
+class Literal(Generic[A], NamedTuple):
     """
     Value which "represents itself". The pragmatic end-of-the-graph used when
     you need to get data out there. Tagged with a datatype for some semantics
@@ -72,15 +74,15 @@ class Literal(NamedTuple):
     """
 
     value: str
-    datatype: Description
+    datatype: A
     language: Optional[str] = None
 
     def __str__(self):
         return self.value
 
-    def to_native(self):
+    def to_native(self) -> object:
         return to_jsonld_object(
-            RdfLiteral(self.value, self.datatype.id, self.language), None, True
+            RdfLiteral(self.value, str(self.datatype._id), self.language), None, True
         )[VALUE]
 
     @staticmethod
@@ -101,24 +103,24 @@ class Literal(NamedTuple):
         if self.language is not None:
             literal[LANGUAGE] = self.language
         elif self.datatype != XSD_STRING:
-            literal[TYPE] = str(self.datatype.id)
+            literal[TYPE] = str(self.datatype._id)
         return literal
 
 
-class OrderedList:
-    surface: Surface
+class OrderedList(Generic[A]):
+    _surface: Surface
     _items: List[JsonMap]
     # _cache: List[Object]
 
     def __init__(self, surface: Surface, items: List):
-        self.surface = surface
+        self._surface = surface
         self._items = items
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}(items={len(self._items)})"
 
     def __iter__(self) -> Iterator[Object]:
-        surface = self.surface
+        surface = self._surface
         for item in self._items:
             yield surface._make_object_view(item)
 
@@ -126,38 +128,35 @@ class OrderedList:
         return {LIST: self._items}
 
 
-Described = TypeVar('Described', bound='About')
+Object = Union[A, OrderedList, Literal]
 
 
-Object = Union[Described, OrderedList, Literal]
+Ref = Union[str, Id, A]
 
 
-Ref = Union[str, Id, Described]
-
-
-class About(abc.ABC, Generic[Described]):
-    id: Optional[Id]
+class About(abc.ABC, Generic[A]):
+    _id: Optional[Id]
 
     def __repr__(self) -> str:
-        return f"{type(self).__name__}(id={self.id!r})"
+        return f"{type(self).__name__}(id={self._id!r})"
 
     def __iter__(self) -> Iterator[PredicateObjects]:
         return iter(self.get_predicates_objects())
 
     def get_id(self) -> Optional[Id]:
-        return self.id
+        return self._id
 
     def get_compact_iri(self) -> Optional[str]:
-        if self.id is None:
+        if self._id is None:
             return None
-        return self._get_active_context().compact_iri(str(self.id))
+        return self._get_active_context().compact_iri(str(self.get_id()))
 
     def get_vocab_term(self) -> Optional[str]:
-        if self.id is None:
+        if self.get_id() is None:
             return None
-        return self._get_active_context().vocab_term(str(self.id))
+        return self._get_active_context().vocab_term(str(self.get_id()))
 
-    def get(self, p: str) -> Optional[Union[Object, Set[Object]]]:
+    def get(self, p: str) -> Optional[Union[Object[A], Set[Object[A]]]]:
         """
         Get a "compact" result:
         - `None` if there are no objects for this predicate.
@@ -169,7 +168,7 @@ class About(abc.ABC, Generic[Described]):
         if len(objects) == 0:
             return None
         if len(objects) == 1:
-            term = self._get_active_context().context.terms.get(p)
+            term = self._get_active_context()._context.terms.get(p)
             if term is None or SET not in term.container:
                 for o in objects:
                     return o
@@ -179,16 +178,16 @@ class About(abc.ABC, Generic[Described]):
     def _get_active_context(self) -> ContextView:
         ...
 
-    def get_type(self) -> Optional[Described]:
+    def get_type(self) -> Optional[A]:
         for tdesc in self.get_types():
             return tdesc
         return None
 
     @abc.abstractmethod
-    def get_types(self) -> Iterable[Described]:
+    def get_types(self) -> Iterable[A]:
         ...
 
-    def get_objects(self, p: str) -> Set[Object]:
+    def get_objects(self, p: str) -> Set[Object[A]]:
         pos = self.get_objects_by_predicate(p)
         return pos.objects if pos is not None else set()
 
@@ -209,28 +208,27 @@ class About(abc.ABC, Generic[Described]):
         ...
 
 
-class PredicateObjects(Generic[Described], NamedTuple):
-    predicate: Described
-    objects: Set[Object[Described]]
+class PredicateObjects(Generic[A], NamedTuple):
+    predicate: A
+    objects: Set[Object[A]]
 
 
-# class Arc(NamedTuple):
+# class Arc(Generic[A], NamedTuple):
 #     predicate: Description
+#     object: Object[A]
 #     annotation: Optional[Description]
-#     object: Object
 
 
 class Description(About['Description']):
-    id: Optional[Id]
-    surface: Surface
-
+    _id: Optional[Id]
+    _surface: Surface
     _data: JsonMap
     _cache: Dict[str, PredicateObjects]
 
     def __init__(self, surface: Surface, data: Optional[JsonMap] = None):
-        self.surface = surface
+        self._surface = surface
         self._data = data or {}
-        self.id = _make_id(cast(Optional[str], self._data.get(ID)))
+        self._id = _make_id(cast(Optional[str], self._data.get(ID)))
         self._cache = {}
 
     def __len__(self) -> int:
@@ -239,12 +237,24 @@ class Description(About['Description']):
     def _predicate_keys(self) -> Iterable[str]:
         return self._data
 
+    @property
+    def id(self):
+        return self._id
+
+    @property
+    def surface(self):
+        return self._surface
+
+    @property
+    def type(self):
+        return self.get_type()
+
     def get_types(self) -> Iterable[Description]:
         if TYPE not in self._data:
             return
         for t in _aslist(self._data[TYPE]):
             assert isinstance(t, str)
-            yield self.surface._desc(t)
+            yield self._surface._desc(t)
 
     def get_objects_by_predicate(
         self, p: str
@@ -258,7 +268,7 @@ class Description(About['Description']):
         if pos is None:
             idata = self._data.get(p)
             if p in self._data:
-                pdesc = self.surface._desc(p)
+                pdesc = self._surface._desc(p)
                 pos = PredicateObjects(pdesc, set())
                 self._cache[p] = pos
                 for idata in cast(List, self._data[p]):
@@ -285,7 +295,7 @@ class Description(About['Description']):
                 self._cache.pop(p, None)
                 objects.append(obj)
                 self.get_objects_by_predicate(p)  # rebuild it all...
-                self.surface.space._added(self.id, p, item)
+                self._surface.space._added(self._id, p, item)
                 return True
 
         return False
@@ -311,7 +321,7 @@ class Description(About['Description']):
                 count = 1
                 if len(objects) == 0:
                     del self._data[raw]
-                self.surface.space._removed(self.id, p, matching)
+                self._surface.space._removed(self._id, p, matching)
         else:
             count = len(objects)
             del self._data[raw]
@@ -330,22 +340,22 @@ class Description(About['Description']):
         return len(self._data) > (1 if ID in self._data else 0)
 
     def find(self) -> Subject:
-        return cast(Subject, self.surface.space.find(self.id))
+        return cast(Subject, self._surface.space.find(self._id))
 
     def load(self) -> Optional[Description]:
-        if self.id is None:
+        if self._id is None:
             return None
-        surface = self.surface.space.load(self.id)
-        return surface.get(self.id)
+        surface = self._surface.space.load(self._id)
+        return surface.get(self._id)
 
     def to_jsonld(self) -> JsonObject:
-        return self.surface.to_jsonld(self._data)
+        return self._surface.to_jsonld(self._data)
 
     def serialize(self, format: str = 'trig') -> str:
         return _serialize(self.to_jsonld(), format)
 
     def _get_active_context(self) -> ContextView:
-        return self.surface._context
+        return self._surface._context
 
     def _expand_term(self, ref: Ref) -> str:
         if ref == TYPE:
@@ -354,7 +364,7 @@ class Description(About['Description']):
         return self._get_active_context().expand_term(p)
 
     def _make_object_view(self, idata: JsonMap) -> Object[Description]:
-        return self.surface._make_object_view(idata)
+        return self._surface._make_object_view(idata)
 
 
 class Surface:
@@ -385,6 +395,11 @@ class Surface:
     def base(self):
         return str(self.id) if self.id else self.space.base
 
+    @property
+    def descriptions(self) -> Iterable[Description]:
+        for desc in self._index.values():
+            yield desc
+
     def parse_data(self, s: str, format=None):
         self.parse(text_input(s, format))
 
@@ -410,7 +425,7 @@ class Surface:
         self._context = ContextView(Context(_opt_str(self.id)).get_context(ctx))
 
     def add(self, desc: Description):
-        key = str(desc.id)
+        key = str(desc._id)
         self._index[key] = desc
         self.space._added_desc(desc)
 
@@ -460,68 +475,90 @@ class Surface:
 
 class Subject(About['Subject']):
 
-    space: Space
-    id: Id
+    _space: Space
+    _id: Id
     _union: Set[Description]
     _reverse: Dict[str, SubjectsByPredicate]
 
     def __init__(self, space: Space, id: Id):
-        self.space = space
-        self.id = id
+        self._space = space
+        self._id = id
         self._union = set()
         self._reverse = {}
 
     def __getattr__(self, key: str):
         return self.get(key)
 
+    def __eq__(self, o: object) -> bool:
+        if isinstance(o, Description):
+            return str(self._id) == str(o.get_id())
+        return self == o
+
+    def __hash__(self):
+        return id(self)
+
+    def get_id(self):
+        return self._id
+
+    def get_space(self):
+        return self._space
+
     def get_descriptions(self) -> Set[Description]:
         return self._union
 
     def _get_active_context(self) -> ContextView:
-        return self.space.context
+        return self._space.context
 
     def _predicate_keys(self) -> Iterable[str]:
         return set(key for desc in self._union for key in desc._predicate_keys())
 
     def get_types(self) -> Iterable[Subject]:
         return set(
-            self.space._term_subject(tdesc)
+            self._space._term_subject(tdesc)
             for desc in self._union
             for tdesc in desc.get_types()
         )
 
     def get_objects_by_predicate(self, p: str) -> Optional[PredicateObjects[Subject]]:
         p = self._get_active_context().expand_term(p)
+
         for desc in self._union:
             pos = desc.get_objects_by_predicate(p)
             if pos is not None:
-                spred = self.space._term_subject(pos.predicate)
+                spred = self._space._term_subject(pos.predicate)
                 return PredicateObjects(
-                    cast(Subject, spred),
-                    set(
-                        cast(Subject, self.space.find(o.id))
-                        if isinstance(o, Description)
-                        else o  # FIXME: Literal datatype from Description to Subject!
-                        for o in pos.objects
-                    ),
+                    cast(Subject, spred), set(self._upcast(o) for o in pos.objects)
                 )
+
         return None
+
+    def _upcast(self, o: Object[Description]) -> Object[Subject]:
+        if isinstance(o, Description):
+            return cast(Subject, self._space.find(o._id))
+        if isinstance(o, Literal):
+            return Literal(o.value, self._space._term_subject(o.datatype), o.language)
+        else:
+            assert isinstance(o, OrderedList)
+            return o
 
     def get_subject(self, p: str) -> Optional[Subject]:
         for o in self.get_subjects(p):
             return o
+
         return None
 
     def get_subjects(self, p: str) -> Iterable[Subject]:
         sbp = self.get_subjects_by_predicate(p)
         if sbp is None:
             return iter(())
+
         return sbp.subjects
 
     def get_subjects_by_predicate(self, p: str) -> Optional[SubjectsByPredicate]:
         p = self._get_active_context().expand_term(p)
         if len(self._reverse) == 0:
-            self.space._full_index()
+            self._space._full_index()
+
         return self._reverse.get(p)
 
 
@@ -546,11 +583,15 @@ class Space:
 
     @property
     def base(self) -> str:
-        return self.context.context.base_iri
+        return self.context._context.base_iri
 
     @base.setter
     def base(self, base: str) -> None:
         self.context.use({BASE: base})
+
+    @property
+    def subjects(self) -> Iterable[Subject]:
+        return self._subjects.values()
 
     def new_surface(self, r: Optional[Ref] = None) -> Surface:
         sid = _make_id(r) if r else None
@@ -580,7 +621,7 @@ class Space:
     def to_jsonld(
         self, data: JsonObject, ctx_data: Optional[dict], base: Optional[str]
     ):
-        context = {CONTEXT: ctx_data} if ctx_data is not None else self.context.context
+        context = {CONTEXT: ctx_data} if ctx_data is not None else self.context._context
         result = compact(context, data, base or self.base)
 
         # NOTE: mutates; OK since compact is a deep copy...
@@ -601,10 +642,10 @@ class Space:
             # TODO: track vocab usage (predicates, types, datatypes)?
             return
 
-        key = str(desc.id)
+        key = str(desc._id)
         subject = self._subjects.get(key)
         if subject is None:
-            subject = Subject(self, cast(Id, desc.id))
+            subject = Subject(self, cast(Id, desc._id))
             self._subjects[key] = subject
 
         subject._union.add(desc)
@@ -614,7 +655,7 @@ class Space:
         # TODO: Add to o._reverse (and/or mark index as dirty...)
         ...
 
-    def _removed(self, s: Optional[Id], p: str, o: Union[JsonMap, Object]):
+    def _removed(self, s: Optional[Id], p: str, o: Union[JsonMap, Object[Description]]):
         # TODO: drop from o._reverse (and/or mark index as dirty...)
         ...
 
@@ -624,63 +665,63 @@ class Space:
             s = Subject(self, cast(Id, _make_id(ref)))
         return s
 
-    def _full_index(self):
+    def _full_index(self) -> None:
         # TODO: log this and smoke-test that it isn't called "too much"...
         # print('FULL INDEX')
         for s in self._subjects.values():
             for pos in s.get_predicates_objects():
-                key = str(pos.predicate.id)
+                key = str(pos.predicate.get_id())
                 for o in pos.objects:
                     if not isinstance(o, Subject):
                         continue
-                    subjs = o._reverse.get(key)
-                    if subjs is None:
-                        subjs = set()
-                        o._reverse[key] = subjs
-                    subjs.add(s)
+                    sbp = o._reverse.get(key)
+                    if sbp is None:
+                        sbp = SubjectsByPredicate(set(), pos.predicate)
+                        o._reverse[key] = sbp
+                    sbp.subjects.add(s)
 
 
 class ContextView:
-    context: Context
+    _context: Context
 
     def __init__(self, context: Context):
-        self.context = context
+        self._context = context
 
     def __setitem__(self, key, value):
         self.use({key: value})
 
     def use(self, data: object):
         if isinstance(data, Context):
-            self.context = data
+            self._context = data
         else:
             ctx = data._context_data if isinstance(data, Surface) else data
-            self.context = self.context.get_context(ctx)
+            self._context = self._context.get_context(ctx)
 
     def pop(self) -> Optional[Context]:
-        if self.context.previous_context is None:
+        if self._context.previous_context is None:
             return None
-        popped = self.context
-        self.context = self.context.previous_context
+        popped = self._context
+        self._context = self._context.previous_context
         return popped
 
     def expand_relative_iri(self, s: str) -> str:
-        return cast(str, self.context.expand_doc_relative_iri(s))
+        return cast(str, self._context.expand_doc_relative_iri(s))
 
     def expand_term(self, s: str):
-        return self.context.expand_vocab_iri(s)
+        return self._context.expand_vocab_iri(s)
 
     def compact_iri(self, s: str):
-        return shorten_iri(self.context, s)
+        return shorten_iri(self._context, s)
 
     def vocab_term(self, s: str):
-        return iri_compaction(self.context, s)
+        return iri_compaction(self._context, s)
 
 
 def _make_id(r: Union[Ref, JsonMap, None]) -> Optional[Id]:
     if r is None:
         return None
     if isinstance(r, Description):
-        return r.id
+        return r._id
     if isinstance(r, Id):
         return r
     s: Optional[str]
@@ -698,9 +739,9 @@ def _opt_str(ref: Ref) -> Optional[str]:
     if isinstance(ref, str):
         return ref
     if isinstance(ref, Description):
-        if ref.id is None:
+        if ref._id is None:
             return None
-        ref = ref.id
+        ref = ref._id
     return str(ref)
 
 
