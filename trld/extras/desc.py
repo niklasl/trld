@@ -220,7 +220,7 @@ class PredicateObjects(Generic[A], NamedTuple):
 
 
 class Description(About['Description']):
-    _id: Optional[Id]
+    _id: Id
     _surface: Surface
     _data: JsonMap
     _cache: Dict[str, PredicateObjects]
@@ -228,7 +228,7 @@ class Description(About['Description']):
     def __init__(self, surface: Surface, data: Optional[JsonMap] = None):
         self._surface = surface
         self._data = data or {}
-        self._id = _make_id(cast(Optional[str], self._data.get(ID)))
+        self._id = cast(Id, _make_id(self._data.get(ID) or surface._genid()))
         self._cache = {}
 
     def __len__(self) -> int:
@@ -422,7 +422,7 @@ class Surface:
 
     def set_context(self, ctx: JsonMap) -> None:
         self._context_data = ctx
-        self._context = ContextView(Context(_opt_str(self.id)).get_context(ctx))
+        self._context = ContextView(Context(_opt_str(self.base)).get_context(ctx))
 
     def add(self, desc: Description):
         key = str(desc._id)
@@ -461,12 +461,14 @@ class Surface:
             return self._desc(_make_id(idata))
 
     def _desc(self, ref: Optional[Ref]) -> Description:
+        descid = None
         desc = None
-        if ref:
-            descid = cast(str, _opt_str(ref))
+        if ref is not None:
+            descid = _opt_str(ref)
             desc = self.get(descid)
+
         if desc is None:
-            desc = Description(self, {ID: descid})
+            desc = Description(self, None if descid is None else {ID: descid})
             self.add(desc)
 
         return desc
