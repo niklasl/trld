@@ -19,7 +19,7 @@ from ..jsonld.compaction import compact, iri_compaction, shorten_iri
 from ..jsonld.context import Context
 from ..jsonld.expansion import expand
 from ..jsonld.extras.frameblanks import frameblanks
-from ..jsonld.flattening import flatten
+from ..jsonld.flattening import BNodes, flatten
 from ..jsonld.rdf import RdfLiteral, to_jsonld_object
 from ..platform.common import resolve_iri
 from ..platform.io import Output
@@ -375,14 +375,14 @@ class Surface:
     _index: Dict[str, Description]
     _context: ContextView
     _context_data: Optional[dict]
-    _blank_count: int
+    _bnodes: BNodes
 
     def __init__(self, space: Space, id: Optional[Id] = None):
         self.id = id
         self.space = space
         self._context_data = None
         self._index = {}
-        self._blank_count = 0
+        self._bnodes = BNodes()
         self._context = ContextView(Context(_opt_str(self.id)))
 
     def __repr__(self) -> str:
@@ -446,8 +446,7 @@ class Surface:
         return _serialize(self.to_jsonld(), format)
 
     def _genid(self) -> str:
-        self._blank_count += 1
-        return f"_:{self._blank_count}"
+        return self._bnodes.make_bnode_id()
 
     def _make_object_view(self, idata: JsonMap) -> Object[Description]:
         if VALUE in idata:
