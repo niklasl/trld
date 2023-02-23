@@ -559,14 +559,14 @@ class SerializerState:
         c_i: int = ref.find(':')
         if c_i > -1:
             pfx = ref[0 : c_i]
+            local = ref[c_i + 1 :]
             if pfx == "_":
                 node_id: str = ref + self.unique_bnode_suffix
                 if self.bnode_skolem_base:
                     ref = self.bnode_skolem_base + node_id[2 :]
                 else:
                     return self.to_valid_term(node_id)
-            elif pfx in self.context:
-                local = ref[c_i + 1 :]
+            elif pfx in self.context and not local.startswith('//'):
                 return f'{pfx}:{self.escape_pname_local(local)}'
         elif use_vocab and ref.find("/") == -1:
             return ":" + ref
@@ -579,15 +579,16 @@ class SerializerState:
         c_i = ref.find(':')
         if c_i > -1:
             pfx = ref[0 : c_i]
-            rest = ref[c_i :]
-            if pfx in self.context:
-                return ref
-            # non-std: check if ref is "most likely" a pname
-            if len(self.context) > 0 and \
-                    rest.find(':') == -1 and \
-                    WORD_START.match(rest) is not None and \
-                    WORD_START.match(pfx) is not None:
-                return ref
+            rest = ref[c_i + 1 :]
+            if not rest.startswith('//'):
+                if pfx in self.context:
+                    return ref
+                # non-std: check if ref is "most likely" a pname
+                if len(self.context) > 0 and \
+                        rest.find(':') == -1 and \
+                        WORD_START.match(rest) is not None and \
+                        WORD_START.match(pfx) is not None:
+                    return ref
 
         return f'<{ref}>'
 
