@@ -14,10 +14,10 @@ except ImportError:
 
 from ..api import parse_rdf, serialize_rdf, text_input
 from ..jsonld.base import (BASE, CONTEXT, GRAPH, ID, LANGUAGE, LIST, SET, TYPE,
-                           VALUE, JsonMap, JsonObject)
+                           VALUE, JsonMap, JsonObject, JsonOptMap)
 from ..jsonld.compaction import compact, iri_compaction, shorten_iri
 from ..jsonld.context import Context
-from ..jsonld.expansion import expand
+from ..jsonld.expansion import _expand_element, expand
 from ..jsonld.extras.frameblanks import frameblanks
 from ..jsonld.flattening import BNodes, flatten
 from ..jsonld.rdf import RdfLiteral, to_jsonld_object
@@ -277,23 +277,32 @@ class Description(About['Description']):
 
         return pos
 
-    def add(self, ref: Ref, obj) -> bool:
+    def add(self, ref: Ref, obj: Union[JsonMap, Object[Description]]) -> bool:
         p = self._expand_term(ref)
-        raw = cast(str, ref) if ref == TYPE else p
+        rawkey = cast(str, ref) if ref == TYPE else p
 
         # TODO: or if isinstance(Object) check index...
-        if raw not in self._data:
-            self._data[raw] = []
+        if rawkey not in self._data:
+            self._data[rawkey] = []
 
-        item = self._make_object_view(obj) if isinstance(obj, Dict) else obj
+        if isinstance(obj, Dict):
+            result = self._surface._expand_element(p, obj)
+            item = self._make_object_view(result)
+        else:
+            item = obj
+
         if p not in self._cache or item not in self._cache[p]:
+            raw: JsonObject
             if isinstance(obj, (Description, OrderedList, Literal)):
-                obj = obj.to_jsonld()
+                raw = cast(Object[Description], obj).to_jsonld()
+            else:
+                raw = item._data if isinstance(item, Description) else item.to_jsonld()
+
             # TODO: optimize (check item in set, convert all back to raw)?
-            objects = cast(List, self._data[raw])
-            if not any(o == obj for o in objects):
+            objects = cast(List, self._data[rawkey])
+            if not any(o == raw for o in objects):
                 self._cache.pop(p, None)
-                objects.append(obj)
+                objects.append(raw)
                 self.get_objects_by_predicate(p)  # rebuild it all...
                 self._surface.space._added(self._id, p, item)
                 return True
@@ -447,6 +456,20 @@ class Surface:
 
     def _genid(self) -> str:
         return self._bnodes.make_bnode_id()
+
+    def _expand_element(self, p: str, obj: Dict) -> Dict:
+        result: JsonOptMap = {}
+        _expand_element(
+            self._context._context,
+            self._context._context,
+            p,
+            cast(JsonOptMap, obj),
+            result,
+            {},
+            None,
+            self.base,
+        )
+        return result
 
     def _make_object_view(self, idata: JsonMap) -> Object[Description]:
         if VALUE in idata:
