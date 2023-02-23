@@ -63,7 +63,7 @@ class Blank(Id):
     """
 
     def __init__(self, s: str):
-        super().__init__(f"_:{s}" if not s.startswith('_:') else s)
+        super().__init__(f"_:{s}" if not _isblank(s) else s)
 
 
 class Literal(Generic[A], NamedTuple):
@@ -102,7 +102,7 @@ class Literal(Generic[A], NamedTuple):
         literal: JsonMap = {VALUE: self.value}
         if self.language is not None:
             literal[LANGUAGE] = self.language
-        elif self.datatype != XSD_STRING:
+        elif str(self.datatype._id) != XSD_STRING:
             literal[TYPE] = str(self.datatype._id)
         return literal
 
@@ -110,7 +110,7 @@ class Literal(Generic[A], NamedTuple):
 class OrderedList(Generic[A]):
     _surface: Surface
     _items: List[JsonMap]
-    # _cache: List[Object]
+    # _cache: List[Object[A]]
 
     def __init__(self, surface: Surface, items: List):
         self._surface = surface
@@ -194,13 +194,13 @@ class About(abc.ABC, Generic[A]):
     # TODO: def get_arcs(self) -> Arc: ...
 
     def get_predicates_objects(self) -> Iterable[PredicateObjects]:
-        for p in self._predicate_keys():
+        for p in self._get_predicate_keys():
             pos = self.get_objects_by_predicate(p)
             if pos is not None:
                 yield pos
 
     @abc.abstractmethod
-    def _predicate_keys(self) -> Iterable[str]:
+    def _get_predicate_keys(self) -> Iterable[str]:
         ...
 
     @abc.abstractmethod
@@ -234,7 +234,7 @@ class Description(About['Description']):
     def __len__(self) -> int:
         return len(self._data)
 
-    def _predicate_keys(self) -> Iterable[str]:
+    def _get_predicate_keys(self) -> Iterable[str]:
         return self._data
 
     @property
@@ -508,8 +508,8 @@ class Subject(About['Subject']):
     def _get_active_context(self) -> ContextView:
         return self._space.context
 
-    def _predicate_keys(self) -> Iterable[str]:
-        return set(key for desc in self._union for key in desc._predicate_keys())
+    def _get_predicate_keys(self) -> Iterable[str]:
+        return set(key for desc in self._union for key in desc._get_predicate_keys())
 
     def get_types(self) -> Iterable[Subject]:
         return set(
@@ -649,7 +649,7 @@ class Space:
 
         subject._union.add(desc)
 
-    def _added(self, s: Optional[Id], p: str, o: Id):
+    def _added(self, s: Optional[Id], p: str, o: Object[Description]):
         # TODO: Ensure _added_desc is called for s and o?
         # TODO: Add to o._reverse (and/or mark index as dirty...)
         ...
@@ -716,6 +716,10 @@ class ContextView:
         return iri_compaction(self._context, s)
 
 
+def _isblank(s: str) -> bool:
+    return s.startswith('_:')
+
+
 def _make_id(r: Union[Ref, JsonMap, None]) -> Optional[Id]:
     if r is None:
         return None
@@ -731,7 +735,7 @@ def _make_id(r: Union[Ref, JsonMap, None]) -> Optional[Id]:
     else:
         s = r
     assert isinstance(s, str)
-    return Link(s) if not s.startswith('_:') else Blank(s)
+    return Link(s) if not _isblank(s) else Blank(s)
 
 
 def _opt_str(ref: Ref) -> Optional[str]:

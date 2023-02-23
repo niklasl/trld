@@ -189,7 +189,7 @@ Subject(id=Link('https://example.org/y'))
 Subjects have full indexing for incoming (reverse) links:
 ```python
 >>> creator = xs.get('dc:creator')
->>> xs in creator.get_subjects_by_predicate('dc:creator')
+>>> xs in creator.get_subjects('dc:creator')
 True
 >>>
 ```
