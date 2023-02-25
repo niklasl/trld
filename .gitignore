@@ -8,5 +8,5 @@ __pycache__
 *.sw[f-p]
 .gradle
 
-/_bak
+/_dev
 /Session.vim
