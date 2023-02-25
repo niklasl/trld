@@ -636,38 +636,19 @@ def iri_compaction(active_context: Context, iri: str,
 
         # 4.14)
         preferred_values: List[str] = []
-        # 4.15)
-        if type_or_language_value == REVERSE:
-            preferred_values.append(REVERSE)
-        # 4.16)
-        if type_or_language_value in {ID, REVERSE} and isinstance(value, Dict) and ID in value:
-            # 4.16.1)
-            compact_id: str = iri_compaction(active_context, cast(str, value[ID]))
-            id_term: Optional[Term] = active_context.terms.get(compact_id)
-            if id_term and id_term.iri == value[ID]:
-                preferred_values.append(VOCAB)
-                preferred_values.append(ID)
-                preferred_values.append(NONE)
-            # 4.16.2)
-            else:
-                preferred_values.append(ID)
-                preferred_values.append(VOCAB)
-                preferred_values.append(NONE)
-        # 4.17)
+
+        # TODO 63ecdd97: errata? Need to compact @container: @list + @type: @vocab
+        # Compute preferred_values from the list values instead of the list itself.
+        if isinstance(value, Dict) and LIST in value:
+            for listitem in cast(List[JsonMap], value[LIST]):
+                _get_preferred_values(
+                    active_context, listitem, type_or_language_value, preferred_values
+                )
         else:
-            preferred_values.append(type_or_language_value)
-            preferred_values.append(NONE)
-            if isinstance(value, Dict) and LIST in value:
-                listvalue: List = cast(List, value[LIST])
-                if len(listvalue) == 0:
-                    type_or_language = ANY
-        # 4.18)
-        preferred_values.append(ANY)
-        # 4.19)
-        for pv in cast(List[str], list(preferred_values)):
-            idx: int = pv.find('_')
-            if idx > -1:
-                preferred_values.append(pv[idx:])
+            _get_preferred_values(
+                active_context, value, type_or_language_value, preferred_values
+            )
+
         # 4.20)
         term_key: Optional[str] = term_selection(active_context, iri, containers, type_or_language, preferred_values)
         # 4.21)
@@ -714,6 +695,47 @@ def iri_compaction(active_context: Context, iri: str,
 
     # 11)
     return iri
+
+
+def _get_preferred_values(
+    active_context: Context,
+    value: Optional[JsonObject],
+    type_or_language_value: str,
+    preferred_values: List[str]
+):
+    # 4.15)
+    if type_or_language_value == REVERSE:
+        preferred_values.append(REVERSE)
+
+    # 4.16)
+    if type_or_language_value in {ID, REVERSE} and isinstance(value, Dict) and ID in value:
+        # 4.16.1)
+        compact_id: str = iri_compaction(active_context, cast(str, value[ID]))
+        id_term: Optional[Term] = active_context.terms.get(compact_id)
+        if id_term and id_term.iri == value[ID]:
+            preferred_values.append(VOCAB)
+            preferred_values.append(ID)
+            preferred_values.append(NONE)
+        # 4.16.2)
+        else:
+            preferred_values.append(ID)
+            preferred_values.append(VOCAB)
+            preferred_values.append(NONE)
+    # 4.17)
+    else:
+        preferred_values.append(type_or_language_value)
+        preferred_values.append(NONE)
+        if isinstance(value, Dict) and LIST in value:
+            listvalue: List = cast(List, value[LIST])
+            if len(listvalue) == 0:
+                type_or_language = ANY
+    # 4.18)
+    preferred_values.append(ANY)
+    # 4.19)
+    for pv in cast(List[str], list(preferred_values)):
+        idx: int = pv.find('_')
+        if idx > -1:
+            preferred_values.append(pv[idx:])
 
 
 def term_selection(active_context: Context,
