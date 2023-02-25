@@ -540,9 +540,11 @@ def iri_compaction(active_context: Context, iri: str,
                 # 4.7.4.7)
                 elif item_type != common_type:
                     common_type = NONE
+
                 # 4.7.4.8)
                 if common_language == NONE and common_type == NONE:
                     break
+
             # 4.7.5)
             if common_language is None:
                 common_language = NONE
@@ -615,19 +617,23 @@ def iri_compaction(active_context: Context, iri: str,
 
         # 4.10)
         containers.append(NONE)
+
         # 4.11)
         if active_context._processing_mode != JSONLD10:
             if not isinstance(value, Dict) or INDEX not in value:
                 containers.append(INDEX)
                 containers.append(f'{INDEX}{SET}')
+
         # 4.12)
         if active_context._processing_mode != JSONLD10:
             if isinstance(value, Dict) and len(value) == 1 and VALUE in value:
                 containers.append(LANGUAGE)
                 containers.append(f'{LANGUAGE}{SET}')
+
         # 4.13)
         if type_or_language_value is None:
             type_or_language_value = NULL
+
         # 4.14)
         preferred_values: List[str] = []
         # 4.15)
