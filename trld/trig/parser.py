@@ -699,6 +699,8 @@ class ReadCollection(ReadCompound):
             return readspace
         elif c == EOF:
             raise NotationError(f'Unexpected EOF in collection.')
+        elif c == ';':
+            raise NotationError(f'Unexpected ";" in collection.')
         elif c == '[':
             return ReadBNode(self), None
         elif c == '(':
