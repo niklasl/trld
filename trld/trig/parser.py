@@ -569,6 +569,8 @@ class ReadNode(ReadCompound):
     open_brace: bool = False
 
     def fill_node(self, value: object):
+        assert self.node is not None
+
         if self.p is None:
             if value == TYPE:
                 self.p = TYPE
