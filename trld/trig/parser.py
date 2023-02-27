@@ -535,7 +535,9 @@ class ReadPrefix(ReadDecl):
 
         return False
 
-    def declare(self):
+    def declare(self) -> None:
+        assert self.ns is not None
+
         ns: Union[str, Dict[str, object]] = self.ns
         if self.pfx != '' and self.ns != '' and not self.ns[-1] in PREFIX_DELIMS:
             ns = {ID: self.ns, PREFIX: True}
@@ -566,7 +568,7 @@ class ReadNode(ReadCompound):
     last_value: Optional[object]
     open_brace: bool = False
 
-    def fill_node(self, value):
+    def fill_node(self, value: object):
         if self.p is None:
             if value == TYPE:
                 self.p = TYPE
