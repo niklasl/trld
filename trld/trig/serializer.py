@@ -400,12 +400,13 @@ class SerializerState:
                 self.write_object(it, depth, via_key)
             return []
         else:
-            indent = self.get_indent(nested_depth - (1 + in_graph_add))
             if self.settings.bracket_end_new_line:
+                indent = self.get_indent(nested_depth - (1 + in_graph_add))
                 self.writeln()
                 self.write(indent)
-            else:
+            elif not is_list:
                 self.write(' ')
+
             if not is_bracketed:
                 self.write("]")
 
