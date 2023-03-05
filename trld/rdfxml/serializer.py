@@ -109,8 +109,6 @@ class RDFXMLSerializer:
 
     def handleNode(self, node: Dict, key: Optional[str] = None):
         graph = node.get(GRAPH)
-        id = cast(str, node.get(ID))
-        id = self.expand(id)
 
         types = node.get(TYPE)
         if not types:
@@ -132,9 +130,14 @@ class RDFXMLSerializer:
         # <https://www.w3.org/2000/03/rdf-tracking/#rdfms-nested-bagIDs>
         tag = firstType if firstType else 'rdfg:Graph' if graph else 'rdf:Description'
 
-        if id is not None and isinstance(id, Dict):
-            qid = self.handleQuotedTriple(id)
-            id = f"_:{qid}"
+        id = cast(str, node.get(ID))
+
+        if id is not None:
+            if isinstance(id, Dict):
+                qid = self.handleQuotedTriple(id)
+                id = f"_:{qid}"
+            else:
+                id = self.expand(id)
 
         aboutattr = (
             ({'rdf:nodeID': id[2:]} if id.startswith('_:') else {'rdf:about': id})
@@ -165,7 +168,8 @@ class RDFXMLSerializer:
 
             self.builder.closeElement()
 
-        self._clear_deferred()
+        if key is None:
+            self._clear_deferred()
 
     def _clear_deferred(self):
         if not self._deferreds:
@@ -216,9 +220,10 @@ class RDFXMLSerializer:
                     self.handleAnnotation(id, key, attrs, value)
                     self.builder.openElement(key, attrs)
                     for part in value[LIST]:
-                        self.handleContents(part, 'rdf:Description')  # TODO: hack
+                        if isinstance(part, Dict):
+                            self.handleContents(part, 'rdf:Description')  # TODO: hack
                     self.builder.closeElement()
-                elif ID in value and len(value) == 1 if ANNOTATION not in value else 2:
+                elif self.is_ref(value):
                     self.handleRef(key, value)
                 else:
                     if key:
@@ -255,7 +260,8 @@ class RDFXMLSerializer:
         if dt:
             attrs['rdf:datatype'] = self.resolve(dt)
 
-        self.handleAnnotation(id, key, attrs, value)
+        if isinstance(value, Dict):
+            self.handleAnnotation(id, key, attrs, value)
 
         if key == 'rdf:Description':  # TODO: hack
             # TODO: actually:
@@ -266,14 +272,17 @@ class RDFXMLSerializer:
         else:
             self.builder.addElement(key, attrs, literal)
 
-    def handleRef(self, key, node):
-        id = self.expand(node[ID])
+    def is_ref(self, value: Dict) -> bool:
+        return ID in value and len(value) == (2 if ANNOTATION in value else 1)
 
+    def handleRef(self, key: str, node: Dict):
+        id: str = node[ID]
         if isinstance(id, Dict):
             self.builder.openElement(key)
             self.handleQuotedTriple(id)
             self.builder.closeElement()
         else:
+            id = self.expand(id)
             if key == 'rdf:Description':  # TODO: hack
                 self.builder.addElement(key, {'rdf:about': id})
             else:
@@ -318,7 +327,10 @@ class RDFXMLSerializer:
                 self.builder.addElement(
                     'rdf:predicate', {'rdf:resource': self.resolve(k)}
                 )
-                self.handleContents({'rdf:object': triplenode[k]})
+                o = triplenode[k]
+                if k == TYPE:
+                    o = {ID: self.resolve(o)}
+                self.handleContents({'rdf:object': o})
                 break
 
         if annot:
@@ -351,7 +363,7 @@ class XMLWriter:
         self._add_attrs(attrs, tag)
         if literal is not None:
             self.write('>')
-            self.write(xmlescape(literal))
+            self.write(xmlescape(str(literal)))
             self.write(f"</{tag}>\n")
         else:
             self.write('/>\n')
@@ -428,7 +440,7 @@ def make_qid(ctx, triplenode: Dict[str, object]) -> str:
     elif isinstance(o, Dict):
         if ID in o:
             orepr = o[ID]
-        else:
+        elif VALUE in o:
             orepr = o[VALUE] + ' '
             lang: Optional[str] = o.get(LANGUAGE)
             dt: Optional[str] = o.get(TYPE)
@@ -436,10 +448,12 @@ def make_qid(ctx, triplenode: Dict[str, object]) -> str:
                 orepr += lang
             elif dt is not None and dt != XSD_STRING:
                 orepr += dt
+        else:  # TODO: unnamed blank node; add id...
+            orepr = ''
 
-    triplerepr = f"{s} {p} {orepr}"
+    triplerepr = f"{s} {p} {orepr}" if orepr != '' else None
 
-    if ctx.triple_id_form == '_':
+    if triplerepr is None or ctx.triple_id_form == '_':
         return ctx.bnodes.make_bnode_id(triplerepr)
     elif ctx.triple_id_form is not None:
         import hashlib
