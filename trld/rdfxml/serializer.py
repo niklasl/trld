@@ -107,7 +107,7 @@ class RDFXMLSerializer:
 
         return attrs
 
-    def handleNode(self, node: Dict, key: str = None):
+    def handleNode(self, node: Dict, key: Optional[str] = None):
         graph = node.get(GRAPH)
         id = cast(str, node.get(ID))
         id = self.expand(id)
@@ -181,7 +181,7 @@ class RDFXMLSerializer:
 
         self._deferreds = []
 
-    def handleType(self, id, types):
+    def handleType(self, id: str, types: List):
         for type in types:
             v: str
             annot: Optional[Dict] = None
@@ -309,7 +309,7 @@ class RDFXMLSerializer:
 
             self._deferreds.append((annot, triplenode, qid))
 
-    def handleQuotedTriple(self, triplenode, annot: Dict = None):
+    def handleQuotedTriple(self, triplenode, annot: Optional[Dict] = None):
         qid = make_qid(self, triplenode)
         self.builder.openElement('rdf:Statement', {'rdf:ID': qid})
         self.builder.addElement('rdf:subject', {'rdf:resource': triplenode[ID]})
