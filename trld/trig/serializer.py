@@ -4,8 +4,8 @@ import re
 from ..platform.common import uuid4
 from ..platform.io import Output
 from ..jsonld.base import (BASE, CONTAINER, CONTEXT, GRAPH, ID, INDEX,
-                           LANGUAGE, LIST, PREFIX, PREFIX_DELIMS, REVERSE,
-                           TYPE, VALUE, VOCAB)
+                           LANGUAGE, LIST, NONE, PREFIX, PREFIX_DELIMS,
+                           REVERSE, TYPE, VALUE, VOCAB)
 from ..jsonld.star import ANNOTATION, ANNOTATED_TYPE_KEY
 
 
@@ -204,9 +204,10 @@ class SerializerState:
 
         if via_key and self.is_lang_container(via_key) and isinstance(obj, Dict):
             first = True
-            for lang, value in cast(StrObject, obj).items():
+            for langkey, value in cast(StrObject, obj).items():
                 if not first:
                     self.write(' , ')
+                lang = None if langkey == NONE else langkey
                 self.to_literal(
                  { self.aliases.value: value, self.aliases.lang: lang },
                     via_key)
