@@ -539,6 +539,14 @@ def _expand_element(active_context: Context,
             if key_term and key_term.index is not None:
                 index_key = key_term.index
 
+            # TODO: Spec errata? At *least* needed for 6425fa63 below.
+            # (Also used in other places; see ruby-rdf/json-ld:s `container_context`)
+            container_context = (
+                key_term.get_local_context(active_context)
+                if key_term
+                else active_context
+            )
+
             # 13.8.3)
             indexes: List[str] = list(value.keys())
             if ordered:
@@ -547,21 +555,21 @@ def _expand_element(active_context: Context,
                 # 13.8.3.1)
                 map_context: Context
                 if (ID in container_mapping or TYPE in container_mapping) and \
-                        active_context.previous_context:
-                    map_context = active_context.previous_context
+                        container_context.previous_context:
+                    map_context = container_context.previous_context
                 else:
-                    map_context = active_context
+                    map_context = container_context
 
                 # 13.8.3.2)
-                index_term: Optional[Term] = active_context.terms.get(index)
+                index_term: Optional[Term] = map_context.terms.get(index)
                 if TYPE in container_mapping and index_term and index_term.has_local_context:
                     map_context = index_term.get_local_context(map_context)
                 # 13.8.3.3)
                 else:
-                    map_context = active_context
+                    map_context = container_context
 
                 # 13.8.3.4)
-                expanded_index: str = cast(str, active_context.expand_vocab_iri(index))
+                expanded_index: str = cast(str, container_context.expand_vocab_iri(index))
                 # 13.8.3.5)
                 index_values: List[JsonMap] = as_list(value[index])
                 # 13.8.3.6)
@@ -578,9 +586,9 @@ def _expand_element(active_context: Context,
                     if INDEX in container_mapping and index_key != INDEX and expanded_index != NONE:
                         # 13.8.3.7.2.1)
                         reexpanded_index: JsonObject = value_expansion(
-                                active_context, index_key, index)
+                                container_context, index_key, index)
                         # 13.8.3.7.2.2)
-                        expanded_index_key: str = cast(str, active_context.expand_vocab_iri(index_key))
+                        expanded_index_key: str = cast(str, container_context.expand_vocab_iri(index_key))
                         # 13.8.3.7.2.3)
                         index_property_values: List = [reexpanded_index]
                         if expanded_index_key in item:
@@ -595,8 +603,9 @@ def _expand_element(active_context: Context,
                         item[INDEX] = index
                     # 13.8.3.7.4)
                     elif ID in container_mapping and ID not in item and expanded_index != NONE:
-                        # TODO: spec errata: different from step 13.8.3.4?
-                        expanded_index = cast(str, active_context.expand_doc_relative_iri(index))
+                        # TODO 6425fa63: spec errata?
+                        # Needs key_term context to use any local context base iri.
+                        expanded_index = cast(str, container_context.expand_doc_relative_iri(index))
                         item[ID] = expanded_index
                     # 13.8.3.7.5)
                     elif TYPE in container_mapping and expanded_index != NONE:
