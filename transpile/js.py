@@ -185,8 +185,8 @@ class JsTranspiler(CStyleTranspiler):
 
     def map_enumerated_for(self, container, ctype, part, parttype, counter):
         ct = [(counter, 'int')]
-        stmts = [f'{parttype} {part} = {container}[{counter}]']
-        return f'for (let {counter} = 0; {counter} < {container}.size(); ++{counter})', stmts, ct
+        stmts = [f'let {part} = {container}[{counter}]']
+        return f'for (let {counter} = 0; {counter} < {container}.length; ++{counter})', stmts, ct
 
     def handle_with(self, expr, var, body):
         vartype = expr.split('(', 1)[0].replace('new ', '')
