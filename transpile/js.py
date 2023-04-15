@@ -371,10 +371,9 @@ class JsTranspiler(CStyleTranspiler):
         ownertype = self.gettype(owner)
 
         if ownertype and ownertype[0] == 'Number':
-            if isinstance(op, ast.Add):
-                return f'{owner} += {value}'
-            elif isinstance(op, ast.Sub):
-                return f'{owner} -= {value}'
+            bop = self.repr_op(op)
+            if bop:
+                return f'{owner} {bop}= {value}'
 
         if isinstance(op, ast.Add):
             return f'Array.prototype.push.apply({owner}, {value})'

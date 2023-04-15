@@ -382,10 +382,11 @@ class JavaTranspiler(CStyleTranspiler):
     def map_op_assign(self, owner, op, value):
         value = self._cast(value)
         if isinstance(op, (ast.Add, ast.Sub)):
-            plusminus = '+' if isinstance(op, ast.Add) else '-'
+            bop = self.repr_op(op)
             ownertype = self.gettype(owner)
             if ownertype[0] == 'Integer':
-                return f'{owner} {plusminus}= {value}'
+                return f'{owner} {bop}= {value}'
+            assert bop == '+'
             return f'{owner}.addAll({value})'
         return None
 

@@ -1104,15 +1104,7 @@ class Transpiler(ast.NodeVisitor):
                 if self.list_concat and (ltype and 'List' in ltype[0] or 'List' in lexpr):
                     return self.list_concat.format(left=lexpr,
                             right=self.repr_expr(expr.right)), gt('List')
-                bop = '+'
-            elif isinstance(expr.op, ast.Sub):
-                bop = '-'
-            elif isinstance(expr.op, ast.Mult):
-                bop = '*'
-            elif isinstance(expr.op, ast.Div):
-                bop = '/'
-            elif isinstance(expr.op, ast.Mod):
-                bop = '%'
+            bop = self.repr_op(expr.op)
             return f'{self.repr_expr(expr.left)} {bop} {self.repr_expr(expr.right)}', None
 
         elif isinstance(expr, ast.Yield):
@@ -1125,6 +1117,20 @@ class Transpiler(ast.NodeVisitor):
             return self._map_lambda(expr), gt('function')
 
         raise NotImplementedError(f'unhandled: {expr!r}')
+
+    def repr_op(self, op) -> Optional[str]:
+        if isinstance(op, ast.Add):
+            return '+'
+        elif isinstance(op, ast.Sub):
+            return '-'
+        elif isinstance(op, ast.Mult):
+            return '*'
+        elif isinstance(op, ast.Div):
+            return '/'
+        elif isinstance(op, ast.Mod):
+            return '%'
+        else:
+            return None
 
     def repr_cast(self, type, expr) -> str:
         return  f'({type}) {expr}'
