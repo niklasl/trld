@@ -31,6 +31,7 @@ pytest: | cache/json-ld-api cache/trig-tests
 	python3 -m trld.tvm.test
 	python3 -m trld.trig.test | grep '^Ran '
 	python3 -m trld test/data/examples/misc.trig | python3 -m trld -i jsonld -o trig | python3 -m trld -i trig > /dev/null
+	python3 -m trld test/data/newlinestrings.jsonld -o ttl | python3 -m trld -i ttl -o ttl | python3 -m trld -i ttl > /dev/null
 
 pydev: dev-requirements.txt
 	python -c 'import sys; assert sys.prefix != sys.base_prefix, "Not in a venv"'

@@ -485,7 +485,8 @@ class SerializerState:
             quote = '"'
             if escaped.find('\n') > -1:
                 quote = '"""'
-                if escaped.endswith('"'):
+                escaped = escaped.replace('"""', '\\"\\"\\"')
+                if escaped.endswith('"') and not escaped.endswith('\\"'):
                     escaped = f'{escaped[0 : len(escaped) - 1]}\\"'
             else:
                 escaped = escaped.replace('"', '\\"')

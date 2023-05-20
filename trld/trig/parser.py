@@ -397,6 +397,7 @@ class ReadLiteral(ReadTerm):
             return self.parent.consume(c, value)
 
         if self.handle_escape(c):
+            self._collect_quotechars()
             return self, None
 
         if c == self.quotechar:
@@ -405,15 +406,19 @@ class ReadLiteral(ReadTerm):
                 self.value = self.pop()
             elif self.multiline > 0:
                 self.multiline += 1
+
             return self, None
 
+        self._collect_quotechars()
+        self.collect(c)
+
+        return self, None
+
+    def _collect_quotechars(self):
         if self.multiline > 1:
             for i in range(self.multiline - 1):
                 self.collect(self.quotechar)
             self.multiline = 1
-
-        self.collect(c)
-        return self, None
 
     def no_after_literal(self, kind, prev_value):
         if prev_value is not None:

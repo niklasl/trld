@@ -1,0 +1,12 @@
+{
+  "@context": {
+    "@vocab": "https://example.org/ns/"
+  },
+  "@id": "https://example.net/item/1",
+  "value": [
+    "\"\"\"\"\nQuad-\"\"\"\"-quoted\"\"\"\"",
+    "\"\"\"\nTriple-\"\"\"quoted\"\"\"",
+    "\"\"\nDouble-\"\"quoted\"\"",
+    "\n\"Quoted\""
+  ]
+}
