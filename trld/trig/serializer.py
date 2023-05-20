@@ -313,7 +313,7 @@ class SerializerState:
                         started_list = False
                     else:
                         self.write('(')
-                else:
+                elif not is_bracketed:
                     if s is None:
                         self.write(self.get_indent(depth - (0 if in_graph else 1)))
                         self.write("[]")
@@ -420,7 +420,7 @@ class SerializerState:
             annotation: StrObject = v[self.aliases.annotation]
             if annotation is not None:
                 self.write(' {|')
-                self.write_object(annotation, depth + 2, self.aliases.annotation)
+                self._emit_contents(self.aliases.annotation, depth + 2, annotation, None)
                 self.write('|}')
 
     def to_literal(
