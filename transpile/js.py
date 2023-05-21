@@ -285,6 +285,11 @@ class JsTranspiler(CStyleTranspiler):
             v = callargs.pop()
             assert not callargs
             return f'{v}.match({castowner})'
+        elif ownertype and ownertype == 'RegExp' and attr == 'sub':
+            v = callargs.pop()
+            sub = callargs.pop()
+            assert not callargs
+            return f'{v}.replace({castowner}, {sub})'
         elif ownertype and ownertype == 'String':
             member = {
                 'startswith': 'startsWith',
@@ -583,7 +588,7 @@ class JsTranspiler(CStyleTranspiler):
         rexp = rexp.replace(r"\\\'", "'")
         rexp = rexp.replace('\\\\', '\\')
         rexp = rexp.replace('/', r'\/')
-        return f'/{rexp}/', 'RegExp'
+        return f'/{rexp}/g', 'RegExp'
 
 
 if __name__ == '__main__':

@@ -1101,9 +1101,10 @@ class Transpiler(ast.NodeVisitor):
                 lexpr = self.repr_expr(expr.left)
                 ltype = self.gettype(lexpr)
                 # TODO: the `or` is a hack since type inference is still too shallow (use "in_boolop (5f54c8e1, 5f76eae2) to control better?)
-                if self.list_concat and (ltype and 'List' in ltype[0] or 'List' in lexpr):
+                listtype = gt('List')
+                if self.list_concat and (ltype and listtype in ltype[0] or listtype in lexpr):
                     return self.list_concat.format(left=lexpr,
-                            right=self.repr_expr(expr.right)), gt('List')
+                            right=self.repr_expr(expr.right)), listtype
             bop = self.repr_op(expr.op)
             return f'{self.repr_expr(expr.left)} {bop} {self.repr_expr(expr.right)}', None
 
@@ -1514,10 +1515,12 @@ def camelize(s: str) -> str:
     if s[0] == '_':
         s = s[1:]
 
-    uscore_i = s.find('_')
+    underscore_at = s.find('_')
 
-    if uscore_i > -1 and all(c.isupper() for c in s[:uscore_i - 1]):
-        return s
+    if underscore_at > -1:
+        before_underscore = s[:underscore_at]
+        if len(before_underscore) > 0 and all(c.isupper() for c in before_underscore):
+            return s
 
     if not any(c.islower() for c in s):
         return s
