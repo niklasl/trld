@@ -207,7 +207,7 @@ class SerializerState:
             for langkey, value in cast(StrObject, obj).items():
                 if not first:
                     self.write(' , ')
-                lang = None if langkey == NONE else langkey
+                lang: Optional[str] = None if langkey == NONE else langkey
                 self.to_literal(
                  { self.aliases.value: value, self.aliases.lang: lang },
                     via_key)
