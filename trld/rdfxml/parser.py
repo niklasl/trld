@@ -49,7 +49,7 @@ class RdfAttrs:
                     self.lang = value
                 elif lname == 'base':
                     self.base = value
-            elif nsUri == RDFNS:
+            elif nsUri == RDFNS and lname != 'value':
                 if lname == 'about':
                     self.about = value
                 elif lname == 'ID':
@@ -146,6 +146,9 @@ def walk(
             elif len(elem.get_child_elements()):
                 value = []
                 result = {CONTEXT: {}, GRAPH: value}
+            elif len(attrs.values) > 0:
+                value = {}
+                value.update(attrs.values)
             else:
                 value = elem.get_text()
                 if attrs.lang:
