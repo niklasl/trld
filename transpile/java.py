@@ -381,8 +381,8 @@ class JavaTranspiler(CStyleTranspiler):
 
     def map_op_assign(self, owner, op, value):
         value = self._cast(value)
-        if isinstance(op, (ast.Add, ast.Sub)):
-            bop = self.repr_op(op)
+        bop = self.repr_op(op)
+        if bop:
             ownertype = self.gettype(owner)
             if ownertype[0] == 'Integer':
                 return f'{owner} {bop}= {value}'
@@ -398,7 +398,7 @@ class JavaTranspiler(CStyleTranspiler):
             method = 'set'
             key = f'{castowner}.size() - 1'
         else:
-            assert self.gettype(owner)[0].startswith('Map')
+            assert self.gettype(owner)[0].startswith(('Map', 'HashMap', 'TreeMap'))
             method = 'put'
 
         key = self._cast(key)

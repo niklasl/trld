@@ -8,7 +8,7 @@ import { guessMimeType } from '../mimetypes'
 
 export class Input {
 
-  constructor(source = null) {
+  constructor(source = null, headers = null) {
     if (typeof source === 'string') {
       this._source = this._openStream(source)
     } else {

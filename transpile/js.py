@@ -36,6 +36,7 @@ class JsTranspiler(CStyleTranspiler):
     types = {
         'object': 'Object',
         'Exception': 'Error',
+        'ValueError': 'Error',
         'bool': 'Boolean',
         'str': 'String',
         'int': 'Number',
@@ -300,7 +301,11 @@ class JsTranspiler(CStyleTranspiler):
                 'rfind': 'lastIndexOf',
                 'upper': 'toUpperCase',
                 'lower': 'toLowerCase',
+                'replace': 'replaceAll',
             }.get(attr, attr)
+            if member == 'split' and len(callargs) == 2:
+                callargs[1] = str(int(callargs[1]) + 1)
+
         elif ownertype and ownertype == 'Number' and attr == 'is_integer':
             assert not callargs
             return f'({castowner} % 1 == 0)'

@@ -1376,6 +1376,7 @@ class Transpiler(ast.NodeVisitor):
     def map_for_to(self, counter: str, ceiling: str) -> Tuple[str, List[str], List[Tuple[str, str]]]:
         raise NotImplementedError
 
+    # TODO: return ReprAndType at least on callargs (and add types to function_map)!
     def map_name(self, name: str, callargs: List[str] = None) -> str:
         if name == 'self':
             return self.this
