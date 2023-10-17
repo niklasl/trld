@@ -246,7 +246,7 @@ def make_node_map(bnodes: BNodes,
             make_node_map(bnodes, evalue, node_map, active_graph, eid, property)
 
 
-def merge_node_maps(node_maps: Dict[str, NodeMap]):
+def merge_node_maps(node_maps: Dict[str, NodeMap]) -> JsonMap:
     # 1)
     result: JsonMap = {}
     # 2)
