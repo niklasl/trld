@@ -70,13 +70,21 @@ function testCaseRunner(category) {
       resultData = expand(sourceData, baseUri, expandContext, ordered)
 
       if (tc[TYPE].indexOf('jld:FlattenTest') > -1) {
+        try {
           resultData = flatten(resultData, ordered)
+        } catch (e) {
+          t.fail(e)
+        }
       }
 
       if (contextData) {
         let compactArrays = options.compactArrays
         if (compactArrays === void(0)) compactArrays = true
-        resultData = compact(contextData, sourceData, baseUri, compactArrays, ordered)
+        try {
+          resultData = compact(contextData, sourceData, baseUri, compactArrays, ordered)
+        } catch (e) {
+          t.fail(e)
+        }
       }
 
       t.deepEqual(resultData, expectedData)

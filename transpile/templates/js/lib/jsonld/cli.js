@@ -1,6 +1,7 @@
 'use(strict)'
 
-import { loadJson, dumpJson } from '../platform/common.js'
+import { jsonEncode } from '../platform/common.js'
+import { loadJson } from '../platform/io.js'
 import { expand } from './expansion.js'
 import { compact } from './compaction.js'
 import { flatten } from './flattening.js'
@@ -40,7 +41,7 @@ export default async function main () {
     let compactArrays = true
     result = compact(context, result, baseIri, compactArrays, ordered)
   }
-  console.log(dumpJson(result, true))
+  console.log(jsonEncode(result, true))
 }
 
 if (typeof require !== 'undefined' && require.main === module) main()
