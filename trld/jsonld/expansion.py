@@ -349,7 +349,8 @@ def _expand_element(active_context: Context,
                     raise InvalidIncludedValueError
                 # 13.4.6.4)
                 if INCLUDED in result:
-                    expanded_value = as_list(result[INCLUDED]) + expanded_list
+                    l: List = as_list(result[INCLUDED])
+                    expanded_value = l + expanded_list
 
             # 13.4.7)
             elif expanded_property == VALUE:
