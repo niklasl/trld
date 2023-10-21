@@ -90,7 +90,7 @@ For Python, this runs mypy and the test suite:
 
     python3 -m trld.jsonld.test [...]
     Running test suite: cache/json-ld-api/tests/expand-manifest.jsonld
-    Ran 371 test cases. Passed: 366. Failed: 4. Errors: 1.
+    Ran 371 test cases. Passed: 367. Failed: 3. Errors: 1.
     Running test suite: cache/json-ld-api/tests/compact-manifest.jsonld
     Ran 242 test cases. Passed: 239. Failed: 2. Errors: 1.
     Running test suite: cache/json-ld-api/tests/flatten-manifest.jsonld
@@ -98,13 +98,16 @@ For Python, this runs mypy and the test suite:
     Running test suite: cache/json-ld-api/tests/fromRdf-manifest.jsonld
     Ran 51 test cases. Passed: 51. Failed: 0. Errors: 0.
     Running test suite: cache/json-ld-api/tests/toRdf-manifest.jsonld
-    Ran 451 test cases. Passed: 400. Failed: 50. Errors: 1.
+    Ran 451 test cases. Passed: 401. Failed: 49. Errors: 1.
 
     python3 -m trld.tvm.test
     Running [...]: OK
 
-    python3 -m trld.trig.test [...]
+    python3 -m trld.trig.test | grep '^Ran '
     Ran 335 tests. Passed 301, failed 34
+
+    python3 -m trld.trig.test_serializer | grep '^Examined '
+    Examined 335 tests. Round-tripped 232, passed 216, failed 13
 
 For the other languages, this will generate packages for each language in the
 build directory, then run their respective test suites:
@@ -112,17 +115,17 @@ build directory, then run their respective test suites:
     $ make java
     [...]
     java -cp build/java/build/libs/trld-with-deps.jar trld.jsonld.TestRunner [...]
-    Ran 371 test cases. Passed: 329. Failed: 15. Errors: 27.
+    Ran 371 test cases. Passed: 330. Failed: 14. Errors: 27.
 
     java -cp build/java/build/libs/trld-with-deps.jar trld.trig.Test [...]
     Ran 335 tests. Passed 252, failed 83
 
     $ make js
     [...]
-    1..547
-    # tests 547
-    # pass  542
-    # fail  5
+    1..551
+    # tests 551
+    # pass  540
+    # fail  11
 
     [...] node [...] lib/trig/test.js [...]
     Ran 335 tests. Passed 270, failed 65
