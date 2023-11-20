@@ -302,6 +302,10 @@ class JavaTranspiler(CStyleTranspiler):
             v = callargs.pop()
             assert not callargs
             return f'({castowner}.matcher({v}).matches() ? {v} : null)'
+        elif ownertype and ownertype == 'Pattern' and attr == 'search':
+            v = callargs.pop()
+            assert not callargs
+            return f'({castowner}.matcher({v}).find() ? {v} : null)'
         elif ownertype and ownertype == 'Pattern' and attr == 'sub':
             v = callargs.pop()
             repl = callargs.pop()

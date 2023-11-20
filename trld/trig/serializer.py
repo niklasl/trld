@@ -12,6 +12,7 @@ from ..jsonld.star import ANNOTATION, ANNOTATED_TYPE_KEY
 StrObject = Dict[str, object]
 StrOrObject = Union[str, StrObject]
 
+LINEBREAK = re.compile('[\n\r]')
 WORD_START = re.compile(r'^\w*$')
 PNAME_LOCAL_ESC = re.compile(r"([~!$&'()*+,;=/?#@%]|^[.-]|[.-]$)")
 
@@ -483,7 +484,7 @@ class SerializerState:
             parts: List[str] = []
             escaped = v.replace('\\', '\\\\')
             quote = '"'
-            if escaped.find('\n') > -1:
+            if LINEBREAK.search(escaped) is not None:
                 quote = '"""'
                 escaped = escaped.replace('"""', '\\"\\"\\"')
                 if escaped.endswith('"') and not escaped.endswith('\\"'):

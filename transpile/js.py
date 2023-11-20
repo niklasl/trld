@@ -285,6 +285,12 @@ class JsTranspiler(CStyleTranspiler):
         elif ownertype and ownertype == 'RegExp' and attr == 'match':
             v = callargs.pop()
             assert not callargs
+            # NOTE: finds a match within v...
+            return f'{v}.match({castowner})'
+        elif ownertype and ownertype == 'RegExp' and attr == 'search':
+            v = callargs.pop()
+            assert not callargs
+            # NOTE: ... and does not require all of v to match.
             return f'{v}.match({castowner})'
         elif ownertype and ownertype == 'RegExp' and attr == 'sub':
             v = callargs.pop()
