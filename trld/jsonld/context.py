@@ -668,10 +668,12 @@ class Term:
                     defined[term] = True
                     # 14.2.4.2)
                     if active_context._expand_init_vocab_iri(term, local_context, defined) != self.iri:
-                        # TODO: spec or TC expand 0026 problem; just pass works
-                        # TODO: expansion TC 0071 fails unless we just return
-                        pass#return
-                        #raise InvalidIriMappingError(term, self.iri)
+                        # TODO: Errata?
+                        # For rule in <https://www.w3.org/TR/json-ld11/#iri-expansion-within-a-context>
+                        # Reported issue: <https://github.com/w3c/json-ld-api/issues/581>.
+                        # Expansion TCs 0026 and 0071 fail unless:
+                        if active_context._processing_mode != JSONLD10:
+                            raise InvalidIriMappingError(term, self.iri)
                 # 14.2.5) # TODO: really no ':' anywhere, so elif not strictly correct...
                 elif simple_term and (self.iri[-1] in PREFIX_DELIMS or is_blank(self.iri)):
                     self.is_prefix = True
