@@ -94,11 +94,14 @@ def main():
 
     sources = args.source or ['-']
 
-    for source in sources:
-        if len(sources) > 1:
-            printerr(f"Parsing file: '{source}'")
-
-        process_source(source, args)
+    if args.input_format in ('ndjson', 'jsonl'):
+        for l in sys.stdin:
+            process_source(json.loads(l), args)
+    else:
+        for source in sources:
+            if len(sources) > 1:
+                printerr(f"Parsing file: '{source}'")
+            process_source(source, args)
 
 
 if __name__ == '__main__':
