@@ -74,7 +74,7 @@ def _absolutize(context_ref: str) -> str:
         return context_ref
 
 
-def main():
+def make_argsparser():
     argparser = argparse.ArgumentParser()
     argparser.add_argument('source', metavar='SOURCE', nargs='*')
     argparser.add_argument('-c', '--context', help='Use to compact expanded JSON-LD', const=True, nargs='?')
@@ -86,7 +86,11 @@ def main():
     argparser.add_argument('-i', '--input-format', help='Set RDF input format')
     argparser.add_argument('-o', '--output-format', help='Set RDF output format')
 
-    args = argparser.parse_args()
+    return argparser
+
+
+def main():
+    args = make_argsparser().parse_args()
 
     sources = args.source or ['-']
 
