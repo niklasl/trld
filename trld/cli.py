@@ -59,6 +59,11 @@ def process_source(source, args, ordered=True):
             if isinstance(context_ref, dict) and CONTEXT in context_ref:
                 result[CONTEXT] = context_ref[CONTEXT]
 
+        if args.embed_blanks:
+            from .jsonld.extras.frameblanks import frameblanks  # type: ignore[import]
+
+            result = frameblanks(result)
+
         serialize_rdf(result, args.output_format)
 
     except Exception as e:
@@ -83,6 +88,7 @@ def make_argsparser():
     argparser.add_argument('-b', '--base',
                         help='Set the base IRI (default is current source)')
     argparser.add_argument('-f', '--flatten', action='store_true')
+    argparser.add_argument('-B', '--embed-blanks', action='store_true')
     argparser.add_argument('-i', '--input-format', help='Set RDF input format')
     argparser.add_argument('-o', '--output-format', help='Set RDF output format')
 
