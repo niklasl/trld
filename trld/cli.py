@@ -20,17 +20,22 @@ def printerr(msg):
 
 
 def process_source(source, args, ordered=True):
+    source_is_data = isinstance(source, (dict, list))
+
     context_ref = args.context
 
     base_iri = (
         args.base if args.base
-        else f'file://{os.getcwd()}/' if source == '-'
+        else f'file://{os.getcwd()}/' if source_is_data or source == '-'
         else f'file://{source}' if '://' not in source
         else source
     )
 
     try:
-        data = parse_rdf(source, args.input_format)
+        if source_is_data:
+            data = source
+        else:
+            data = parse_rdf(source, args.input_format)
 
         if args.expand_context:
             expand_context = (
