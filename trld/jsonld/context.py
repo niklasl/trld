@@ -635,10 +635,9 @@ class Term:
             # 13.7)
             active_context.terms[term] = self
             defined[term] = True
-            return
 
         # 14)
-        if ID in dfn and term != dfn[ID]:
+        elif ID in dfn and term != dfn[ID]:
             id: str = cast(str, dfn[ID]) # TODO: redundant cast for transpile
             # 14.1
             if id is None:
