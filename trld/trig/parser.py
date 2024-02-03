@@ -41,8 +41,6 @@ RESERVED_CHARS = {'~', '.', '-', '!',
 
 NUMBER_LEAD_CHARS = re.compile(r'[+-.0-9]')
 
-TURTLE_INT_CHARS = re.compile(r'[+-.0-9]')
-
 LITERAL_QUOTE_CHARS = {'"', "'"}
 
 SYMBOL = '@symbol'
@@ -337,7 +335,7 @@ class ReadNumber(ReadTerm):
                 return {VALUE: value, TYPE: XSD_DOUBLE if self.exp else XSD_DECIMAL}
             return number
         else:
-            if len(value) > 1 and TURTLE_INT_CHARS.match(value[0]) is not None:
+            if len(value) > 1 and value[0] == '+':
                 return {VALUE: value, TYPE: XSD_INTEGER}
             return int(value)
 
