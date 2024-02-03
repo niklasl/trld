@@ -3,6 +3,8 @@ import json
 import sys
 from typing import Any, Dict, Optional
 
+from .jsonld.base import CONTEXT
+from .jsonld.extras.contexts import to_simple_context
 from .mimetypes import SUFFIX_MIME_TYPE_MAP
 from .platform.common import json_encode
 from .platform.io import Input, Output
@@ -45,7 +47,7 @@ def parse_rdf(source: Any, fmt: Optional[str] = None) -> Any:
     return inp.load_json()
 
 
-def serialize_rdf(result, fmt, out=None):
+def serialize_rdf(result, fmt, out=None, context=None):
     if fmt is None or fmt == 'jsonld':
         print(json_encode(result, pretty=True))
         return
@@ -53,6 +55,9 @@ def serialize_rdf(result, fmt, out=None):
     out = Output(out or sys.stdout)
     if fmt in {'trig', 'ttl', 'turtle', 'turtle-union'}:
         from .trig import serializer as trig
+
+        if context and CONTEXT not in result:
+            result[CONTEXT] = to_simple_context(context)
 
         if fmt == 'trig':
             trig.serialize(result, out)

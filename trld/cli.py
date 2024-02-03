@@ -6,6 +6,7 @@ import sys
 from .platform.common import json_encode
 from .jsonld.base import CONTEXT
 from .jsonld.compaction import compact
+from .jsonld.context import get_context
 from .jsonld.docloader import set_document_loader, any_document_loader
 from .jsonld.expansion import expand
 from .jsonld.flattening import flatten
@@ -48,13 +49,16 @@ def process_source(source, args, ordered=True):
         if args.flatten or args.output_format in {'nq', True}:
             result = flatten(result, ordered=ordered)
 
+        context = None
+
         if context_ref:
             if context_ref is True:
                 context_ref = data
             elif isinstance(context_ref, str):
                 context_ref = _absolutize(context_ref)
 
-            result = compact(context_ref, result, base_iri, ordered=ordered)
+            context = get_context(context_ref)
+            result = compact(context, result, base_iri, ordered=ordered)
 
             if isinstance(context_ref, dict) and CONTEXT in context_ref:
                 result[CONTEXT] = context_ref[CONTEXT]
@@ -64,7 +68,7 @@ def process_source(source, args, ordered=True):
 
             result = frameblanks(result)
 
-        serialize_rdf(result, args.output_format)
+        serialize_rdf(result, args.output_format, None, context)
 
     except Exception as e:
         printerr(f"Error in file '{source}'")

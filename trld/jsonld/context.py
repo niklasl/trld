@@ -885,3 +885,11 @@ class Term:
                 self.nest_value == other.nest_value and \
                 self.type_mapping == other.type_mapping and \
                 self._local_context == other._local_context
+
+
+def get_context(context: object, base_iri: Optional[str] = None) -> Context:
+    context_url: Optional[str] = context if isinstance(context, str) else None
+    if isinstance(context, Dict):
+        context = context.get(CONTEXT)
+
+    return Context(base_iri).get_context(cast(object, context), context_url)

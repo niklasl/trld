@@ -1,7 +1,7 @@
 from typing import Optional, Dict, List, Set, Union, cast
 from ..platform.common import warning
 from .base import *
-from .context import Context, Term, InvalidNestValueError
+from .context import Context, Term, InvalidNestValueError, get_context
 from .invcontext import get_inverse_context
 
 
@@ -16,21 +16,21 @@ def compact(context: object, doc_data: JsonObject,
         base_iri: Optional[str] = None,
         compact_arrays = True,
         ordered = False) -> JsonObject:
-    active_context: Context
-    if isinstance(context, Context):
-        active_context = context
-    else:
-        context_url: Optional[str] = context if isinstance(context, str) else None
-        if isinstance(context, Dict):
-            context = context.get(CONTEXT)
-        active_context = Context(base_iri).get_context(cast(object, context), context_url)
 
-    result: JsonObject = compaction(active_context, None, doc_data, compact_arrays, ordered)
+    active_context: Context = (
+        context if isinstance(context, Context) else get_context(context, base_iri)
+    )
+
+    result: JsonObject = compaction(
+        active_context, None, doc_data, compact_arrays, ordered
+    )
+
     if isinstance(result, List):
         if len(result) == 0:
             result = {}
         else:
             result = {iri_compaction(active_context, GRAPH): result}
+
     return result
 
 
