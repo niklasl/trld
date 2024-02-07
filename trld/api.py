@@ -4,7 +4,7 @@ import sys
 from typing import Any, Dict, Optional
 
 from .jsonld.base import CONTEXT
-from .jsonld.extras.contexts import to_simple_context
+from .jsonld.extras.contexts import to_context_data
 from .mimetypes import SUFFIX_MIME_TYPE_MAP
 from .platform.common import json_encode
 from .platform.io import Input, Output
@@ -57,7 +57,7 @@ def serialize_rdf(result, fmt, out=None, context=None):
         from .trig import serializer as trig
 
         if context and CONTEXT not in result:
-            result[CONTEXT] = to_simple_context(context)
+            result[CONTEXT] = to_context_data(context)
 
         if fmt == 'trig':
             trig.serialize(result, out)
