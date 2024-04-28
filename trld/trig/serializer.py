@@ -198,6 +198,7 @@ class SerializerState:
             obj: object,
             depth: int = 0,
             via_key: Optional[str] = None,
+            in_list = False,
     ) -> List[StrObject]:
         if depth > 0 and isinstance(obj, Dict) and CONTEXT in obj:
             # TODO: use SerializerState(node[CONTEXT], None, None, state)
@@ -219,7 +220,7 @@ class SerializerState:
             self.to_literal(cast(object, obj), via_key)
             return []
 
-        if via_key and self.is_list_container(via_key):
+        if not in_list and via_key and self.is_list_container(via_key):
             obj = { self.aliases.list_: obj }
 
         s = cast(Optional[str], obj.get(self.aliases.id))
@@ -384,7 +385,7 @@ class SerializerState:
                         top_objects.append(v)
                         self.write(self.ref_repr(v[self.aliases.id]))
                     elif v is not None:
-                        objects = self.write_object(v, nested_depth, key)
+                        objects = self.write_object(v, nested_depth, key, started_list)
                         for it in objects:
                             top_objects.append(it)
 
