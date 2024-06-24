@@ -3,7 +3,7 @@ import json
 import sys
 from typing import Any, Dict, Optional
 
-from .jsonld.base import CONTEXT
+from .jsonld.keys import CONTEXT, GRAPH
 from .jsonld.extras.contexts import to_context_data
 from .mimetypes import SUFFIX_MIME_TYPE_MAP
 from .platform.common import json_encode

@@ -1,5 +1,5 @@
 import json
-from ..jsonld.base import CONTEXT, GRAPH, ID
+from ..jsonld.keys import CONTEXT, GRAPH, ID
 from ..jsonld.expansion import expand
 from ..jsonld.compaction import compact
 from ..jsonld.extras.index import make_index

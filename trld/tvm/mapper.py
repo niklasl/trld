@@ -1,5 +1,6 @@
 from typing import Optional, Dict, List, Set, Union, cast
-from ..jsonld.base import CONTEXT, GRAPH, ID, TYPE, VOCAB, as_list
+from ..jsonld.keys import CONTEXT, GRAPH, ID, TYPE, VOCAB
+from ..jsonld.base import as_list
 
 
 ListOrJsonMap = Union[List, Dict[str, object]]

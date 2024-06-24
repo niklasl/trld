@@ -1,7 +1,8 @@
 from collections import OrderedDict
 from typing import Optional
 
-from ..base import GRAPH, ID, JsonObject
+from ..keys import GRAPH, ID
+from ..base import JsonObject
 from ..star import ANNOTATION
 
 

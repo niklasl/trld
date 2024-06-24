@@ -1,6 +1,9 @@
 from typing import Optional, Dict, List, Set, Union, cast
 from ..platform.common import warning
-from .base import *
+from .base import (JsonLdError, JsonList, JsonMap, JsonObject, as_list,
+                     is_blank, node_equals)
+from .keys import (DEFAULT, GRAPH, ID, INCLUDED, INDEX, KEYWORDS, LIST,
+                   REVERSE, TYPE, VALUE)
 
 
 NodeMap = Dict[str, JsonMap]

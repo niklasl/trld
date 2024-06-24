@@ -1,5 +1,7 @@
-from .base import *
+from typing import Optional, Dict, List, cast
+from .base import JsonMap
 from .context import Context, Term
+from .keys import ANY, GRAPH, ID, LANGUAGE, NONE, NULL, REVERSE, TYPE
 
 
 def get_inverse_context(active_context: Context) -> Dict:

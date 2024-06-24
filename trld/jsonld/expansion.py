@@ -2,11 +2,20 @@
 # - Most cast calls (especially "upcasts" to JsonObject)
 # - Some `if ...: if ....:` could be just `and`
 
-from typing import Optional, Dict, List, Set, Union, cast
-from .docloader import LoadDocumentCallback
+from typing import Dict, List, Optional, Set, Union, cast
+
 from ..platform.common import warning
-from .base import *
-from .context import Context, Term, InvalidBaseDirectionError, InvalidNestValueError
+from .base import (JsonLdError, JsonList, JsonMap, JsonObject, JsonOptList,
+                   JsonOptMap, Scalar, add_value, add_value_as_list, as_list,
+                   is_graph_object, is_iri, is_lang_tag, is_scalar,
+                   is_simple_graph_object, relativise_iri)
+from .context import (Context, InvalidBaseDirectionError,
+                      InvalidNestValueError, Term)
+from .docloader import LoadDocumentCallback
+from .keys import (ANY, CONTEXT, DEFAULT, DIRECTION, DIRECTIONS, GRAPH, ID,
+                   INCLUDED, INDEX, JSON, JSONLD10, JSONLD11, KEYWORDS,
+                   LANGUAGE, LIST, NEST, NONE, NOTHING, NULL, NULLS, REVERSE,
+                   SET, TYPE, VALUE, VALUE_KEYWORDS, VOCAB)
 
 
 # framing keywords

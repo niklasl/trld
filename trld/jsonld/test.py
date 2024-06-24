@@ -4,7 +4,7 @@ import traceback
 from pathlib import Path
 
 from .docloader import any_document_loader, set_document_loader
-from .base import JSONLD10, JSONLD11
+from .keys import JSONLD10, JSONLD11
 from . import context
 from .testbase import TestCase, TESTS_URL
 

@@ -6,7 +6,8 @@ from typing import Dict, Iterator, List, NamedTuple, Optional, Set, TextIO, Unio
 from urllib.request import Request, urlopen
 
 from ..builtins import Char
-from ..jsonld.base import JSONLD_CONTEXT_RELATION, JsonLdError, JsonObject
+from ..jsonld.keys import JSONLD_CONTEXT_RELATION
+from ..jsonld.base import JsonLdError, JsonObject
 from ..mimetypes import (JSONLD_MIME_TYPE, SUFFIX_MIME_TYPE_MAP, get_first_mime_type,
                          guess_mime_type)
 

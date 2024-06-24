@@ -2,7 +2,7 @@ from typing import Iterator, List, Dict, Union, NamedTuple, cast
 from pathlib import Path
 from ..platform.common import json_encode_canonical
 from ..platform.io import Input
-from ..jsonld.base import CONTEXT, GRAPH, ID, TYPE, LIST
+from ..jsonld.keys import CONTEXT, GRAPH, ID, TYPE, LIST
 from ..jsonld.expansion import expand
 from ..jsonld.compaction import compact
 from ..jsonld.flattening import flatten

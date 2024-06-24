@@ -3,7 +3,8 @@ from typing import Dict, List, Optional, Tuple, cast
 from ..nq.parser import load
 from ..nq.serializer import serialize
 from ..platform.io import Input, Output
-from .base import CONTEXT, ID, TYPE, JsonObject
+from .keys import CONTEXT, ID, TYPE
+from .base import JsonObject
 from .compaction import compact
 from .docloader import LoadDocumentCallback, get_document_loader
 from .expansion import expand

@@ -1,6 +1,7 @@
 from typing import Dict
 
-from ..base import *
+from ..keys import (BASE, CONTAINER, CONTEXT, DIRECTION, ID, INDEX, LANGUAGE,
+                    NEST, PROTECTED, REVERSE, TYPE, VOCAB)
 from ..context import Context, get_context
 from ..compaction import iri_compaction
 

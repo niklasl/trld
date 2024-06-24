@@ -1,7 +1,7 @@
 import json
 import sys
 import os
-from ..jsonld.base import CONTEXT
+from ..jsonld.keys import CONTEXT
 from ..jsonld.expansion import expand
 from ..jsonld.compaction import compact
 from .mapmaker import make_target_map

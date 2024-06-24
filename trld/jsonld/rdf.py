@@ -1,27 +1,18 @@
-from typing import List, Dict, Set, Iterable, Iterator, Union, Optional, NamedTuple, cast
-from ..platform.common import json_encode_canonical, json_decode
-from .base import *
+from typing import (Dict, Iterable, Iterator, List, NamedTuple, Optional, Set,
+                    Union, cast)
+
+from ..platform.common import json_decode, json_encode_canonical
+from ..rdfterms import (I18N, RDF_DIRECTION, RDF_FIRST, RDF_JSON,
+                        RDF_LANGSTRING, RDF_LANGUAGE, RDF_LIST, RDF_NIL,
+                        RDF_REST, RDF_TYPE, RDF_VALUE, XSD_BOOLEAN, XSD_DOUBLE,
+                        XSD_INTEGER, XSD_STRING)
+from .base import (JsonMap, JsonObject, as_list, is_blank, is_iri, is_lang_tag,
+                   node_equals)
 from .context import InvalidBaseDirectionError
 from .expansion import InvalidLanguageTaggedStringError
 from .flattening import BNodes, NodeMap, make_node_map
-from ..rdfterms import (
-    RDF_TYPE,
-    RDF_VALUE,
-    RDF_LIST,
-    RDF_FIRST,
-    RDF_REST,
-    RDF_NIL,
-    RDF_DIRECTION,
-    RDF_LANGUAGE,
-    RDF_JSON,
-    RDF_LANGSTRING,
-    XSD_BOOLEAN,
-    XSD_DOUBLE,
-    XSD_INTEGER,
-    XSD_STRING,
-    I18N,
-)
-
+from .keys import (DEFAULT, DIRECTION, DIRECTIONS, GRAPH, ID, JSON, JSONLD10,
+                   JSONLD11, KEYWORDS, LANGUAGE, LIST, TYPE, VALUE)
 
 MAX_INT: float = pow(10, 21)
 

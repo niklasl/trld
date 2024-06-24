@@ -2,7 +2,8 @@ from typing import NamedTuple, Optional, Tuple, Dict, List, Set, Union, cast
 
 from collections import OrderedDict
 
-from ..jsonld.base import CONTEXT, GRAPH, ID, LIST, REVERSE, TYPE, VOCAB, as_list, JsonMap
+from ..jsonld.keys import CONTEXT, GRAPH, ID, LIST, REVERSE, TYPE, VOCAB
+from ..jsonld.base import as_list, JsonMap
 from ..jsonld.extras.index import make_index
 
 

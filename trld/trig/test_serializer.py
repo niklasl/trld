@@ -2,7 +2,7 @@ from io import StringIO
 from typing import Dict, Union, cast
 from pathlib import Path
 from ..platform.io import Input, Output
-from ..jsonld.base import CONTEXT
+from ..jsonld.keys import CONTEXT
 
 from . import parser
 from . import serializer

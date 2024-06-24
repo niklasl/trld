@@ -4,7 +4,7 @@ import os
 import sys
 
 from .platform.common import json_encode
-from .jsonld.base import CONTEXT
+from .jsonld.keys import CONTEXT
 from .jsonld.compaction import compact
 from .jsonld.context import get_context
 from .jsonld.docloader import set_document_loader, any_document_loader

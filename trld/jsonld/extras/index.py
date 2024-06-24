@@ -1,5 +1,6 @@
 from typing import Optional, Tuple, Dict, List, Union, cast
-from ..base import ID, GRAPH, REVERSE, JsonMap, as_list
+from ..keys import ID, GRAPH, REVERSE
+from ..base import JsonMap, as_list
 
 
 def make_index(graph: List[JsonMap], add_reverses=True) -> Dict[str, JsonMap]:

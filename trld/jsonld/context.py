@@ -1,9 +1,16 @@
 from typing import Dict, List, Optional, Set, Tuple, Union, cast
 
-from .docloader import LoadDocumentCallback, LoadDocumentOptions, get_document_loader
 from ..platform.common import resolve_iri, warning
-from .base import *
-
+from .base import (PREFIX_DELIMS, JsonLdError, as_list, has_keyword_form,
+                   is_blank, is_iri, is_iri_ref, is_lang_tag)
+from .docloader import (LoadDocumentCallback, LoadDocumentOptions,
+                        get_document_loader)
+from .keys import (BASE, CONTAINER, CONTAINER_KEYWORDS, CONTEXT,
+                   CONTEXT_KEYWORDS, DEFAULT, DIRECTION, DIRECTIONS, GRAPH, ID,
+                   IMPORT, INDEX, JSON, JSONLD10, JSONLD11,
+                   JSONLD_CONTEXT_RELATION, KEYWORDS, LANGUAGE, LIST, NEST,
+                   NONE, NULL, PREFIX, PROPAGATE, PROTECTED, REVERSE, SET,
+                   TYPE, VALUE, VERSION, VOCAB)
 
 DEFAULT_PROCESSING_MODE: str = JSONLD11
 

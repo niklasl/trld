@@ -1,13 +1,13 @@
-from typing import Callable, Dict, List, NamedTuple, Optional, Union, cast
 import re
+from typing import Callable, Dict, List, NamedTuple, Optional, Union, cast
 
+from ..jsonld.base import PREFIX_DELIMS
+from ..jsonld.keys import (BASE, CONTAINER, CONTEXT, GRAPH, ID, INDEX,
+                           LANGUAGE, LIST, NONE, PREFIX, REVERSE, TYPE, VALUE,
+                           VOCAB)
+from ..jsonld.star import ANNOTATED_TYPE_KEY, ANNOTATION
 from ..platform.common import uuid4
 from ..platform.io import Output
-from ..jsonld.base import (BASE, CONTAINER, CONTEXT, GRAPH, ID, INDEX,
-                           LANGUAGE, LIST, NONE, PREFIX, PREFIX_DELIMS,
-                           REVERSE, TYPE, VALUE, VOCAB)
-from ..jsonld.star import ANNOTATION, ANNOTATED_TYPE_KEY
-
 
 StrObject = Dict[str, object]
 StrOrObject = Union[str, StrObject]

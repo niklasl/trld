@@ -1,14 +1,14 @@
-from typing import List, Dict, Set, Optional, Iterable, Union, Tuple, ClassVar, cast
 import re
+from typing import (ClassVar, Dict, Iterable, List, Optional, Set, Tuple,
+                    Union, cast)
+
 from ..builtins import Char
+from ..jsonld.base import PREFIX_DELIMS
+from ..jsonld.keys import (BASE, CONTEXT, GRAPH, ID, LANGUAGE, LIST, PREFIX,
+                           TYPE, VALUE, VOCAB)
+from ..jsonld.star import ANNOTATED_TYPE_KEY, ANNOTATION
 from ..platform.common import json_encode
 from ..platform.io import Input
-from ..jsonld.base import (
-        VALUE, TYPE, LANGUAGE,
-        ID, LIST, GRAPH,
-        CONTEXT, VOCAB, BASE,
-        PREFIX, PREFIX_DELIMS)
-from ..jsonld.star import ANNOTATION, ANNOTATED_TYPE_KEY
 from ..rdfterms import RDF_TYPE, XSD, XSD_DOUBLE, XSD_INTEGER
 
 

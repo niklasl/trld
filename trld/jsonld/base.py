@@ -1,5 +1,9 @@
-from typing import Optional, Dict, List, Set, Union, cast
+from typing import Dict, List, Optional, Set, Union
 
+from .keys import GRAPH, ID, INDEX
+
+# From <https://tools.ietf.org/html/rfc3986#section-2.2>
+PREFIX_DELIMS: Set[str] = {':', '/', '?', '#', '[', ']', '@'}
 
 Scalar = Union[str, int, float, bool]
 JsonObject = Union[Dict, List, Scalar]
@@ -7,93 +11,6 @@ JsonMap = Dict[str, JsonObject]
 JsonOptMap = Dict[str, Optional[JsonObject]]
 JsonList = List[JsonObject]
 JsonOptList = List[Optional[JsonObject]]
-
-
-# From <https://tools.ietf.org/html/rfc3986#section-2.2>
-PREFIX_DELIMS: Set[str] = {':', '/', '?', '#', '[', ']', '@'}
-
-BASE: str = '@base'
-CONTAINER: str = '@container'
-CONTEXT: str = '@context'
-DIRECTION: str = '@direction'
-GRAPH: str = '@graph'
-ID: str = '@id'
-IMPORT: str = '@import'
-INCLUDED: str = '@included'
-INDEX: str = '@index'
-JSON: str = '@json'
-LANGUAGE: str = '@language'
-LIST: str = '@list'
-NEST: str = '@nest'
-NONE: str = '@none'
-PREFIX: str = '@prefix'
-PROPAGATE: str = '@propagate'
-PROTECTED: str = '@protected'
-REVERSE: str = '@reverse'
-SET: str = '@set'
-TYPE: str = '@type'
-VALUE: str = '@value'
-VERSION: str = '@version'
-VOCAB: str = '@vocab'
-
-# TODO: not "really" (public) keywords...?
-ANY: str = '@any'
-NULL: str = '@null'
-DEFAULT: str = '@default'
-
-# TODO: see 5f6117d4
-NULLS: Set[Optional[str]] = {None, NULL}
-NOTHING: Set[Optional[str]] = {None, NULL, NONE}
-
-KEYWORDS: Set[str] = {
-    BASE,
-    CONTAINER,
-    CONTEXT,
-    DIRECTION,
-    GRAPH,
-    ID,
-    IMPORT,
-    INCLUDED,
-    INDEX,
-    JSON,
-    LANGUAGE,
-    LIST,
-    NEST,
-    NONE,
-    PREFIX,
-    PROPAGATE,
-    PROTECTED,
-    REVERSE,
-    SET,
-    TYPE,
-    VALUE,
-    VERSION,
-    VOCAB
-}
-
-CONTEXT_KEYWORDS: Set[str] = {
-    VERSION,
-    IMPORT,
-    BASE,
-    VOCAB,
-    LANGUAGE,
-    DIRECTION,
-    PROPAGATE,
-    PROTECTED
-}
-
-VALUE_KEYWORDS: Set[str] = {
-    DIRECTION, INDEX, LANGUAGE, TYPE, VALUE
-}
-
-CONTAINER_KEYWORDS: Set[str] = {GRAPH, ID, INDEX, LANGUAGE, LIST, SET, TYPE}
-
-DIRECTIONS: Set[str] = {'rtl', 'ltr'}
-
-JSONLD10: str = 'json-ld-1.0'
-JSONLD11: str = 'json-ld-1.1'
-
-JSONLD_CONTEXT_RELATION: str = 'http://www.w3.org/ns/json-ld#context'
 
 
 class JsonLdError(Exception):
