@@ -438,7 +438,7 @@ class SerializerState:
         datatype: Optional[str] = None
         if isinstance(obj, Dict):
             value = obj.get(self.aliases.value)
-            datatype = cast(str, obj.get(self.aliases.type))
+            datatype = cast(Optional[str], obj.get(self.aliases.type))
             lang = obj.get(self.aliases.lang)
         else:
             kdef: Optional[StrOrObject] = None

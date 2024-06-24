@@ -13,7 +13,7 @@ def frameblanks(doc: JsonObject) -> JsonObject:
             data = data[GRAPH]
     items = data if isinstance(data, list) else [data] if data is not None else []
 
-    index: dict[str, tuple[dict, list[dict]]] = OrderedDict()
+    index: dict[str, tuple[Optional[dict], list[dict]]] = OrderedDict()
 
     graphs = []
 
