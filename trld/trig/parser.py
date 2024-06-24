@@ -46,6 +46,8 @@ LITERAL_QUOTE_CHARS = {'"', "'"}
 SYMBOL = '@symbol'
 EOF = ''
 
+EXP = {'E', 'e'}
+
 StateResult = Tuple['ParserState', object]
 
 
@@ -279,8 +281,6 @@ class ReadSymbol(ReadTerm):
 
 class ReadNumber(ReadTerm):
 
-    EXP = {'E', 'e'}
-
     whole: Optional[str]
     dot: Char
     exp: bool
@@ -291,7 +291,7 @@ class ReadNumber(ReadTerm):
         self.exp = False
 
     def consume(self, c: str, prev_value) -> StateResult:
-        exp = c in self.EXP
+        exp = c in EXP
         if exp:
             self.exp = True
         if self.whole is None and c == '.':
@@ -305,9 +305,9 @@ class ReadNumber(ReadTerm):
         elif c.isdecimal() or (self.whole is None and
                                 len(self.collected) == 0 and
                                 NUMBER_LEAD_CHARS.match(c) is not None) or (
-                            self.whole is not None and c in self.EXP) or (
+                            self.whole is not None and c in EXP) or (
                                 len(self.collected) > 0
-                                and self.collected[-1] in self.EXP
+                                and self.collected[-1] in EXP
                                 and NUMBER_LEAD_CHARS.match(c) is not None):
             self.collect(c)
             return self, None
