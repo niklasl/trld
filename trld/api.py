@@ -47,7 +47,7 @@ def parse_rdf(source: Any, fmt: Optional[str] = None) -> Any:
     return inp.load_json()
 
 
-def serialize_rdf(result, fmt, out=None, context=None):
+def serialize_rdf(result: Any, fmt: Optional[str], out=None, context=None) -> None:
     if fmt is None or fmt == 'jsonld':
         print(json_encode(result, pretty=True))
         return
@@ -56,8 +56,12 @@ def serialize_rdf(result, fmt, out=None, context=None):
     if fmt in {'trig', 'ttl', 'turtle', 'turtle-union'}:
         from .trig import serializer as trig
 
-        if context and CONTEXT not in result:
-            result[CONTEXT] = to_context_data(context)
+        if context:
+            if not isinstance(result, dict):
+                result = {GRAPH: result}
+
+            if CONTEXT not in result:
+                result[CONTEXT] = to_context_data(context)
 
         if fmt == 'trig':
             trig.serialize(result, out)
