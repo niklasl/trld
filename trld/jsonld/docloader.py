@@ -12,7 +12,7 @@ class RemoteDocument(NamedTuple):
     content_type: Optional[str]
     context_url: Optional[str]
     profile: Optional[str]
-    document: JsonObject | str
+    document: Union[JsonObject, str]
 
 
 class LoadDocumentOptions(NamedTuple):
@@ -67,7 +67,7 @@ def https_document_loader(url: str, options: Optional[LoadDocumentOptions] = Non
 
 
 def _load_any_document(url: str) -> RemoteDocument:
-    document: JsonObject | str
+    document: Union[JsonObject, str]
     inp = Input(url, REQUEST_HEADERS)
     try:
         if inp.content_type in JSON_MIME_TYPES:
