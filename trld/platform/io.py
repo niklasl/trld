@@ -43,7 +43,7 @@ class Input:
             self._stream = source
 
         if (
-            self.content_type is None
+            not isinstance(self.content_type, str)
             and headers is not None
             and ACCEPT_HEADER in headers
         ):
