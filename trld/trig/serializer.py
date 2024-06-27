@@ -13,7 +13,6 @@ StrObject = Dict[str, object]
 StrOrObject = Union[str, StrObject]
 
 LINEBREAK = re.compile('[\n\r]')
-WORD_START = re.compile(r'^\w*$')
 PNAME_LOCAL_ESC = re.compile(r"([~!$&'()*+,;=/?#@%]|^[.-]|[.-]$)")
 
 
@@ -580,20 +579,6 @@ class SerializerState:
             return ":" + ref[len(cast(str, self.context[VOCAB])) :]
 
         ref = self.clean_value(ref)
-
-        c_i = ref.find(':')
-        if c_i > -1:
-            pfx = ref[0 : c_i]
-            rest = ref[c_i + 1 :]
-            if not rest.startswith('//'):
-                if pfx in self.context:
-                    return ref
-                # non-std: check if ref is "most likely" a pname
-                if len(self.context) > 0 and \
-                        rest.find(':') == -1 and \
-                        WORD_START.match(rest) is not None and \
-                        WORD_START.match(pfx) is not None:
-                    return ref
 
         return f'<{ref}>'
 
