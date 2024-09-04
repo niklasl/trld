@@ -549,6 +549,13 @@ def _expand_element(active_context: Context,
             if key_term and key_term.index is not None:
                 index_key = key_term.index
 
+            # TODO: Spec errata. Needed for 6425fa63 below.
+            container_context = (
+                key_term.get_local_context(active_context)
+                if key_term
+                else active_context
+            )
+
             # 13.8.3)
             indexes: List[str] = list(value.keys())
             if ordered:
@@ -605,8 +612,9 @@ def _expand_element(active_context: Context,
                         item[INDEX] = index
                     # 13.8.3.7.4)
                     elif ID in container_mapping and ID not in item and expanded_index != NONE:
-                        # TODO: spec errata: different from step 13.8.3.4?
-                        expanded_index = cast(str, active_context.expand_doc_relative_iri(index))
+                        # TODO 6425fa63: spec errata.
+                        # Needs key_term context to use any local context base iri.
+                        expanded_index = cast(str, container_context.expand_doc_relative_iri(index))
                         item[ID] = expanded_index
                     # 13.8.3.7.5)
                     elif TYPE in container_mapping and expanded_index != NONE:
