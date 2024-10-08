@@ -159,10 +159,10 @@ def handle_statement(dataset: RdfDataset, terms: List):
     graph.add(RdfTriple(s, p, o))
 
 
-def parse(inp: Input) -> object:
+def parse(inp: Input, use_native_types=True) -> object:
     dataset = RdfDataset()
     load(dataset, inp)
-    return to_jsonld(dataset)
+    return to_jsonld(dataset, use_native_types=use_native_types)
 
 
 if __name__ == '__main__':
