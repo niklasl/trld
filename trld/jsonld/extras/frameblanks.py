@@ -1,24 +1,26 @@
 from collections import OrderedDict
-from typing import Optional
+from typing import Dict, List, Optional, Tuple, cast
 
 from ..keys import GRAPH, ID
 from ..base import JsonObject
 from ..star import ANNOTATION
 
+IndexType = Dict[str, Tuple[Optional[Dict], List[Dict]]]
+
 
 def frameblanks(doc: JsonObject) -> JsonObject:
     data = doc
-    if isinstance(data, dict):
+    if isinstance(data, Dict):
         if GRAPH in data:
             data = data[GRAPH]
-    items = data if isinstance(data, list) else [data] if data is not None else []
+    items: List = data if isinstance(data, List) else [data] if data is not None else []
 
-    index: dict[str, tuple[Optional[dict], list[dict]]] = OrderedDict()
+    index: IndexType = OrderedDict()
 
     graphs = []
 
     for item in items:
-        assert isinstance(item, dict)
+        assert isinstance(item, Dict)
         if GRAPH in item:
             graphs.append(item)
         else:
@@ -26,22 +28,27 @@ def frameblanks(doc: JsonObject) -> JsonObject:
 
     items = graphs
 
-    for id, (node, refs) in index.items():
+    node_id: str
+    for node_id, node_and_refs in index.items():
+        node: Optional[Dict]
+        refs: List[Dict]
+        (node, refs) = node_and_refs
         if node is None:
             continue
 
-        if id.startswith('_:'):
+        if node_id.startswith('_:'):
             if len(refs) == 1:
-                refs[0].update(node)
-                del refs[0][ID]
+                ref = refs[0]
+                ref.update(node)
+                del ref[ID]
                 continue
 
         items.append(node)
 
-    if isinstance(doc, list):
+    if isinstance(doc, List):
         return items
     else:
-        assert isinstance(doc, dict)
+        assert isinstance(doc, Dict)
         if GRAPH not in doc:
             assert len(items) < 2
             return items[0] if items else items
@@ -51,13 +58,13 @@ def frameblanks(doc: JsonObject) -> JsonObject:
     return doc
 
 
-def visit_node(index: dict, node: dict, parent: Optional[dict]):
-    id = node.get(ID)
-    if id is not None:
-        full_node: dict | None
-        refs: list[dict]
-        if id in index:
-            full_node, refs = index[id]
+def visit_node(index: IndexType, node: Dict[str, object], parent: Optional[Dict]):
+    if ID in node:
+        node_id = cast(str, node[ID])
+        full_node: Optional[Dict]
+        refs: List[Dict]
+        if node_id in index:
+            full_node, refs = index[node_id]
         else:
             full_node = None
             refs = []
@@ -69,12 +76,13 @@ def visit_node(index: dict, node: dict, parent: Optional[dict]):
         else:
             full_node = node
 
-        index[id] = full_node, refs
+        if isinstance(full_node, Dict):
+            index[node_id] = full_node, refs
 
     for value in node.values():
-        if isinstance(value, list):
+        if isinstance(value, List):
             for v in value:
-                if isinstance(v, dict):
+                if isinstance(v, Dict):
                     visit_node(index, v, node)
-        elif isinstance(value, dict):
+        elif isinstance(value, Dict):
             visit_node(index, value, node)
