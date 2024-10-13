@@ -85,6 +85,8 @@ class JavaTranspiler(CStyleTranspiler):
     @contextmanager
     def enter_file(self, srcpath: Path):
         # TODO: Change back to just staticname + 'Common'?
+        self._current_staticname_sameas_class = False
+
         self._srcpath = srcpath
         self.staticname = upper_camelize(srcpath.with_suffix('').parts[-1])
         self.package = str(srcpath.parent.with_suffix('')).replace('/', '.')
@@ -95,10 +97,38 @@ class JavaTranspiler(CStyleTranspiler):
         self._output_prelude()
         yield
 
+    def _staticout(self, inclass=None):
+        if inclass is None and self._current_staticname_sameas_class:
+            # A class was just closed and we need to add static members.
+            # Rewrite file and skip last end block.
+            self.outfile.close()
+
+            with self.filename.open() as f:
+                lines = f.readlines()
+
+            endblock_offset = 0
+            for line in lines[::-1]:
+                endblock_offset -= 1
+                if line[:-1] == self.end_block:
+                    break
+
+            self.outfile = self.filename.open('w')
+            for line in lines[:endblock_offset]:
+                self.outfile.write(line)
+
+            super()._staticout(self.staticname)
+
+            self.outfile.write(self.end_block)
+        else:
+            super()._staticout(inclass)
+
     def visit_ClassDef(self, node):
         classname = self.map_name(node.name)
         currclass = self.filename.with_suffix('').name
         classfilepath = self.filename.parent / f'{classname}.java'
+
+        if classname == self.staticname:
+            self._current_staticname_sameas_class = True
 
         if classfilepath == self.filename:
             super().visit_ClassDef(node)

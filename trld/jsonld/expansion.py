@@ -64,7 +64,7 @@ def expand(doc_data: JsonObject,
            document_loader: Optional[LoadDocumentCallback] = None) -> List:
     ctx: Context = Context(base_iri, None, document_loader)
     if expand_context is not None:
-        ctx = ctx.get_context(expand_context, expand_context)
+        ctx = ctx.get_subcontext(expand_context, expand_context)
     result: Optional[JsonObject] = expansion(ctx, None, doc_data, base_iri,
                                              False, ordered)
     if result is None:
@@ -153,7 +153,7 @@ def expansion(active_context: Context,
 
     # 9)
     if CONTEXT in element:
-        active_context = active_context.get_context(element[CONTEXT], base_url)
+        active_context = active_context.get_subcontext(element[CONTEXT], base_url)
 
     # 10)
     type_scoped_context: Context = active_context

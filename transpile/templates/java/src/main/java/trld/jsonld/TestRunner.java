@@ -5,8 +5,8 @@ import java.util.*;
 import trld.Builtins;
 import trld.platform.Common;
 
-import static trld.jsonld.Base.CONTEXT;
-import static trld.jsonld.Base.JSONLD10;
+import static trld.jsonld.Keys.CONTEXT;
+import static trld.jsonld.Keys.JSONLD10;
 import static trld.jsonld.Docloader.setDocumentLoader;
 import static trld.jsonld.Docloader.loadAnyDocument;
 import static trld.jsonld.Testbase.TESTS_URL;

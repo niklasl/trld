@@ -143,7 +143,7 @@ class Context:
         cloned._processing_mode = self._processing_mode
         return cloned
 
-    def get_context(self, context_data: object,
+    def get_subcontext(self, context_data: object,
             base_url: Optional[str] = None,
             remote_contexts: Optional[Set[str]] = None,
             override_protected=False,
@@ -863,7 +863,7 @@ class Term:
         override_protected: bool = propagate
 
         if cached is None:
-            cached = active_context.get_context(self._local_context,
+            cached = active_context.get_subcontext(self._local_context,
                         self.base_url,
                         set(self._remote_contexts),
                         override_protected=override_protected,
@@ -899,4 +899,4 @@ def get_context(context: object, base_iri: Optional[str] = None) -> Context:
     if isinstance(context, Dict):
         context = context.get(CONTEXT)
 
-    return Context(base_iri).get_context(cast(object, context), context_url)
+    return Context(base_iri).get_subcontext(cast(object, context), context_url)
