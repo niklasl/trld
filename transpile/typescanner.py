@@ -40,10 +40,22 @@ class TypeScanner(ast.NodeVisitor):
 
     def read(self, src):
         self._in_src.append(Path(src))
+
         with open(src) as f:
             code = f.read()
+
         tree = ast.parse(code)
-        self.visit(tree)
+
+        # NOTE: _transpiler.visit_ImportFrom sets up typing aliases;
+        # after which all type alias assigns must be visited;
+        # before other imports, classes and functions.
+        for child in sorted(ast.iter_child_nodes(tree), key=lambda child:
+            1 if isinstance(child, ast.ImportFrom) and child.module == 'typing'
+            else 2 if isinstance(child, ast.Assign)
+            else 3
+        ):
+            self.visit(child)
+
         self._in_src.pop()
 
     def visit_ImportFrom(self, node):
@@ -106,7 +118,7 @@ class TypeScanner(ast.NodeVisitor):
             proto_args = tuple(arg for arg in list(proto_args.items())[1:])
             self._protocols[proto_args] = clstype
 
-    def addtype(self, name: str, typename: str, narrowed=False):
+    def addtype(self, name: str, typename: Union[str, FuncType], narrowed=False):
         ns = self.module[self._within[-1]] if self._within else self.module
         if isinstance(ns, ClassType):
             ns = ns.members
