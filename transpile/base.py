@@ -58,7 +58,9 @@ class Transpiler(ast.NodeVisitor):
     implements_keyword: Optional[str] = None
     union_surrogate: Optional[str] = None
     optional_type_form: Optional[str] = None
+    has_static: bool
     static_annotation_form: Optional[str] = None
+    end_stmt: str
     begin_block: str
     end_block: str
     ctor: Optional[str] = None
@@ -68,6 +70,7 @@ class Transpiler(ast.NodeVisitor):
     func_defaults: Optional[str] = None
     selfarg: Optional[str] = None
     this: str
+    public: str
     protected = ''
     declaring: Optional[str] = None
     none: str
@@ -85,7 +88,7 @@ class Transpiler(ast.NodeVisitor):
 
     outdir: str
 
-    def __init__(self, outdir: str = None):
+    def __init__(self, outdir: Optional[str] = None):
         super().__init__()
         self.in_static = False
         self.staticname = 'Statics'
@@ -659,14 +662,14 @@ class Transpiler(ast.NodeVisitor):
         var = self.repr_expr(withitem.optional_vars)
         self.handle_with(expr, var, node.body)
 
-    def visit_FunctionDef(self, node):
+    def visit_FunctionDef(self, node: ast.FunctionDef):
         self.outln()
 
         scope = self.new_scope(node)
         # TODO: 5f55548d
-        argdecls = []
-        calls = []
-        defaultcalls = []
+        argdecls: List[Tuple[str, str, Optional[str]]] = []
+        calls: List[str] = []
+        defaultcalls: List[Tuple] = []
         defaultsat = len(node.args.args) - len(node.args.defaults)
         # TODO: remove nametypes and just add (use new scope logic)
         nametypes = []
@@ -680,6 +683,7 @@ class Transpiler(ast.NodeVisitor):
             else:
                 aname = self.to_var_name(arg.arg)
 
+            atype: Optional[str]
             if arg.annotation:
                 atype = self.repr_annot(arg.annotation)
             else:
@@ -690,7 +694,7 @@ class Transpiler(ast.NodeVisitor):
                 default = node.args.defaults[i - defaultsat]
                 call = calls[:] + [self.repr_expr(default)]
                 # TODO: self.repr_expr(default)?
-                aval_name = default if isinstance(default, ast.Name) else type(default.n if isinstance(default, AST_NUM) else default.value).__name__
+                aval_name = default if isinstance(default, ast.Name) else type(default.n if isinstance(default, AST_NUM) else default.value).__name__  # type: ignore[attr-defined]
                 atype = self.types.get(aval_name, atype)
                 if self.func_defaults:
                     aname_val = self.func_defaults.format(
@@ -709,8 +713,8 @@ class Transpiler(ast.NodeVisitor):
             ret = 'boolean'
 
         name = None
-        on_exit: Callable = None
-        stmts = []
+        on_exit: Optional[Callable] = None
+        stmts: List[str] = []
         if isinstance(node.returns, ast.Subscript) and \
                 isinstance(node.returns.value, ast.Name) and \
                 node.returns.value.id == 'Iterator':
@@ -721,7 +725,7 @@ class Transpiler(ast.NodeVisitor):
 
         in_ctor = False
         if node.name == '__init__':
-            name = self.ctor or self._within[-2].node.name
+            name = self.ctor or self._within[-2].node.name  # type: ignore[attr-defined]
             ret = '' # TODO: self.ctordef?
             in_ctor = True
         elif node.name == '__repr__':
@@ -832,10 +836,10 @@ class Transpiler(ast.NodeVisitor):
         if node.finalbody:
             self.enter_block(node.finalbody, f'finally')
 
-    def visit_ClassDef(self, node):
+    def visit_ClassDef(self, node: ast.ClassDef):
         self.outln()
 
-        on_exit: Callable = None
+        on_exit: Optional[Callable] = None
 
         # TODO: 5f831dc1 (java-specific)
         classname = self.map_name(node.name)
@@ -903,7 +907,7 @@ class Transpiler(ast.NodeVisitor):
             if not (isinstance(member, ast.FunctionDef) and
                     member.name == '__iter__'):
                 continue
-            iterated_type = self.repr_expr(_get_slice(member.returns.slice))
+            iterated_type = self.repr_expr(_get_slice(member.returns.slice))  # type: ignore[union-attr]
             # TODO: 5f831dc1 (still too java-specific?)
             iterable_type = self.types.get('Iterable', 'Iterable')
             if self.typing:
@@ -1101,8 +1105,11 @@ class Transpiler(ast.NodeVisitor):
                 lexpr = self.repr_expr(expr.left)
                 ltype = self.gettype(lexpr)
                 # TODO: the `or` is a hack since type inference is still too shallow (use "in_boolop (5f54c8e1, 5f76eae2) to control better?)
-                listtype = gt('List')
-                if self.list_concat and (ltype and listtype in ltype[0] or listtype in lexpr):
+                listtype = cast(str, gt('List'))
+                if self.list_concat and (
+                    isinstance(ltype, tuple) and listtype in cast(str, ltype[0]) or
+                    listtype in lexpr
+                ):
                     return self.list_concat.format(left=lexpr,
                             right=self.repr_expr(expr.right)), listtype
             bop = self.repr_op(expr.op)
@@ -1377,7 +1384,7 @@ class Transpiler(ast.NodeVisitor):
         raise NotImplementedError
 
     # TODO: return ReprAndType at least on callargs (and add types to function_map)!
-    def map_name(self, name: str, callargs: List[str] = None) -> str:
+    def map_name(self, name: str, callargs: Optional[List[str]] = None) -> str:
         if name == 'self':
             return self.this
 
@@ -1417,7 +1424,7 @@ class Transpiler(ast.NodeVisitor):
     def map_getitem(self, owner: str, key: str) -> str:
         raise NotImplementedError
 
-    def map_getslice(self, owner: str, lower: str, upper: str = None) -> str:
+    def map_getslice(self, owner: str, lower: str, upper: Optional[str] = None) -> str:
         raise NotImplementedError
 
     def map_op_assign(self, owner: str, op: ast.operator, value: str) -> Optional[str]:
@@ -1435,7 +1442,7 @@ class Transpiler(ast.NodeVisitor):
     def map_in(self, container, contained, negated=False):
         raise NotImplementedError
 
-    def map_attr(self, owner: str, attr: str, callargs: List[str] = None) -> str:
+    def map_attr(self, owner: str, attr: str, callargs: Optional[List[str]] = None) -> str:
         raise NotImplementedError
 
     def map_list(self, expr: ast.List) -> str:

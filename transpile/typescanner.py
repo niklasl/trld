@@ -23,9 +23,9 @@ Type = Union[str, ClassType, FuncType]
 
 class TypeScanner(ast.NodeVisitor):
 
-    def __init__(self, transpiler = None):
+    def __init__(self, transpiler = None) -> None:
         self.modules: Dict[str, Dict[str, Type]] = {}
-        self._protocols = {}
+        self._protocols: Dict[Tuple, str] = {}
         self._in_src: List[Path] = []
         self._within: List[str] = []
         if transpiler:
