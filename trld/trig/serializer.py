@@ -13,7 +13,9 @@ StrObject = Dict[str, object]
 StrOrObject = Union[str, StrObject]
 
 LINEBREAK = re.compile('[\n\r]')
-PNAME_LOCAL_ESC = re.compile(r"([~!$&'()*+,;=/?#@%]|^[.-]|[.-]$)")
+PNAME_LOCAL_ESC = re.compile(
+    r"([~!$&'()*+,;=/?#@]|^[.-]|[.-]$|%(?![0-9A-Fa-f]{2}))"
+)
 
 
 class Settings(NamedTuple):
@@ -653,6 +655,7 @@ class SerializerState:
     def escape_pname_local(self, pnlocal: str) -> str:
         # From: https://www.w3.org/TR/turtle/#grammar-production-PN_LOCAL_ESC
         # Note that '.-' are OK within, but need escaping at start/end.
+        # '%' is OK if followed by HEX HEX.
         # And '_' *may* be escaped but is OK everywhere in PN_LOCAL.
         return PNAME_LOCAL_ESC.sub(r'\\\1', pnlocal)
 
