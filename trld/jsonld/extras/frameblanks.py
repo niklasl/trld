@@ -76,8 +76,7 @@ def visit_node(index: IndexType, node: Dict[str, object], parent: Optional[Dict]
         else:
             full_node = node
 
-        if isinstance(full_node, Dict):
-            index[node_id] = full_node, refs
+        index[node_id] = full_node, refs
 
     for value in node.values():
         if isinstance(value, List):
