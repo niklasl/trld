@@ -51,7 +51,7 @@ def _modify_pair(target_map: Dict, k: Union[str, int], v: object, outo: Union[Di
 def _map(target_map: Dict, key: Union[str, int], value, drop_unmapped=False) -> Dict:
     somerule: object = target_map.get(key)
 
-    if drop_unmapped and isinstance(key, str) and key[0] != '@' and somerule is None:
+    if drop_unmapped and somerule is None and isinstance(key, str) and key[0] != '@':
         return {}
 
     if isinstance(value, List):
@@ -85,8 +85,10 @@ def _map(target_map: Dict, key: Union[str, int], value, drop_unmapped=False) -> 
             # TODO: use both property and property_from if present
             if property_from is not None:
                 first: Dict = objectvalues[0]
-                property_from_object: List[Dict] = first[property_from]
-                property = property_from_object[0][ID]
+                if property_from in first:
+                    property_from_object: Optional[List[Dict]] = first[property_from]
+                    if property_from_object:
+                        property = property_from_object[0][ID]
 
             if property in target_map:
                 property = as_list(target_map[property])[0]
