@@ -86,9 +86,15 @@ if __name__ == '__main__':
     import json
     import sys
 
+    simplify = False
+
     for ref in sys.argv[1:]:
 
-        ctx = get_context(ref)
-        ctx_data = to_context_data(ctx)
+        if ref in ('-s', '--simplify'):
+            simplify = True
+            continue
 
-        json.dump(ctx_data, sys.stdout, indent=2)
+        ctx = get_context(ref)
+        ctx_data = to_simple_context(ctx) if simplify else to_context_data(ctx)
+
+        json.dump({CONTEXT: ctx_data}, sys.stdout, indent=2)
