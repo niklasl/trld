@@ -49,7 +49,11 @@ def parse_rdf(source: Any, fmt: Optional[str] = None) -> Any:
 
 def serialize_rdf(result: Any, fmt: Optional[str], out=None, context=None) -> None:
     if fmt is None or fmt == 'jsonld':
-        print(json_encode(result, pretty=True))
+        if out is not None:
+            return json.dump(result, out, indent=2, ensure_ascii=False)
+        else:
+            print(json_encode(result, pretty=True))
+
         return
 
     out = Output(out or sys.stdout)
