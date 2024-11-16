@@ -1,5 +1,5 @@
 import re
-from typing import Callable, Dict, List, NamedTuple, Optional, Union, cast
+from typing import Callable, Dict, Final, List, NamedTuple, Optional, Union, cast
 
 from ..jsonld.base import PREFIX_DELIMS
 from ..jsonld.keys import (BASE, CONTAINER, CONTEXT, GRAPH, ID, INDEX,
@@ -240,15 +240,15 @@ class SerializerState:
     def _emit_contents(
         self, via_key: Optional[str], depth: int, obj: Dict, s: Optional[str]
     ) -> List[StrObject]:
-        in_graph: bool = via_key == self.aliases.graph and not self.settings.turtle_only
-        in_graph_add: int = 1 if in_graph else 0
-        at_top: bool = depth == 0
-        not_linked: bool = at_top or in_graph
+        in_graph: Final[bool] = via_key == self.aliases.graph and not self.settings.turtle_only
+        in_graph_add: Final[int] = 1 if in_graph else 0
+        at_top: Final[bool] = depth == 0
+        not_linked: Final[bool] = at_top or in_graph
 
         is_list: bool = self.aliases.list_ in obj
         started_list: bool = is_list
 
-        is_bracketed: bool = is_list or via_key == self.aliases.annotation
+        is_bracketed: Final[bool] = is_list or via_key == self.aliases.annotation
 
         subject_started: bool = False
 

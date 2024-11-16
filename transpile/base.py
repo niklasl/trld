@@ -71,6 +71,7 @@ class Transpiler(ast.NodeVisitor):
     selfarg: Optional[str] = None
     this: str
     public: str
+    constant: Optional[str] = None
     protected = ''
     declaring: Optional[str] = None
     none: str
@@ -1031,7 +1032,7 @@ class Transpiler(ast.NodeVisitor):
             return self._map_call(expr, isowner=isowner)
 
         elif isinstance(expr, ast.Subscript):
-            return self._map_subscript(expr, annot=annot)
+            return self._map_subscript(expr, annot=annot, assignedto=assignedto)
 
         elif isinstance(expr, ast.Compare):
             left = self.repr_expr(expr.left)
@@ -1248,7 +1249,7 @@ class Transpiler(ast.NodeVisitor):
 
         return self.map_isinstance(v, c)
 
-    def _map_subscript(self, expr, annot) -> ReprAndType:
+    def _map_subscript(self, expr, annot, assignedto=None) -> ReprAndType:
         owner, ownertype = self.repr_expr_and_type(expr.value, annot=annot)
 
         if isinstance(expr.slice, ast.Slice):
@@ -1279,9 +1280,12 @@ class Transpiler(ast.NodeVisitor):
         tname = self.types.get(tname, tname)
 
         if annot:
-            if isinstance(expr.value, ast.Name) and expr.value.id == 'Optional' \
-                    and self.optional_type_form:
-                return self.optional_type_form.format(tname), None
+            if isinstance(expr.value, ast.Name):
+                if expr.value.id == 'Optional' and self.optional_type_form:
+                    return self.optional_type_form.format(tname), None
+                elif expr.value.id == 'Final' and self.constant:
+                    texpr = f"{self.constant} {tname}" if assignedto else tname
+                    return texpr, None
 
             # TODO: unhack the static_annotation_form and cleantype juggling
             if isinstance(expr.value, ast.Name) and expr.value.id == 'ClassVar' \
