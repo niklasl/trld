@@ -1,0 +1,90 @@
+prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+prefix owl: <http://www.w3.org/2002/07/owl#>
+prefix skos: <http://www.w3.org/2004/02/skos/core#>
+prefix sdo: <https://schema.org/>
+prefix bf: <http://id.loc.gov/ontologies/bibframe/>
+prefix gf: <http://example.org/term/gf/>
+prefix rda: <http://example.org/term/rda/>
+
+<tbox> {
+
+    _:TextContent a owl:Restriction ;
+      owl:onProperty bf:content ;
+      owl:hasValue rda:Text .
+
+    bf:Text rdfs:subClassOf _:TextContent .
+
+    gf:Newspaper skos:broader gf:Periodical .
+
+    [] owl:equivalentClass sdo:Periodical ;
+        owl:intersectionOf (
+                bf:Serial
+                [ a owl:Restriction ;
+                    owl:onProperty bf:genreForm ;
+                    owl:hasValue gf:Periodical ]
+            ) .
+
+    # TODO: differentiate from sdo:PublicationVolume ...
+    [] owl:equivalentClass sdo:PublicationIssue ;
+        owl:intersectionOf (
+                bf:Text
+                # bf:Monograph
+                [ a owl:Restriction ;
+                    owl:onProperty bf:genreForm ;
+                    owl:hasValue gf:Periodical ]
+                [ a owl:Restriction ;
+                    owl:onProperty bf:issuance ;
+                    owl:hasValue bf:Monograph ]
+            ) .
+
+    [] owl:equivalentClass sdo:Atlas ;
+        owl:intersectionOf (
+            bf:Cartography
+            [ owl:onProperty bf:genreForm ;
+                owl:hasValue gf:Book ]
+            [ owl:onProperty bf:content ;
+                owl:hasValue rda:Text ]
+            [ owl:onProperty bf:content ;
+                owl:hasValue rda:CartographicImage ]
+            ) .
+
+}
+
+<newspaperserial/exp> {
+    <newspaperserial> a bf:Serial ;
+        bf:genreForm gf:Newspaper .
+}
+<newspaperserial/cmp> {
+    <newspaperserial> a sdo:Periodical ;
+        bf:genreForm gf:Newspaper .
+}
+
+<periodical/exp> {
+    <periodical> a bf:Serial ;
+        bf:genreForm gf:Periodical .
+}
+<periodical/cmp> {
+    <periodical> a sdo:Periodical .
+}
+
+<publissue/exp> {
+    <publissue> a bf:Text ;
+        bf:issuance bf:Monograph ;
+        bf:content rda:Text ;
+        bf:genreForm gf:Periodical .
+}
+<publissue/cmp> {
+    <publissue> a sdo:PublicationIssue .
+}
+
+
+graph <atlas/cmp> {
+  <atlas> a sdo:Atlas .
+}
+
+graph <atlas/exp> {
+  <atlas> a bf:Cartography ;
+    bf:genreForm gf:Book ;
+    bf:content rda:Text ,
+      rda:CartographicImage .
+}
