@@ -29,12 +29,12 @@ def make_fold_target_map(tbox: Dict[str, Dict], target: Dict) -> Tuple[Dict, Dic
 
     transitivebases: Dict[str, Set[str]] = {}
 
-    target_vocab = target[VOCAB]
+    target_vocab: str = target[VOCAB]
 
     for obj in tbox[GRAPH]:
         target_classes: List[str] = []
         for o in cast(List[Dict], [obj] + as_list(obj.get('owl:equivalentClass', []))):
-            if ID in o and o[ID].startswith(target_vocab):
+            if ID in o and cast(str, o[ID]).startswith(target_vocab):
                 target_classes.append(o[ID])
 
         current_tree: Dict = matchpattern_orderedprop_tree
@@ -253,7 +253,7 @@ def fold_type(
         keeptypes = [
             t
             for t in objtypes
-            if t.startswith(target_vocab) and not matches(transitivebases, newtype, t)
+            if cast(str, t).startswith(target_vocab) and not matches(transitivebases, newtype, t)
         ]
         new_types += keeptypes + as_list(newtype)
 
@@ -356,7 +356,7 @@ def unfold_type(
                 else:
                     out_obj[prop] = value
             elif ID in intersect:
-                it_id = intersect[ID]
+                it_id: str = intersect[ID]
                 if it_id != objtype and not it_id.startswith('_:'):
                     out_obj[TYPE] = it_id
 
