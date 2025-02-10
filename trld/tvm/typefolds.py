@@ -31,44 +31,55 @@ def make_fold_target_map(tbox: Dict[str, Dict], target: Dict) -> Tuple[Dict, Dic
 
     target_vocab: str = target[VOCAB]
 
-    for obj in tbox[GRAPH]:
+    tbox_terms: List[Dict] = cast(List, tbox[GRAPH])
+
+    for obj in tbox_terms:
         target_classes: List[str] = []
-        for o in cast(List[Dict], [obj] + as_list(obj.get('owl:equivalentClass', []))):
+        for o in cast(List[Dict], [obj] + as_list(obj.get('owl:equivalentClass'))):
             if ID in o and cast(str, o[ID]).startswith(target_vocab):
                 target_classes.append(o[ID])
 
         current_tree: Dict = matchpattern_orderedprop_tree
 
         rule: Optional[Dict] = None
-        intersections: Optional[Dict] = obj.get('owl:intersectionOf')
 
-        if intersections is None and ID in obj and obj.get(TYPE) == 'owl:Restriction':
-            intersections = {LIST: [obj]}
+        tbox_index: Dict[str, Dict] = _make_tbox_index(tbox_terms)
 
-        if isinstance(intersections, Dict) and LIST in intersections:
-            for o in intersections[LIST]:
-                if 'owl:onProperty' in o:
-                    prop = o['owl:onProperty'][ID]
-                    by_pred: Dict = current_tree.setdefault('matchByPredicate', {})
-                    valuematch: Dict = by_pred.setdefault(prop, {})
-                    if 'owl:hasValue' not in o:
-                        continue
-                    value = o['owl:hasValue']
-                    rule = {}
-                    if ID in value:
-                        by_id: Dict = valuematch.setdefault('byId', {})
-                        by_id[value[ID]] = rule
+        # TODO: this is is currently very brittle, only matching structures
+        # verbatim (including relying on intersection *order*: type,
+        # prop-pattern, ...).
+        for o in get_shallow_intersections(obj):
 
-                    current_tree = rule
-                elif ID in o:
-                    by_type: Dict = current_tree.setdefault('matchByType', {})
-                    subtree: Dict = by_type.setdefault(o[ID], {})
-                    current_tree = subtree
+            mapped = _get_mapped(tbox_index, o)
+            if 'owl:onProperty' not in mapped:
+                for equiv in as_list(mapped.get('owl:equivalentClass')):
+                    equiv = _get_mapped(tbox_index, equiv)
+                    if 'owl:onProperty' in equiv:
+                        mapped = equiv
+                        break
 
-            if rule is not None and target_classes:
-                rule['targetClass'] = (
-                    target_classes[0] if len(target_classes) == 1 else target_classes
-                )
+            if 'owl:onProperty' in mapped:
+                prop = mapped['owl:onProperty'][ID]
+                by_pred: Dict = current_tree.setdefault('matchByPredicate', {})
+                valuematch: Dict = by_pred.setdefault(prop, {})
+                if 'owl:hasValue' not in mapped:
+                    continue
+                value = mapped['owl:hasValue']
+                rule = {}
+                if ID in value:
+                    by_id: Dict = valuematch.setdefault('byId', {})
+                    by_id[value[ID]] = rule
+
+                current_tree = rule
+            elif ID in o:
+                by_type: Dict = current_tree.setdefault('matchByType', {})
+                subtree: Dict = by_type.setdefault(o[ID], {})
+                current_tree = subtree
+
+        if rule is not None and target_classes:
+            rule['targetClass'] = (
+                target_classes[0] if len(target_classes) == 1 else target_classes
+            )
 
         if ID in obj:
             for key in BROADER:
@@ -92,6 +103,29 @@ def make_fold_target_map(tbox: Dict[str, Dict], target: Dict) -> Tuple[Dict, Dic
                             bases.add(obj[ID])
 
     return matchpattern_orderedprop_tree, transitivebases
+
+
+def get_shallow_intersections(obj) -> List:
+        intersections: Optional[Dict] = obj.get('owl:intersectionOf')
+
+        if intersections is None and ID in obj and obj.get(TYPE) == 'owl:Restriction':
+            intersections = {LIST: [obj]}
+
+        if isinstance(intersections, Dict) and LIST in intersections:
+            return intersections[LIST]
+        else:
+            return []
+
+
+def _make_tbox_index(tbox_terms: List[Dict]) -> Dict[str, Dict]:
+    tbox_index: Dict[str, Dict] = {}
+
+    for term in tbox_terms:
+        if ID in term:
+            term_id = cast(str, term[ID])
+            tbox_index[term_id] = term
+
+    return tbox_index
 
 
 def make_tbox_equivalency_map(tbox: Dict[str, Dict]) -> Dict[str, Dict]:
@@ -331,7 +365,7 @@ def _get_mapped(obj_map: Dict[str, Dict], obj: Dict) -> Dict:
 
 
 def unfold_type(
-    tbox_map: Dict[str, Dict],
+    tbox_eq_map: Dict[str, Dict],
     transitivebases: Dict[str, Set[str]],
     target_vocab: str,
     obj: Dict,
@@ -339,12 +373,12 @@ def unfold_type(
 ) -> Dict:
     out_obj = obj.copy()
     for objtype in as_list(obj[TYPE]):
-        typedfn = tbox_map.get(objtype)
+        typedfn = tbox_eq_map.get(objtype)
         if not isinstance(typedfn, Dict):
             continue
 
         # TODO: precompute target type + intersection set (it + baseclasses)
-        for intersect in get_intersections(tbox_map, typedfn):
+        for intersect in get_intersections(tbox_eq_map, typedfn):
             if 'owl:onProperty' in intersect and 'owl:hasValue' in intersect:
                 prop = intersect['owl:onProperty'][ID]
                 value = intersect['owl:hasValue']

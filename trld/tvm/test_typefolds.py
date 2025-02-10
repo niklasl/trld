@@ -81,7 +81,7 @@ def test_typefolds():
     )
     #print(json.dumps(matchpattern_orderedprop_tree, indent=2))
 
-    tbox_map = make_tbox_equivalency_map(tbox)
+    tbox_eq_map = make_tbox_equivalency_map(tbox)
 
     for name, boxmap in aboxes.items():
         print("Test", name)
@@ -99,7 +99,7 @@ def test_typefolds():
         print()
 
         unfolded = [
-            unfold_type(tbox_map, transitivebases, target[VOCAB], obj)
+            unfold_type(tbox_eq_map, transitivebases, target[VOCAB], obj)
             for obj in folded
         ]
 
