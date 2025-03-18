@@ -59,7 +59,10 @@ def process_source(source, args, ordered=True):
                 context_ref = _absolutize(context_ref)
 
             context = get_context(context_ref)
-            result = compact(context, result, base_iri, ordered=ordered)
+
+            # TODO: Explicit flag instead of assuming data is already compacted?
+            if args.expand_context:
+                result = compact(context, result, base_iri, ordered=ordered)
 
             if isinstance(context_ref, dict) and CONTEXT in context_ref:
                 result[CONTEXT] = context_ref[CONTEXT]
