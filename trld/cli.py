@@ -4,11 +4,12 @@ import os
 import sys
 
 from .platform.common import json_encode
-from .jsonld.keys import CONTEXT
+from .jsonld.keys import CONTAINER, CONTEXT, TYPE
 from .jsonld.compaction import compact
 from .jsonld.context import get_context
 from .jsonld.docloader import set_document_loader, any_document_loader
 from .jsonld.expansion import expand
+from .jsonld.extras.contexts import to_simple_context
 from .jsonld.flattening import flatten
 from .api import parse_rdf, serialize_rdf
 
@@ -76,6 +77,26 @@ def process_source(source, args, ordered=True):
         traceback.print_exc()
 
 
+def process_linestream(args, stream):
+    container_context = {}
+
+    if args.context:
+        context = get_context(_absolutize(args.context))
+
+        # Hack to get compact terms but supress prefix declarations in trig output.
+        container_context[CONTEXT] = {
+            key: {CONTAINER: term.container, TYPE: term.type_mapping}
+            for key, term in context.terms.items()
+        }
+
+        ctx = to_simple_context(context)
+        # Print prefix declarations
+        process_source({CONTEXT: ctx}, args)
+
+    for l in stream:
+        process_source(json.loads(l) | container_context, args)
+
+
 def _absolutize(context_ref: str) -> str:
     if '://' not in context_ref and os.path.exists(context_ref):
         return os.path.abspath(context_ref)
@@ -105,8 +126,7 @@ def main():
     sources = args.source or ['-']
 
     if args.input_format in ('ndjson', 'jsonl'):
-        for l in sys.stdin:
-            process_source(json.loads(l), args)
+        process_linestream(args, sys.stdin)
     else:
         for source in sources:
             if len(sources) > 1:
