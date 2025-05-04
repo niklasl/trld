@@ -79,22 +79,27 @@ def flatten(element: JsonObject, ordered=False, bnodes: Optional[BNodes] = None)
 
 
 def make_node_map(bnodes: BNodes,
-        element,
+        in_element: object,
         node_map: NodeMap,
         active_graph: str = DEFAULT,
         active_subject: Optional[Union[str, JsonMap]] = None,
         active_property: Optional[str] = None,
         list_map: Optional[Dict[str, JsonObject]] = None):
+    # TODO: See <https://github.com/w3c/json-ld-api/issues/549> about problems below.
+
     # 1)
-    if isinstance(element, List):
-        for item in element:
+    if isinstance(in_element, List):
+        for item in in_element:
             # 1.1)
             make_node_map(bnodes, item, node_map, active_graph, active_subject,
                           active_property, list_map)
         return
 
     # 2)
-    assert isinstance(element, Dict)
+    assert isinstance(in_element, Dict)
+    # FIXME: Errata? Otherwise, this algorithm mutates the input.
+    element = dict(in_element)
+
     # TODO: spec problem; seems to expect node_map[active_graph] to already be
     # set?
     graph: JsonMap = node_map.setdefault(active_graph, {})
