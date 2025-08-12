@@ -18,7 +18,7 @@ from . import parser
 class TestCase(NamedTuple):
     ttype: str
     taction: str
-    tresult: str
+    tresult: str | None
 
 
 def read_manifest(manifest_path) -> Iterator[TestCase]:
