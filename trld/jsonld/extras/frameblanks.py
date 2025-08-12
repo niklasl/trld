@@ -13,6 +13,7 @@ def frameblanks(doc: JsonObject) -> JsonObject:
     if isinstance(data, Dict):
         if GRAPH in data:
             data = data[GRAPH]
+
     items: List = data if isinstance(data, List) else [data] if data is not None else []
 
     index: IndexType = OrderedDict()
@@ -23,6 +24,7 @@ def frameblanks(doc: JsonObject) -> JsonObject:
         assert isinstance(item, Dict)
         if GRAPH in item:
             graphs.append(item)
+            frameblanks(item)
         else:
             visit_node(index, item, None)
 
