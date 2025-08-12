@@ -27,6 +27,7 @@ def process_source(source, args):
     ordered = args.sorted
 
     context_ref = args.context
+    expand_context = args.expand_context
 
     base_iri = (
         args.base if args.base
@@ -41,10 +42,12 @@ def process_source(source, args):
         else:
             data = parse_rdf(source, args.input_format)
 
-        if args.expand_context:
-            expand_context = (
-                None if args.expand_context == True else args.expand_context
-            )
+        if expand_context:
+            if expand_context == True:
+                expand_context = None
+            elif isinstance(expand_context, str):
+                expand_context = _absolutize(args.expand_context)
+
             result = expand(data, base_iri, expand_context, ordered=ordered)
         else:
             result = data
@@ -61,9 +64,14 @@ def process_source(source, args):
                 context_ref = _absolutize(context_ref)
 
             context = get_context(context_ref)
+            if args.base is not None:
+                context.base_iri = args.base
 
             # TODO: Explicit flag instead of assuming data is already compacted?
             if args.expand_context:
+                if args.context is True:
+                    context_ref = {CONTEXT: to_simple_context(context)}
+                context = get_context(context_ref)
                 result = compact(context, result, base_iri, ordered=ordered)
 
             if isinstance(context_ref, dict) and CONTEXT in context_ref:
@@ -121,6 +129,8 @@ def make_argsparser():
                         help='Set the base IRI (default is current source)')
     argparser.add_argument('-f', '--flatten', action='store_true')
     argparser.add_argument('-B', '--embed-blanks', action='store_true')
+    argparser.add_argument('-r', '--recompact', action='store_true',
+                        help='Re-compact input into a Turtle-like shape (same as -e -f -c -B)')
     argparser.add_argument('-s', '--sorted', action='store_true')
 
     return argparser
@@ -128,6 +138,12 @@ def make_argsparser():
 
 def main():
     args = make_argsparser().parse_args()
+
+    if args.recompact:
+        args.expand_context = True
+        args.flatten = True
+        args.context = True
+        args.embed_blanks = True
 
     sources = args.source or ['-']
 
