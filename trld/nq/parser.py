@@ -37,6 +37,7 @@ def load(dataset: RdfDataset, inp: Input):
     datatype: Optional[str] = None
     language: Optional[str] = None
     terms: List[RdfObject] = []
+    passed_dot = False
 
     for c in cast(Iterable[Char], inp.characters()):
         if READ_ESCAPES.handle_escape(c):
@@ -48,6 +49,12 @@ def load(dataset: RdfDataset, inp: Input):
         if state == READ_LITERAL_FINISH:
             assert literal is not None
             terms.append(RdfLiteral(literal, datatype, language))
+
+            if passed_dot:
+                handle_statement(dataset, terms)
+                terms = []
+                passed_dot = False
+
             literal = datatype = language = None
             state = READ_STMT
 
@@ -87,10 +94,13 @@ def load(dataset: RdfDataset, inp: Input):
                 chars = []
                 continue
         elif state == READ_BNODE_ID:
-            if c.isspace():
+            if c.isspace() or c == '.':
                 terms.append(''.join(chars))
                 chars = []
                 state = READ_STMT
+                if c == '.':
+                    handle_statement(dataset, terms)
+                    terms = []
                 continue
         elif state == READ_STRING:
             if c == '"':
@@ -107,12 +117,16 @@ def load(dataset: RdfDataset, inp: Input):
                 continue
             else:
                 state = READ_LITERAL_FINISH
+                if c == '.':
+                    passed_dot = True
                 continue
         elif state == READ_LANGUAGE:
             if c.isspace():
                 language = ''.join(chars)
                 chars = []
                 state = READ_LITERAL_FINISH
+                if c == '.':
+                    passed_dot = True
                 continue
         elif state == READ_DATATYPE_START:
             if c == '^':
