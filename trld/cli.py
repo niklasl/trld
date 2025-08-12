@@ -21,8 +21,10 @@ def printerr(msg):
     print(msg, file=sys.stderr)
 
 
-def process_source(source, args, ordered=True):
+def process_source(source, args):
     source_is_data = isinstance(source, (dict, list))
+
+    ordered = args.sorted
 
     context_ref = args.context
 
@@ -119,6 +121,7 @@ def make_argsparser():
     argparser.add_argument('-B', '--embed-blanks', action='store_true')
     argparser.add_argument('-i', '--input-format', help='Set RDF input format')
     argparser.add_argument('-o', '--output-format', help='Set RDF output format')
+    argparser.add_argument('-s', '--sorted', action='store_true')
 
     return argparser
 
