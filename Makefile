@@ -24,6 +24,10 @@ cache/trig-tests: cache/trig-tests.tar.gz
 	mkdir -p $@
 	tar -xzf $^ -C $@
 
+pytestreport: | cache/json-ld-api
+	python3 -m trld.jsonld.test cache/json-ld-api/tests/expand-manifest.jsonld cache/json-ld-api/tests/compact-manifest.jsonld cache/json-ld-api/tests/flatten-manifest.jsonld cache/json-ld-api/tests/fromRdf-manifest.jsonld cache/json-ld-api/tests/toRdf-manifest.jsonld --reports-dir build/reports 2>&1 | grep '^Running test suite\|^Ran '
+	cd build/reports; for fname in *-report.jsonld; do python3 -m trld $$fname -o ttl > $${fname%.jsonld}.ttl; done
+
 pytest: | cache/json-ld-api cache/trig-tests
 	mypy trld/
 	find trld -name '*.py' | xargs grep -l '^\s*>>> ' | sed 's/\.py\>//; s!/!.!g'| xargs -n1 python3 -m

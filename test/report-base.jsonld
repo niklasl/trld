@@ -1,0 +1,34 @@
+{
+  "@context": {
+    "xsd": "http://www.w3.org/2001/XMLSchema#",
+    "earl": "http://www.w3.org/ns/earl#",
+    "dct": "http://purl.org/dc/terms/",
+    "doap": "http://usefulinc.com/ns/doap#",
+    "foaf": "http://xmlns.com/foaf/spec/#",
+    "date": {"@id": "dct:date", "@type": "xsd:date"},
+    "@base": "https://w3c.github.io/json-ld-api/tests/"
+  },
+  "@graph": [
+    {
+      "@id": "https://github.com/niklasl/trld",
+      "@type": [ "doap:Project", "earl:TestSubject", "earl:Software" ],
+      "doap:name": "TRLD",
+      "doap:homepage": {"@id": "https://github.com/niklasl/trld"},
+      "doap:license": {"@id": "https://spdx.org/licenses/0BSD"},
+      "doap:description": {
+        "@value": "TRLD is a transpilable implementation of algorithms for working with Linked Data as JSON-LD. This includes translating to and from various RDF syntaxes, and mapping of vocabularies.",
+        "@language": "en"
+      },
+      "doap:programming-language": "Python",
+      "doap:developer": {"@id": "https://neverspace.net/id#self"},
+      "dct:title": "TRLD",
+      "dct:creator": {"@id": "https://neverspace.net/id#self"}
+    },
+    {
+      "@id": "https://neverspace.net/id#self",
+      "@type": [ "foaf:Person", "earl:Assertor" ],
+      "foaf:name": "Niklas Lindström",
+      "foaf:homepage": {"@id": "https://neverspace.net/"}
+    }
+  ]
+}
