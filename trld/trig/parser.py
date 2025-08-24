@@ -98,6 +98,10 @@ class BaseParserState(ParserState):
             if sym in self.context:
                 sym = cast(str, self.context[VOCAB]) + sym
             return sym
+
+        if ID not in value:
+            raise NotationError(f'Unexpected symbol: {value!r}')
+
         return value[ID]
 
 
@@ -363,14 +367,16 @@ class ReadLiteral(ReadTerm):
             self.value = None
             return self, None
         elif self.value is not None:
-            if self.prev_dt_start:
+            if self.prev_dt_start > 0:
                 self.no_after_literal('Datatype', prev_value)
                 if c == '^':
-                    assert self.prev_dt_start == 1
+                    if self.prev_dt_start != 1:
+                        raise NotationError(f"Expected '^' got {c!r}")
                     self.prev_dt_start = 2
                     return self, None
                 else:
-                    assert self.prev_dt_start == 2
+                    if self.prev_dt_start != 2:
+                        raise NotationError(f"Expected '^' got {c!r}")
                     self.prev_dt_start = 0
                     return ReadSymbol(self).consume(c, None)
 
@@ -385,12 +391,17 @@ class ReadLiteral(ReadTerm):
                 return ReadLanguage(self), None
 
             value = {VALUE: self.value}
-            if prev_value:
+            if prev_value is not None:
                 if isinstance(prev_value, Dict) and LANGUAGE in prev_value:
                     value.update(prev_value)
                 else:
-                    assert isinstance(prev_value, Dict)
-                    value[TYPE] = self.symbol(prev_value)
+                    if not isinstance(prev_value, Dict):
+                        raise NotationError(f"Expected datatype IRI, got {prev_value!r}")
+                    assert self.prev_dt_start == 0
+                    dtype = self.symbol(prev_value)
+                    if dtype == '':
+                        raise NotationError(f'Literal datatype must not be empty')
+                    value[TYPE] = dtype
 
             return self.parent.consume(c, value)
 
@@ -435,6 +446,8 @@ class ReadLanguage(ReadTerm):
             self.collect(c)
             return self, None
         else:
+            if len(self.collected) == 0:
+                raise NotationError(f'Language tags must not be empty')
             value = self.pop()
             self.collected = []
             return self.parent.consume(c, {LANGUAGE: value})
@@ -620,7 +633,8 @@ class ReadNode(ReadCompound):
             self.open_brace = True
             return self, None
         elif c == '|':
-            assert self.open_brace
+            if not self.open_brace:
+                raise NotationError(f'Unexpected: {c!r}')
             self.open_brace = False
             return ReadAnnotation(self), None
         elif c == '[':
@@ -630,6 +644,8 @@ class ReadNode(ReadCompound):
         elif c == ';':
             if self.node is None:
                 raise NotationError(f'Unexpected: {c!r}')
+            if self.p is not None and self.last_value is None:
+                raise NotationError(f'Missing triple object')
             self.p = None
             self.last_value = None
             return self, None
@@ -678,10 +694,14 @@ class ReadAnnotation(ReadBNode): # TODO: Factor out ReadNodeBase
             self.end_started = True
             return self, None
         elif c == '}':
-            assert self.end_started
+            if not self.end_started:
+                raise NotationError(f'Unexpected: {c!r}')
             self.end_started = False
             return self.parent, {ANNOTATION: self.node}
         else:
+            if self.end_started:
+                raise NotationError(f'Unexpected: {c!r}')
+
             return self.consume_node_char(c)
 
 
@@ -830,7 +850,9 @@ def parse(inp: Input) -> object:
 
         cno += 1
 
-        assert next_state is not None
+        if next_state is None:
+            raise NotationError(f'Unexpected')
+
         state = next_state
 
     endstate, result = state.consume(EOF, value)
