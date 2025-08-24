@@ -644,8 +644,7 @@ class ReadNode(ReadCompound):
         elif c == ';':
             if self.node is None:
                 raise NotationError(f'Unexpected: {c!r}')
-            if self.p is not None and self.last_value is None:
-                raise NotationError(f'Missing triple object')
+            self.check_complete()
             self.p = None
             self.last_value = None
             return self, None
@@ -656,6 +655,10 @@ class ReadNode(ReadCompound):
             return ReadLiteral(self, c), None
         else:
             return ReadSymbol(self).consume(c, None)
+
+    def check_complete(self) -> None:
+        if self.p is not None and self.last_value is None:
+            raise NotationError(f'Missing triple object')
 
 
 class ReadBNode(ReadNode):
@@ -675,6 +678,7 @@ class ReadBNode(ReadNode):
         if c == EOF:
             raise NotationError(f'Unexpected {c!r} in bnode.')
         elif c == ']':
+            self.check_complete()
             return self.parent, self.node
         else:
             return self.consume_node_char(c)
@@ -697,6 +701,7 @@ class ReadAnnotation(ReadBNode): # TODO: Factor out ReadNodeBase
             if not self.end_started:
                 raise NotationError(f'Unexpected: {c!r}')
             self.end_started = False
+            self.check_complete()
             return self.parent, {ANNOTATION: self.node}
         else:
             if self.end_started:
