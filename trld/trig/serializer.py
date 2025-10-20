@@ -142,11 +142,12 @@ class SerializerState:
 
     def prelude(self, prefixes: Dict[str, str]):
         for k, v in prefixes.items():
-            if k == BASE:
-                self.write_base(v)
-            else:
-                self.writeln(f'{self.prefix_keyword} {k}: <{v}>')
-        if self.base_iri:
+            self.writeln(f'{self.prefix_keyword} {k}: <{v}>')
+
+        base_iri: object = self.context.get(BASE)
+        if isinstance(base_iri, str):
+            self.write_base(base_iri)
+        elif self.base_iri:
             self.write_base(self.base_iri)
         if self.settings.prologue_end_line > 1:
             self.writeln()
@@ -697,6 +698,9 @@ def collect_prefixes(context: Optional[object]) -> Dict[str, str]:
 
     prefixes = {}
     for key, value in cast(StrObject, context).items():
+        if key == BASE:
+            continue
+
         if isinstance(value, str) and value[-1] in PREFIX_DELIMS:
             prefixes['' if key == VOCAB else key] = value
         elif isinstance(value, Dict) and value.get(PREFIX) == True:
