@@ -277,7 +277,14 @@ class SerializerState:
             index_key: Optional[str] = self.index_key_for(key)
             if index_key is not None:
                 key = index_key
-                vo = list(vo.values()) if isinstance(vo, Dict) else vo
+                if isinstance(vo, Dict):
+                    items: List[object] = []
+                    for iv in vo.values():
+                        if isinstance(iv, List):
+                            items += iv
+                        else:
+                            items.append(iv)
+                    vo = items
 
             term = self.term_for(key)
 
