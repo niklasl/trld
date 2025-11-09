@@ -586,7 +586,8 @@ class SerializerState:
             return ":" + ref
 
         if VOCAB in self.context and ref.startswith(cast(str, self.context[VOCAB])):
-            return ":" + ref[len(cast(str, self.context[VOCAB])) :]
+            v_local = ref[len(cast(str, self.context[VOCAB])) :]
+            return ":" + self.escape_pname_local(v_local)
 
         ref = self.clean_value(ref)
 
