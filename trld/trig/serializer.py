@@ -305,7 +305,7 @@ class SerializerState:
             vs: List = vo if isinstance(vo, List) else [vo] if vo is not None else []
             vs = cast(List, [x for x in vs if x is not None])
 
-            if len(vs) == 0: # TODO: and not @list
+            if len(vs) == 0 and not is_list:
                 continue
 
             if self.is_lang_container(key):
