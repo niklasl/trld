@@ -59,7 +59,7 @@ def process_source(source, args):
 
         if context_ref:
             if context_ref is True:
-                context_ref = data
+                context_ref = data if isinstance(data, dict) and CONTEXT in data else {}
             elif isinstance(context_ref, str):
                 context_ref = _absolutize(context_ref)
 
@@ -69,8 +69,8 @@ def process_source(source, args):
 
             # TODO: Explicit flag instead of assuming data is already compacted?
             if args.expand_context:
-                if args.context is True:
-                    context_ref = {CONTEXT: to_simple_context(context)}
+                if args.context is True and expand_context:
+                    context_ref = {CONTEXT: to_simple_context(get_context(expand_context))}
                 context = get_context(context_ref)
                 result = compact(context, result, base_iri, ordered=ordered)
 
@@ -93,7 +93,7 @@ def process_source(source, args):
 def process_linestream(args, stream):
     container_context = {}
 
-    if args.context:
+    if isinstance(args.context, str):
         context = get_context(_absolutize(args.context))
 
         # Hack to get compact terms but supress prefix declarations in trig output.
@@ -140,9 +140,9 @@ def main():
     args = make_argsparser().parse_args()
 
     if args.recompact:
-        args.expand_context = True
+        args.expand_context = args.expand_context if isinstance(args.expand_context, str) else True
         args.flatten = True
-        args.context = True
+        args.context = args.context if isinstance(args.context, str) else True
         args.embed_blanks = True
 
     sources = args.source or ['-']
