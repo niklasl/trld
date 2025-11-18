@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 python3 -m trld test/data/examples/misc.trig | python3 -m trld -i jsonld -o trig | python3 -m trld -i trig > /dev/null
 
