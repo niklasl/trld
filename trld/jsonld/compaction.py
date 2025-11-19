@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Set, Union, cast
+from typing import Dict, Iterable, List, Optional, Set, Union, cast
 
 from ..platform.common import warning
 from .context import Context, InvalidNestValueError, Term, get_context
@@ -125,8 +125,17 @@ def compaction(
                 active_context = typeterm.get_local_context(current_active_context, False)
 
     # 12)
-    for expanded_property, expanded_value in cast(Dict[str, JsonObject], element).items():
+    element_keys: Iterable[str] = element.keys()
+    if ordered:
+        element_keys = sorted(element_keys)
+
+    expanded_value: JsonObject
+
+    for expanded_property in element_keys:
+        expanded_value = element[expanded_property]
+
         compacted_value: Optional[str] = None
+
         # TODO: [5f594ad1] spec improvement; do this once
         alias: str = iri_compaction(active_context, expanded_property, expanded_value)
         alias_term: Optional[Term] = active_context.terms.get(alias)
@@ -227,10 +236,7 @@ def compaction(
             add_value_as_list(nest_result, item_active_property, [])
 
         # 12.8)
-        expanded_value = as_list(expanded_value)
-        assert isinstance(expanded_value, List)
-
-        for expanded_item in expanded_value:
+        for expanded_item in as_list(expanded_value):
             # 12.8.1)
             item_active_property = iri_compaction(active_context, expanded_property, expanded_item, vocab=True, reverse=inside_reverse)
             item_active_term = active_context.terms.get(item_active_property)

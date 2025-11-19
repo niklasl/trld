@@ -5,19 +5,29 @@ import java.util.function.Function;
 
 public class Builtins {
 
-    public static List sorted(Collection items) {
+    public static List sorted(Iterable items) {
         return sorted(items, false);
     }
 
-    public static List sorted(Collection items, boolean reversed) {
+    public static List sorted(Iterable items, boolean reversed) {
         return sorted(items, null, false);
     }
 
-    public static List sorted(Collection items, Function<Object, Comparable> getKey, boolean reversed) {
-        List result = new ArrayList(items.size());
-        result.addAll(items);
+    public static List sorted(Iterable items, Function<Object, Comparable> getKey, boolean reversed) {
+        List result;
+        if (items instanceof Collection) {
+          result = new ArrayList(((Collection) items).size());
+          result.addAll((Collection) items);
+        } else {
+          result = new ArrayList();
+          items.forEach(result::add);
+        }
         Comparator cmp = makeComparator(getKey, reversed);
-        Collections.sort(result, cmp);
+        try {
+          Collections.sort(result, cmp);
+        } catch (ClassCastException e) {
+          return result;
+        }
         return result;
     }
 
