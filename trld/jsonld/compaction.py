@@ -374,22 +374,24 @@ def compaction(
                         map_key = _get_map_key_and_deplete_container_key(compacted_item, container_key, as_array)
                 # 12.8.9.7)
                 elif ID in container:
-                    assert isinstance(compacted_item, Dict) # TOOD: check?
-                    map_key = cast(Optional[str], compacted_item.pop(container_key, None))
+                    # NOTE: checking as in previous and next elif branches
+                    if isinstance(compacted_item, Dict):
+                        map_key = cast(Optional[str], compacted_item.pop(container_key, None))
                 # 12.8.9.8)
                 elif TYPE in container:
                     # 12.8.9.8.1)
                     # 12.8.9.8.2)
                     # 12.8.9.8.3)
-                    assert isinstance(compacted_item, Dict) # TOOD: check?
-                    if container_key in compacted_item:
-                        map_key = _get_map_key_and_deplete_container_key(compacted_item, container_key, as_array)
-                    # 12.8.9.8.4)
-                    if len(compacted_item) == 1:
-                        for key, idval in cast(Dict[str, object], compacted_item).items():
-                            if active_context.expand_vocab_iri(key) == ID:
-                                compacted_item = compaction(
-                                        active_context, item_active_property, {ID: idval})
+                    # NOTE: Check instead of assume; as of <https://github.com/w3c/json-ld-api/pull/611/files>
+                    if isinstance(compacted_item, Dict):
+                        if container_key in compacted_item:
+                            map_key = _get_map_key_and_deplete_container_key(compacted_item, container_key, as_array)
+                        # 12.8.9.8.4)
+                        if len(compacted_item) == 1:
+                            for key, idval in cast(Dict[str, object], compacted_item).items():
+                                if active_context.expand_vocab_iri(key) == ID:
+                                    compacted_item = compaction(
+                                            active_context, item_active_property, {ID: idval})
                 # 12.8.9.9)
                 if map_key is None:
                     map_key = iri_compaction(active_context, NONE)
