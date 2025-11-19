@@ -403,7 +403,8 @@ class JavaTranspiler(CStyleTranspiler):
             lower = '0'
         if upper:
             upper = self._get_upper_key(upper, owner)
-            return f'({owner}.length() >= {lower} ? {owner}.substring({lower}, {upper}) : "")'
+            minlength = '2' if lower != '0' and upper.endswith('- 1') else lower
+            return f'({owner}.length() >= {minlength} ? {owner}.substring({lower}, {upper}) : "")'
         return f'({owner}.length() >= {lower} ? {owner}.substring({lower}) : "")'
 
     def _get_upper_key(self, key, owner, ownertype=None):
