@@ -82,6 +82,14 @@ def process_source(source, args):
 
             result = frameblanks(result)
 
+        if args.sorted:
+            if isinstance(result, dict):
+                ctx = result.get(CONTEXT)
+                if isinstance(ctx, dict):
+                    result[CONTEXT] = dict(sorted(ctx.items()))
+
+                result = dict(sorted(result.items()))
+
         serialize_rdf(result, args.output_format, None, context)
 
     except Exception as e:
