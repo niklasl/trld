@@ -84,12 +84,12 @@ class TypeScanner(ast.NodeVisitor):
 
     def visit_Assign(self, node):
         self._transpiler._handle_type_alias(node)
-        name = self.map_name(self._transpiler.repr_annot(node.targets[0]))
+        name = self.map_name(self._transpiler.repr_annot(node.targets[0], instance=True))
         typename = self._transpiler.repr_expr_and_type(node.value)[1]
         self.addtype(name, typename)
 
     def visit_AnnAssign(self, node):
-        name = self.map_name(self.repr_annot(node.target))
+        name = self.map_name(self.repr_annot(node.target, instance=True))
         typename = self.repr_annot(node.annotation)
         self.addtype(name, typename)
 

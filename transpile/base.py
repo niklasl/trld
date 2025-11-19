@@ -433,7 +433,7 @@ class Transpiler(ast.NodeVisitor):
 
     def visit_AnnAssign(self, node):
         typename = self.repr_annot(node.annotation)
-        name = self.repr_annot(node.target)
+        name = self.repr_annot(node.target, instance=True)
         rval = self.repr_expr(node.value) if node.value else None
         self._handle_Assign(node, name, typename, rval)
 
@@ -962,15 +962,17 @@ class Transpiler(ast.NodeVisitor):
         public = self.public if self.typing else ''
         return f'{public}{self.ctor or classname}'
 
-    def repr_annot(self, expr) -> str:
-        return self.repr_expr(expr, annot=True)
+    def repr_annot(self, expr, instance=False) -> str:
+        return self.repr_expr(expr, annot=True, instance=instance)
 
     def repr_expr(self, expr, annot=False, isowner=False, callargs=None,
-            assignedto=None) -> str:
-        return self.repr_expr_and_type(expr, annot, isowner, callargs, assignedto)[0]
+            assignedto=None, instance=False) -> str:
+        expr, etype = self.repr_expr_and_type(expr, annot, isowner, callargs, assignedto, instance=instance)
+        return str(expr)
 
-    def repr_expr_and_type(self, expr, annot=False, isowner=False, callargs=None,
-            assignedto=None) -> ReprAndType:
+    def repr_expr_and_type(
+        self, expr, annot=False, isowner=False, callargs=None, assignedto=None, instance=False
+        ) -> ReprAndType:
         gt = self.types.get
 
         def repr_and_type(r: Union[ReprAndType, str], etype=None) -> ReprAndType:
@@ -1013,7 +1015,7 @@ class Transpiler(ast.NodeVisitor):
             return f'-{expr.operand.n}', t # type: ignore
 
         elif isinstance(expr, ast.Name):
-            name = self.map_name(expr.id, callargs)
+            name = self.map_name(expr.id, callargs, instance=instance)
             return repr_and_type(name)
 
         elif isinstance(expr, ast.Attribute):
@@ -1388,7 +1390,9 @@ class Transpiler(ast.NodeVisitor):
         raise NotImplementedError
 
     # TODO: return ReprAndType at least on callargs (and add types to function_map)!
-    def map_name(self, name: str, callargs: Optional[List[str]] = None) -> str:
+    def map_name(
+        self, name: str, callargs: Optional[List[str]] = None, instance=False
+    ) -> str:
         if name == 'self':
             return self.this
 
@@ -1400,7 +1404,9 @@ class Transpiler(ast.NodeVisitor):
                 return map_repr.format(*callargs)
 
         name = self._type_alias.get(name, name)
-        obj = self.types.get(name) or self.to_attribute_name(name)
+
+        obj = self.types.get(name) if not instance else None
+        obj = obj or self.to_attribute_name(name)
 
         if callargs is not None:
             obj, rtype = self.complete_call(name, obj, callargs)
