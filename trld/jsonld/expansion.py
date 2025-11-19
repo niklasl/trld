@@ -119,7 +119,9 @@ def expansion(active_context: Context,
         # 5.2)
         for item in element:
             # 5.2.1)
-            expanded_item: Optional[JsonObject] = expansion(active_context, active_property, item, base_url, frame_expansion, from_map)
+            expanded_item: Optional[JsonObject] = expansion(
+                active_context, active_property, item, base_url, frame_expansion, ordered, from_map
+            )
             # 5.2.2)
             active_term: Optional[Term] = active_context.terms.get(active_property)
             if active_term is not None and LIST in active_term.container and isinstance(expanded_item, List):
