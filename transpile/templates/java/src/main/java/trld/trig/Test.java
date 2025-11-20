@@ -51,9 +51,12 @@ public class Test {
   }
 
   public static void runTests(String testSuiteDir) {
+    Parser.setUseNativeTypes(false);
+
     int i = 0;
     int failed = 0;
     int passed = 0;
+
     Iterator<TestCase> manifest = readManifest(testSuiteDir + "/manifest.ttl");
     while (manifest.hasNext()) {
       TestCase tcase = manifest.next();

@@ -98,7 +98,7 @@ def make_node_map(bnodes: BNodes,
     # 2)
     assert isinstance(in_element, Dict)
     # FIXME: Errata? Otherwise, this algorithm mutates the input.
-    element = dict(in_element)
+    element: Dict = dict(in_element)
 
     # TODO: spec problem; seems to expect node_map[active_graph] to already be
     # set?

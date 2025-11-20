@@ -198,7 +198,7 @@ class JsTranspiler(CStyleTranspiler):
                          end=' ')
         self.enter_block(None, f'finally', stmts=[f'{var}.close()'], continued=True)
 
-    def map_name(self, name, callargs=None):
+    def map_name(self, name, callargs=None, instance=False):
         if name == 'list':
             if not callargs:
                 return '[]'

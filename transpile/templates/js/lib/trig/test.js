@@ -2,7 +2,7 @@
 
 import { jsonEncodeCanonical } from '../platform/common.js'
 import { Input } from '../platform/io.js'
-import { CONTEXT, GRAPH, ID, TYPE, LIST } from '../jsonld/base.js'
+import { CONTEXT, GRAPH, ID, TYPE, LIST } from '../jsonld/keys.js'
 import { expand } from '../jsonld/expansion.js'
 import { compact } from '../jsonld/compaction.js'
 import { flatten } from '../jsonld/flattening.js'

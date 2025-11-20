@@ -3,7 +3,7 @@ import os from 'os'
 
 import { anyDocumentLoader, setDocumentLoader } from '../lib/jsonld/docloader.js'
 import * as context from '../lib/jsonld/context.js'
-import { JSONLD10, CONTEXT, ID, TYPE } from '../lib/jsonld/base.js'
+import { JSONLD10, CONTEXT, ID, TYPE } from '../lib/jsonld/keys.js'
 import { expand } from '../lib/jsonld/expansion.js'
 import { compact } from '../lib/jsonld/compaction.js'
 import { flatten } from '../lib/jsonld/flattening.js'
