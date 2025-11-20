@@ -537,6 +537,9 @@ class ReadPrefix(ReadDecl):
 
     def more_parts(self, value: Dict) -> bool:
         if self.pfx is None:
+            if SYMBOL not in value:
+                raise NotationError(f'Invalid prefix {value!r}')
+
             pfx = cast(str, value[SYMBOL])
             if pfx != '':
                 if pfx.endswith(':'):
@@ -552,7 +555,8 @@ class ReadPrefix(ReadDecl):
         return False
 
     def declare(self) -> None:
-        assert self.ns is not None
+        if self.ns is None:
+            raise NotationError(f'Missing namespace for prefix {self.pfx}')
 
         ns: Union[str, Dict[str, object]] = self.ns
         if self.pfx != '' and self.ns != '' and not self.ns[-1] in PREFIX_DELIMS:
@@ -778,7 +782,9 @@ class ReadNodes(ReadNode):
                 prev_value = prev_str
 
             if self.node is None:
-                assert isinstance(prev_value, Dict)
+                if not isinstance(prev_value, Dict) or VALUE in prev_value:
+                    raise NotationError(f'Unexpected node: {prev_value!r}.')
+
                 self.node = self.node_with_id(prev_value)
             else:
                 if self.p is None and self.expect_graph and self.node is not None:
