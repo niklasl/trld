@@ -35,6 +35,8 @@ def read_manifest(manifest_path) -> Iterator[TestCase]:
 
 
 def run_tests(test_suite_dir: Union[str, Path]):
+    parser.set_use_native_types(False)
+
     test_suite_dir = Path(test_suite_dir)
 
     i = 0
@@ -50,8 +52,9 @@ def run_tests(test_suite_dir: Union[str, Path]):
         inp = Input(str(trig_path))
         try:
             result = cast(Dict, parser.parse(inp))
-            assert result is not None
-        except Exception as e:
+            if result is None:
+                raise parser.NotationError('Empty result')
+        except (parser.NotationError, parser.ParserError) as e:
             if negative:
                 passed += 1
             else:
@@ -64,7 +67,8 @@ def run_tests(test_suite_dir: Union[str, Path]):
             elif tresult:
                 nq_path = test_suite_dir / tresult
                 try:
-                    expected = nq_parser.parse(Input(str(nq_path)))
+                    nq_input = Input(str(nq_path))
+                    expected = nq_parser.parse(nq_input, use_native_types=False)
                 except Exception:
                     print(f'Error parsing NQuads {nq_path}')
                     raise
