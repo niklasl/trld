@@ -9,7 +9,7 @@ from ..jsonld.keys import (BASE, CONTEXT, GRAPH, ID, LANGUAGE, LIST, PREFIX,
 from ..jsonld.star import ANNOTATED_TYPE_KEY, ANNOTATION
 from ..platform.common import json_encode
 from ..platform.io import Input
-from ..rdfterms import RDF_TYPE, XSD, XSD_DOUBLE, XSD_INTEGER
+from ..rdfterms import RDF_TYPE, XSD, XSD_BOOLEAN, XSD_DOUBLE, XSD_INTEGER
 
 
 XSD_DECIMAL: str = f'{XSD}decimal'
@@ -49,6 +49,19 @@ EOF = ''
 EXP = {'E', 'e'}
 
 StateResult = Tuple['ParserState', object]
+
+
+# NOTE: Turn this into a stateful setting if this is to be used at runtime.
+_use_native_types = True
+
+
+def set_use_native_types(use: bool) -> None:
+    global _use_native_types
+    _use_native_types = use
+
+
+def get_use_native_types() -> bool:
+    return _use_native_types
 
 
 class NotationError(Exception):
@@ -262,7 +275,10 @@ class ReadSymbol(ReadTerm):
         value: Union[str, bool, Dict] = v
 
         if v in {'true', 'false'}:
-            value = cast(bool, v == 'true')
+            if _use_native_types:
+                value = cast(bool, v == 'true')
+            else:
+                value = {VALUE: v, TYPE: XSD_BOOLEAN}
         elif v == 'a':
             value = TYPE
         elif v not in AT_KEYWORDS:
@@ -335,11 +351,11 @@ class ReadNumber(ReadTerm):
         if self.whole:
             value = f'{self.whole}{self.dot}{value}'
             number: float = float(value)
-            if number.is_integer():
+            if not _use_native_types or number.is_integer():
                 return {VALUE: value, TYPE: XSD_DOUBLE if self.exp else XSD_DECIMAL}
             return number
         else:
-            if len(value) > 1 and value[0] == '+':
+            if not _use_native_types or (len(value) > 1 and value[0] == '+'):
                 return {VALUE: value, TYPE: XSD_INTEGER}
             return int(value)
 
