@@ -93,6 +93,46 @@ def as_list(obj: object) -> List:
 
 
 def relativise_iri(base: str, iri: str) -> str:
+    """
+    Return a relative IRI which when resolved against the base IRI results in the given IRI.
+
+    Examples from JSON-LD test suite:
+    ```
+    >>> baseiri = "https://w3c.github.io/json-ld-api/tests/compact/0066-in.jsonld"
+    >>> relativise_iri(baseiri, "https://w3c.github.io/json-ld-api/tests/compact/link")
+    'link'
+    >>> relativise_iri(baseiri, "https://w3c.github.io/json-ld-api/tests/compact/0066-in.jsonld#fragment-works")
+    '#fragment-works'
+    >>> relativise_iri(baseiri, "https://w3c.github.io/json-ld-api/tests/compact/0066-in.jsonld?query=works")
+    '?query=works'
+    >>> relativise_iri(baseiri, "https://w3c.github.io/json-ld-api/tests/")
+    '../'
+    >>> relativise_iri(baseiri, "https://w3c.github.io/json-ld-api/")
+    '../../'
+    >>> relativise_iri(baseiri, "https://w3c.github.io/json-ld-api/parent")
+    '../../parent'
+    >>> relativise_iri(baseiri, "https://w3c.github.io/json-ld-api/parent#fragment")
+    '../../parent#fragment'
+    >>> relativise_iri(baseiri, "https://w3c.github.io/parent-parent-eq-root")
+    '../../../parent-parent-eq-root'
+    >>> relativise_iri(baseiri, "https://w3c.github.io/still-root")
+    '../../../still-root'
+    >>> relativise_iri(baseiri, "https://w3c.github.io/too-many-dots")
+    '../../../too-many-dots'
+    >>> relativise_iri(baseiri, "https://w3c.github.io/absolute")
+    '../../../absolute'
+    >>> relativise_iri(baseiri, "http://example.org/scheme-relative")
+    'http://example.org/scheme-relative'
+    >>>
+    ```
+
+    Additional examples:
+    ```
+    >>> relativise_iri("http://example.org/abc/", "http://example.org/abc")
+    '../abc'
+    >>>
+    ```
+    """
     if iri.startswith(base + '#'):
         return iri[len(base):]
     if '?' in iri and iri.startswith(base):
@@ -107,11 +147,11 @@ def relativise_iri(base: str, iri: str) -> str:
     leaf: str = iri[iri.rfind('/') + 1:]
     relativeto: List[str] = []
     while '/' in parentbase and not parentbase.endswith(':/'):
-        if iri.startswith(parentbase):
-            relativeto.append(leaf)
-            return '/'.join(relativeto)
         relativeto.append('..')
         parentbase = parentbase[:parentbase.rfind('/')]
+        if iri.startswith(parentbase) and not parentbase.endswith(':/'):
+            relativeto.append(leaf)
+            return '/'.join(relativeto)
 
     return iri
 
