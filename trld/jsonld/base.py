@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Set, Union
+from typing import Dict, List, Optional, Set, Union, cast
 
 from .keys import GRAPH, ID, INDEX
 
@@ -84,10 +84,7 @@ def add_value(map: Dict, key: str, value: object, aslist=False):
         if isinstance(value, List):
             map[key] += value
         else:
-            assert isinstance(map, Dict) # TODO: just for transpile
-            values: object = map[key]
-            assert isinstance(values, List) # TODO: just for transpile
-            assert isinstance(value, object) # TODO: just for transpile
+            values: List = cast(List, map[key])
             values.append(value)
 
 
