@@ -79,35 +79,37 @@ JS-based command-line usage:
 Build requirements:
 
 * Make
-* For Python: Python 3.6+ (and mypy for development)
-* For Java: Java 8+ (uses Gradle Wrapper)
-* For JS: Node 11+ (using ES6 & ESM)
+* For Python: Python >=3.10,<3.14 (plus mypy and pytest for development)
+* For Java: Java 11+ (uses Gradle Wrapper)
+* For JS: Node 20+ (using ES6 & ESM)
 
-For Python, this runs mypy and the test suite:
+*Note: TRLD runs well on Python 3.14, but the transpiler does not (yet).*
+
+For Python, this runs mypy, pytest and the test suite:
 
     $ make pytest
     [...]
 
     python3 -m trld.jsonld.test [...]
     Running test suite: cache/json-ld-api/tests/expand-manifest.jsonld
-    Ran 371 test cases. Passed: 367. Failed: 3. Errors: 1.
+    Ran 376 test cases. Passed: 371. Failed: 4. Errors: 1.
     Running test suite: cache/json-ld-api/tests/compact-manifest.jsonld
-    Ran 242 test cases. Passed: 239. Failed: 2. Errors: 1.
+    Ran 244 test cases. Passed: 241. Failed: 3. Errors: 0.
     Running test suite: cache/json-ld-api/tests/flatten-manifest.jsonld
     Ran 55 test cases. Passed: 55. Failed: 0. Errors: 0.
     Running test suite: cache/json-ld-api/tests/fromRdf-manifest.jsonld
-    Ran 51 test cases. Passed: 51. Failed: 0. Errors: 0.
+    Ran 52 test cases. Passed: 51. Failed: 1. Errors: 0.
     Running test suite: cache/json-ld-api/tests/toRdf-manifest.jsonld
-    Ran 451 test cases. Passed: 401. Failed: 49. Errors: 1.
+    Ran 456 test cases. Passed: 405. Failed: 50. Errors: 1.
 
     python3 -m trld.tvm.test
     Running [...]: OK
 
     python3 -m trld.trig.test | grep '^Ran '
-    Ran 335 tests. Passed 301, failed 34
+    Ran 335 tests. Passed 299, failed 36
 
     python3 -m trld.trig.test_serializer | grep '^Examined '
-    Examined 335 tests. Round-tripped 232, passed 216, failed 13
+    Examined 335 tests. Round-tripped 232, passed 223, failed 6
 
 For the other languages, this will generate packages for each language in the
 build directory, then run their respective test suites:
@@ -130,3 +132,6 @@ build directory, then run their respective test suites:
     [...] node [...] lib/trig/test.js [...]
     Ran 335 tests. Passed 270, failed 65
 
+To generate transpiled source code without source line comments, use:
+
+    $ make TRFLAGS=-L javatr
