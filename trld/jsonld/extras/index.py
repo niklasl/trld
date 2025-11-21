@@ -18,18 +18,34 @@ def make_index(graph: List[JsonMap], add_reverses=True) -> Dict[str, JsonMap]:
 
 
 def _index_reverses(index: Dict[str, JsonMap]):
+    undescribed: Dict[str, JsonMap] = {}
+
     for item in index.values():
         if ID not in item:
             continue
+
         for link in list(item.keys()):
             refs: List = as_list(item[link])
+
             for ref in refs:
                 if not isinstance(ref, Dict):
                     continue
-                linked: object = index.get(cast(str, ref.get(ID)))
-                if not isinstance(linked, Dict):
+                if ID not in ref:
                     continue
-                revmap: Dict = linked.setdefault(REVERSE, {})
+
+                ref_id: str = ref[ID]
+
+                linked: Optional[Dict] = index.get(ref_id)
+                if linked is None:
+                    linked = undescribed.get(ref_id)
+                    if linked is None:
+                        linked = {ID: ref_id}
+                        undescribed[ref_id] = linked
+
+                revmap: Dict = cast(Dict, linked.setdefault(REVERSE, {}))
+
                 revs: List[Dict] = revmap.setdefault(link, [])
                 if not any(rev[ID] == item[ID] for rev in revs):
                     revs.append({ID: item[ID]})
+
+    index.update(undescribed)
