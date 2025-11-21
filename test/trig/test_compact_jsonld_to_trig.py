@@ -67,7 +67,7 @@ TESTS = [
 ]
 
 
-def run_tests():
+def test_all():
     for indata, expected in TESTS:
         out = StringIO()
         trld.api.serialize_rdf(indata, 'ttl', out)
@@ -78,4 +78,4 @@ def run_tests():
 
 
 if __name__ == '__main__':
-    run_tests()
+    test_all()

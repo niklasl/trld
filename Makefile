@@ -30,7 +30,7 @@ pytestreport: | cache/json-ld-api
 
 pytest: | cache/json-ld-api cache/trig-tests
 	mypy trld/
-	pytest --doctest-modules trld/
+	pytest --doctest-modules trld/ test/
 	python3 -m trld.jsonld.test cache/json-ld-api/tests/expand-manifest.jsonld cache/json-ld-api/tests/compact-manifest.jsonld cache/json-ld-api/tests/flatten-manifest.jsonld cache/json-ld-api/tests/fromRdf-manifest.jsonld cache/json-ld-api/tests/toRdf-manifest.jsonld 2>&1 | grep '^Running test suite\|^Ran '
 	python3 -m trld.tvm.test
 	python3 -m trld.trig.test | grep '^Ran '
