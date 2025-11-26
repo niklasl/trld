@@ -1,6 +1,9 @@
-import json
+from typing import Dict, List, cast
+from ..platform.common import json_encode
+from ..jsonld.base import JsonMap, JsonObject
 from ..jsonld.keys import CONTEXT, GRAPH, ID
 from ..jsonld.expansion import expand
+from ..jsonld.flattening import flatten
 from ..jsonld.compaction import compact
 from ..jsonld.extras.index import make_index
 from .mapmaker import make_target_map, leads_to
@@ -8,8 +11,6 @@ from .mapper import map_to
 
 
 DEBUG = False
-
-null = None
 
 
 context = {
@@ -31,7 +32,7 @@ context = {
 }
 
 
-def test_make_target_map():
+def test_make_target_map() -> None:
     vocab = {
         "@graph": [
             {
@@ -55,12 +56,12 @@ def test_make_target_map():
         "http://www.w3.org/2000/01/rdf-schema#Resource": "http://www.w3.org/2000/01/rdf-schema#Resource",
         "http://www.w3.org/2000/01/rdf-schema#label": "http://www.w3.org/2000/01/rdf-schema#label",
     }
-    vocab = expand(dict(context, **vocab), "")
-    target_map = make_target_map(vocab, {CONTEXT: target})
+    flat_vocab = _flat_graph(context, vocab)
+    target_map: Dict = make_target_map(flat_vocab, {CONTEXT: target})
     assert_json_equals(target_map, expect)
 
 
-def test_make_target_map_from_target_terms():
+def test_make_target_map_from_target_terms() -> None:
     vocab = {
         "@graph": [
             {
@@ -82,8 +83,8 @@ def test_make_target_map_from_target_terms():
         "http://www.w3.org/2000/01/rdf-schema#Resource": "http://www.w3.org/2000/01/rdf-schema#Resource",
         "http://www.w3.org/2000/01/rdf-schema#label": "http://www.w3.org/2000/01/rdf-schema#label",
     }
-    vocab = expand(dict(context, **vocab), "")
-    target_map = make_target_map(vocab, {CONTEXT: target})
+    flat_vocab = _flat_graph(context, vocab)
+    target_map: Dict = make_target_map(flat_vocab, {CONTEXT: target})
     assert_json_equals(target_map, expect)
 
 
@@ -136,7 +137,7 @@ def test_reducing_foaf_to_rdfs():
         ]
     }
 
-    check(**locals())
+    check(given, target, expect, assuming)
 
 
 def test_remap_datatypes():
@@ -166,7 +167,7 @@ def test_remap_datatypes():
         ]
     }
 
-    check(**locals())
+    check(given, target, expect, assuming)
 
 
 def test_structured_values_and_shorthand_properties():
@@ -202,7 +203,7 @@ def test_structured_values_and_shorthand_properties():
         ]
     }
 
-    check(**locals())
+    check(given, target, expect, assuming)
 
 
 def test_qualified_relations_as_reifications():
@@ -257,7 +258,7 @@ def test_qualified_relations_as_reifications():
         ]
     }
 
-    check(**locals())
+    check(given, target, expect, assuming)
 
 
 def test_inferred_qualified_relations_as_reifications():
@@ -332,7 +333,7 @@ def test_inferred_qualified_relations_as_reifications():
         ]
     }
 
-    check(**locals())
+    check(given, target, expect, assuming)
 
 
 def test_property_chains_for_events():
@@ -384,7 +385,7 @@ def test_property_chains_for_events():
         ]
     }
 
-    check(**locals())
+    check(given, target, expect, assuming)
 
 
 def test_add_to_existing_key():
@@ -415,10 +416,10 @@ def test_add_to_existing_key():
         ]
     }
 
-    check(**locals())
+    check(given, target, expect, assuming)
 
 
-def test_only_add_most_specific():
+def test_only_add_most_specific() -> None:
     given = {
         "@id": "",
         "bf:identifiedBy": {
@@ -431,7 +432,7 @@ def test_only_add_most_specific():
         "bibo:identifier": "0000000000"
     }
 
-    target = [
+    target: List = [
         {"bibo": "http://purl.org/ontology/bibo/"},
         {"dc": "http://purl.org/dc/terms/"},
         {"rdfs": "http://www.w3.org/2000/01/rdf-schema#"}
@@ -452,10 +453,10 @@ def test_only_add_most_specific():
         ]
     }
 
-    check(**locals())
+    check(given, target, expect, assuming)
 
 
-def test_sort_target_rules():
+def test_sort_target_rules() -> None:
     vocab = {
         "@graph": [
             {
@@ -482,7 +483,7 @@ def test_sort_target_rules():
             }
         ]
     }
-    target = [
+    target: List = [
         {"@vocab": "http://schema.org/"},
         #{"@vocab": "http://purl.org/dc/terms/"}
     ]
@@ -497,17 +498,19 @@ def test_sort_target_rules():
                 "valueFrom": "http://www.w3.org/1999/02/22-rdf-syntax-ns#value"
             },
             {
-                "match": null,
+                "match": None,
                 "property": "http://schema.org/identifier",
-                "propertyFrom": null,
+                "propertyFrom": None,
                 "valueFrom": "http://www.w3.org/1999/02/22-rdf-syntax-ns#value"
             }
         ],
-        "http://schema.org/isbn": "http://schema.org/isbn",
         "http://schema.org/identifier": "http://schema.org/identifier",
+        "http://schema.org/isbn": "http://schema.org/isbn"
     }
-    vocab = expand(dict(context, **vocab), "")
-    target_map = make_target_map(vocab, {CONTEXT: target})
+
+    flat_vocab = _flat_graph(context, vocab)
+    target_map: Dict = make_target_map(flat_vocab, {CONTEXT: target})
+
     assert_json_equals(target_map, expect)
 
 
@@ -536,67 +539,82 @@ def test_keep_target_terms():
         ]
     }
 
-    check(**locals())
+    check(given, target, expect, assuming)
 
 
-def test_leads_to():
+def test_leads_to() -> None:
     r0 = {ID: "urn:x-test:0"}
     r1 = {ID: "urn:x-test:1"}
     r2 = {ID: "urn:x-test:2"}
     rel = "urn:x-test:rel"
-    graph = [
+    graph: List = [
         r0,
         dict(r1, **{rel: [r0]}),
         dict(r2, **{rel: [r1]})
     ]
-    index = make_index(graph)
+    index: Dict = make_index(graph)
     assert leads_to(r0, index, rel, r0[ID])
     assert leads_to(r1, index, rel, r0[ID])
     assert leads_to(r2, index, rel, r0[ID])
     print_ok()
 
 
-def check(given, target, expect, assuming):
+def check(given: Dict, target: JsonObject, expect: Dict, assuming: Dict) -> None:
+    drop_unmapped = False
     target_map = _to_target_map(target, assuming)
     if DEBUG:
         print(_jsonstr(target_map))
-    indata = expand(dict(context, **given), "")
-    outdata = map_to(target_map, indata)
+    indata: JsonObject = expand(dict(context, **given), "")
+    outdata: JsonObject = map_to(target_map, indata, drop_unmapped)
     outdata = compact(context, outdata)
     assert_json_equals(outdata, expect)
 
 
-def assert_json_equals(given, expected):
+def assert_json_equals(given, expected) -> None:
     gvn = _jsonstr(given)
     exp = _jsonstr(expected)
     assert_equals(gvn, exp)
 
 
-def assert_equals(given: str, expected: str):
+def assert_equals(given: str, expected: str) -> None:
     assert given == expected, f'Expected:\n{expected}\nGot:\n{given}'
     print_ok()
 
 
-def print_ok():
+def print_ok() -> None:
     print('OK', end='')
 
 
-def _to_target_map(target, assuming) -> dict:
-    vocab = expand(dict(context, **assuming), "")
+def _flat_graph(context: Dict, graph: Dict) -> List:
+    data = dict(context)
+    data.update(graph)
+    return flatten(expand(data, ""))
+
+
+def _to_target_map(target: JsonObject, assuming: Dict) -> Dict:
+    vocab = _flat_graph(context, assuming)
     return make_target_map(expand(vocab, ""), {CONTEXT: target})
 
 
 def _jsonstr(data) -> str:
-    return json.dumps(data, indent=2, sort_keys=True)
+    return json_encode(data, pretty=True, sort_keys=True)
 
 
 if __name__ == '__main__':
     from sys import argv
 
-    DEBUG = '-d' in argv
+    args = []
+    for arg in argv[1:]:
+        if arg == '-d':
+            DEBUG = True
+        else:
+            args.append(arg)
 
     for k, v in dict(globals()).items():
         if k.startswith('test_') and hasattr(v, '__call__'):
+            if args and not any(k.endswith(arg) for arg in args):
+                continue
+
             print(f'Running {k}:', end=' ')
             try:
                 v()
