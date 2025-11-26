@@ -1,4 +1,4 @@
-trld_modules = trld/jsonld/base.py trld/jsonld/expansion.py trld/jsonld/compaction.py trld/jsonld/flattening.py trld/jsonld/rdf.py trld/jsonld/testbase.py trld/nq/parser.py trld/nq/serializer.py trld/trig/parser.py trld/trig/serializer.py trld/tvm/mapmaker.py trld/tvm/mapper.py -I trld/builtins.py trld/platform/*.py
+trld_modules = trld/jsonld/base.py trld/jsonld/expansion.py trld/jsonld/compaction.py trld/jsonld/flattening.py trld/jsonld/rdf.py trld/jsonld/testbase.py trld/nq/parser.py trld/nq/serializer.py trld/trig/parser.py trld/trig/serializer.py trld/tvm/mapmaker.py trld/tvm/mapper.py trld/tvm/test.py -I trld/builtins.py trld/platform/*.py
 
 mkdir = python -c 'import sys, pathlib; pathlib.Path(sys.argv[1]).resolve().mkdir(parents=1, exist_ok=1)'
 
@@ -53,6 +53,7 @@ java: javatr
 	(cd build/java && ./gradlew -q clean uberjar test)
 	java -cp build/java/build/libs/trld-with-deps.jar trld.jsonld.TestRunner cache/json-ld-api/tests 2>&1 | grep '^Ran '
 	java -cp build/java/build/libs/trld-with-deps.jar trld.trig.Test cache/trig-tests 2>&1 | grep '^Ran '
+	java -cp build/java/build/libs/trld-with-deps.jar trld.tvm.TestRunner
 
 jar: javatr
 	(cd build/java && ./gradlew -q test jar)
