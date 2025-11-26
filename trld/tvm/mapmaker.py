@@ -75,10 +75,10 @@ def make_target_map(vocab: object, target: object) -> Dict:
 
     target_map: Dict[str, object] = {}
 
-    identity_map: Dict[str, str] = {}
+    identity_set: Set[str] = set()
 
     for obj in graph:
-        id: Optional[str] = cast(Optional[str], obj[ID])
+        id: Optional[str] = cast(Optional[str], obj[ID]) if ID in obj else None
 
         _process_class_relations(obj, vocab_index, target_dfn, target_map)
 
@@ -88,7 +88,7 @@ def make_target_map(vocab: object, target: object) -> Dict:
 
         if id and id not in target_map:
             if _get_target_priority(target_dfn, id) > 0:
-                identity_map[id] = id
+                identity_set.add(id)
 
     for key, rule in target_map.items():
         rules: List[Tuple[int, Union[Dict, str]]] = sorted(as_list(rule),
@@ -103,10 +103,14 @@ def make_target_map(vocab: object, target: object) -> Dict:
         # Add identity mappings to keep target terms in source:
         for priority, it in rules:
             if isinstance(it, str):
-                identity_map[it] = it
+                identity_set.add(it)
             break
 
-    target_map.update(identity_map)
+    for it in identity_set:
+        if it in target_map:
+            target_map[it] = as_list(target_map[it]) + [it]
+        else:
+            target_map[it] = it
 
     return target_map
 
@@ -186,6 +190,8 @@ def _process_property_relations(obj: Dict, vocab_index: Dict, target: Dict[str, 
 
     candidate_prop: Optional[str] = None
 
+    seen_candidates: Set[str] = set()
+
     while candidates:
         crel, candidate = candidates.pop(0)
         if ID not in candidate:
@@ -205,17 +211,22 @@ def _process_property_relations(obj: Dict, vocab_index: Dict, target: Dict[str, 
             candidate_prop = candidate_id
             prop_prio = target_prio
             #break
-        else:
+        elif candidate_id not in seen_candidates:
             _extend_candidates(candidates, candidate, rels)
 
-    _process_property_chain(obj, target, target_map, candidate_prop, baseprops)
+        seen_candidates.add(candidate_id)
+
+    _process_property_chain(obj, vocab_index, target, target_map, candidate_prop, baseprops)
 
 
-def _process_property_chain(obj: Dict,
-                             target: Dict[str, object],
-                             target_map: Dict,
-                             candidate_prop: Optional[str],
-                             baseprops: List[Tuple[int, str]]) -> bool:
+def _process_property_chain(
+    obj: Dict,
+    vocab_index: Dict,
+    target: Dict[str, object],
+    target_map: Dict,
+    candidate_prop: Optional[str],
+    baseprops: List[Tuple[int, str]]
+) -> bool:
     if OWL_propertyChainAxiom not in obj:
         return False
 
@@ -223,34 +234,48 @@ def _process_property_chain(obj: Dict,
     source_property: Optional[str] = None
 
     lst: List[Dict] = prop_chain[0][LIST]
-    lead: Dict = lst[0]
-    # TODO: assert(len(lst) == 2) or use rest as path to value...
-    if lead:
-        source_property = lead.get(ID)
+    if len(lst) == 0:
+        return False
 
-    value_from: str = lst[1][ID]
+    first: Dict = lst[0]
+    if len(lst) <= 1:
+        return False
+
+    if ID in first:
+        id_key: str = first[ID]
+        if id_key in vocab_index:
+            first = vocab_index[id_key]
+
+    second_id: str = lst[1][ID]
+
+    source_property = first.get(ID)
+
     rtype: Optional[str] = None
-
+    value_from: Optional[str] = None
     # TODO: don't rely solely on anonymous subPropertyOf
     if source_property is None or source_property.startswith('_:'):
         try:
-            ranges: List[Dict] = lead[RDFS_range]
+            ranges: List[Dict] = first[RDFS_range]
             rtype = ranges[0][ID]
         except:
             pass
-        superprops: List[Dict] = lead[RDFS_subPropertyOf]
+        superprops: List[Dict] = first[RDFS_subPropertyOf]
         source_property = superprops[0][ID]
+        value_from = second_id
+    else:
+        value_from = second_id
 
     match: Optional[Dict] = {TYPE: rtype} if rtype else None
     # TODO: also match OWL_Restriction using OWL_onProperty PLUS
     # OWL_hasValue OR OWL_allValuesFrom
 
-    if source_property:
-        if (source_property != candidate_prop and
-            not _get_target_priority(target, source_property)):
+    if source_property and value_from:
+        if source_property != candidate_prop:
             for prio, baseprop in baseprops:
                 rule: Dict = _rule_from(baseprop, None, value_from, match)
-                _add_rule(target_map, source_property, rule, prio)
+                if _get_target_priority(target, source_property) < prio:
+                    # TODO: only if rule is "explicit enough" (has a 'propertyFrom' or 'match' term)?
+                    _add_rule(target_map, source_property, rule, prio)
 
             return True
 
@@ -306,7 +331,10 @@ def _process_reified_forms(obj: Dict, vocab_index: Dict, target_map: Dict[str, o
                     value_from = domain_prop[ID]
 
         if property_from and value_from and isinstance(prop_id, str):
-            _add_rule(target_map, prop_id, _rule_from(None, property_from, value_from, None))
+            ## TODO: needs target prio at runtime from property_from...
+            target_prio: int = 4096  # _get_target_priority(target, candidate_id)
+            rule = _rule_from(None, property_from, value_from, None)
+            _add_rule(target_map, prop_id, rule, target_prio)
 
 
 def _trace_inverse_of_subject(obj: Dict, vocab_index: Dict) -> Optional[Dict]:
@@ -372,7 +400,8 @@ def _get_target_priority(target: Dict[str, object], id: str) -> int:
             return prio
         prio -= 1
 
-    if VOCAB in target and id.startswith(cast(str, target[VOCAB])):
+    vocab: Optional[object] = target.get(VOCAB)
+    if isinstance(vocab, str) and id.startswith(vocab):
         return top_prio * 2
 
     prio = top_prio
