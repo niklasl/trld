@@ -101,8 +101,16 @@ def _map(target_map: Dict, key: Union[str, int], value, drop_unmapped=False) -> 
                 for v in objectvalues:
                     assert isinstance(v, Dict)
                     match: Optional[Dict[str, str]] = rule.get('match')
-                    if match is None or TYPE in match and any(
-                            t == match[TYPE] for t in cast(List, v[TYPE])):
+                    matches_type = False
+                    if match is None:
+                        matches_type = True
+                    elif TYPE in match:
+                        for t in cast(List, v.get(TYPE, [])):
+                            if t == match[TYPE]:
+                                matches_type = True
+                                break
+
+                    if match is None or matches_type:
                         vv: object = v.get(value_from)
                         if isinstance(vv, List):
                             for m in vv:

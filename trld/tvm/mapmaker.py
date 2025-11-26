@@ -33,6 +33,7 @@ OWL_inverseOf: str = f'{OWL}inverseOf'
 OWL_propertyChainAxiom: str = f'{OWL}propertyChainAxiom'
 OWL_onProperty: str = f'{OWL}onProperty'
 OWL_hasValue: str = f'{OWL}hasValue'
+OWL_hasSelf: str = f'{OWL}hasSelf'
 OWL_allValuesFrom: str = f'{OWL}allValuesFrom'
 
 SKOS: str = 'http://www.w3.org/2004/02/skos/core#'
@@ -252,8 +253,31 @@ def _process_property_chain(
 
     rtype: Optional[str] = None
     value_from: Optional[str] = None
+
+    rolified: Optional[JsonMap] = None
+
+    step_desc: Optional[Dict] = vocab_index.get(second_id)
+    if step_desc is not None and REVERSE in step_desc:
+        reverses: Dict[str, List] = step_desc[REVERSE]
+        if OWL_onProperty in reverses:
+            for propref in cast(List[Dict], reverses[OWL_onProperty]):
+                assert isinstance(propref, Dict)
+                if ID in propref and propref[ID] in vocab_index:
+                    onprop: Dict = vocab_index[propref[ID]]
+                    if OWL_hasSelf in onprop:
+                        rolified = onprop
+                        break
+
+    if rolified is not None:
+        if OWL_equivalentClass in rolified:
+            for equiv in cast(List[Dict], rolified[OWL_equivalentClass]):  # or RDFS_subClassOf...
+                rtype = equiv[ID]
+                break
+        if rtype is not None and len(lst) > 2:
+            value_from = lst[2][ID]
+    # TODO: Deprecate this blank subPropertyOf pattern in favour of the rolified form.
     # TODO: don't rely solely on anonymous subPropertyOf
-    if source_property is None or source_property.startswith('_:'):
+    elif source_property is None or source_property.startswith('_:'):
         try:
             ranges: List[Dict] = first[RDFS_range]
             rtype = ranges[0][ID]

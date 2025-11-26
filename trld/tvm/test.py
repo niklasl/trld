@@ -170,7 +170,7 @@ def test_remap_datatypes():
     check(given, target, expect, assuming)
 
 
-def test_structured_values_and_shorthand_properties():
+def test_structured_values_and_shorthand_properties_subprop():
     given = {
         "@id": "/instance/a",
         "bf:identifiedBy": {
@@ -201,6 +201,72 @@ def test_structured_values_and_shorthand_properties():
                 }
             }
         ]
+    }
+
+    check(given, target, expect, assuming)
+
+
+def test_structured_values_and_shorthand_properties_rolified():
+    given = {
+        "@id": "/instance/a",
+        "bf:identifiedBy": {
+            "@type": "bf:Isbn",
+            "rdf:value": "12-3456-789-0"
+        }
+    }
+
+    target = {"@vocab": "http://schema.org/"}
+
+    expect = {
+        "@id": "/instance/a",
+        "schema:isbn": "12-3456-789-0"
+    }
+
+    assuming = {
+        "@graph": [
+            {
+                "@id": "schema:isbn",
+                "owl:propertyChainAxiom": {
+                    "@list": [
+                        {"@id": "bf:identifiedBy"},
+                        {"@id": "_:a_Isbn"},
+                        {"@id": "rdf:value"}
+                    ]
+                }
+            },
+            {
+                "owl:hasSelf": True,
+                "owl:onProperty": {"@id": "_:a_Isbn"},
+                "owl:equivalentClass": {"@id": "bf:Isbn"}
+            }
+        ]
+    }
+
+    check(given, target, expect, assuming)
+
+    given = {
+        "@id": "/instance/a",
+        "bf:identifiedBy": {
+            "@type": "bf:Issn",
+            "rdf:value": "1234-5678"
+        }
+    }
+
+    expect = {
+        "@id": "/instance/a"
+    }
+
+    check(given, target, expect, assuming)
+
+    given = {
+        "@id": "/instance/a",
+        "bf:identifiedBy": {
+            "rdf:value": "123"
+        }
+    }
+
+    expect = {
+        "@id": "/instance/a"
     }
 
     check(given, target, expect, assuming)
@@ -336,7 +402,7 @@ def test_inferred_qualified_relations_as_reifications():
     check(given, target, expect, assuming)
 
 
-def test_property_chains_for_events():
+def test_property_chains_for_events_subprop():
     given = {
         "@id": "/instance/a",
         "bf:provisionActivity": {
@@ -381,6 +447,59 @@ def test_property_chains_for_events():
                         {"@id": "bf:agent"}
                     ]
                 }
+            }
+        ]
+    }
+
+    check(given, target, expect, assuming)
+
+
+def test_property_chains_for_events_rolified():
+    given = {
+        "@id": "/instance/a",
+        "bf:provisionActivity": {
+            "@type": "bf:Publication",
+            "bf:agent": {"@id": "/org/a"},
+            "bf:date": "2017"
+        }
+    }
+
+    target = {"@vocab": "http://schema.org/"}
+
+    expect = {
+        "@id": "/instance/a",
+        "schema:publisher": {"@id": "/org/a"},
+        "schema:datePublished": "2017"
+    }
+
+    assuming = {
+        "@graph": [
+            {
+                "@id": "schema:datePublished",
+                "rdfs:subPropertyOf": {"@id": "dcterms:issued"},
+                "owl:propertyChainAxiom": {
+                    "@list": [
+                        {"@id": "bf:provisionActivity"},
+                        {"@id": "_:a_Publication"},
+                        {"@id": "bf:date"}
+                    ]
+                }
+            },
+            {
+                "@id": "dcterms:publisher",
+                "owl:equivalentProperty": {"@id": "schema:publisher"},
+                "owl:propertyChainAxiom": {
+                    "@list": [
+                        {"@id": "bf:provisionActivity"},
+                        {"@id": "_:a_Publication"},
+                        {"@id": "bf:agent"}
+                    ]
+                }
+            },
+            {
+                "owl:hasSelf": True,
+                "owl:onProperty": {"@id": "_:a_Publication"},
+                "owl:equivalentClass": {"@id": "bf:Publication"}
             }
         ]
     }
