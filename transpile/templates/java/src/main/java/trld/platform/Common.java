@@ -3,9 +3,13 @@ package trld.platform;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import com.fasterxml.jackson.jr.ob.JSON;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectWriter;
+import com.fasterxml.jackson.databind.SerializationFeature;
 
 public class Common {
+
+    private static final ObjectMapper mapper = new ObjectMapper();
 
     public static String resolveIri(String base, String relative) {
         try {
@@ -25,7 +29,7 @@ public class Common {
 
     public static Object jsonDecode(String s) {
         try {
-            return JSON.std.anyFrom(s);
+            return mapper.readValue(s, Object.class);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -36,19 +40,23 @@ public class Common {
     }
 
     public static String jsonEncode(Object o, boolean pretty) {
+        return jsonEncode(o, pretty, false);
+    }
+
+    public static String jsonEncode(Object o, boolean pretty, boolean sortKeys) {
+        ObjectWriter writer = pretty ? mapper.writerWithDefaultPrettyPrinter() : mapper.writer();
+        if (sortKeys) {
+            writer = writer.with(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS);
+        }
         try {
-            if (pretty) {
-                return JSON.std.with(JSON.Feature.PRETTY_PRINT_OUTPUT).asString(o);
-            } else {
-                return JSON.std.asString(o);
-            }
+            return writer.writeValueAsString(o);
         } catch (IOException e) {
             return null;
         }
     }
 
     public static String jsonEncodeCanonical(Object o) {
-        return jsonEncode(o); // FIXME: no space separators, do sort keys
+        return jsonEncode(o, false, true); // TODO: ensure no space for separators
     }
 
 }

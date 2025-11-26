@@ -8,8 +8,10 @@ def json_decode(s: str) -> object:
     return json.loads(s)
 
 
-def json_encode(o: object, pretty=False) -> str:
-    return json.dumps(o, indent=2 if pretty else None, ensure_ascii=not pretty)
+def json_encode(o: object, pretty=False, sort_keys=False) -> str:
+    indent = 2 if pretty else None
+    ensure_ascii = not pretty
+    return json.dumps(o, indent=indent, ensure_ascii=ensure_ascii, sort_keys=sort_keys)
 
 
 def json_encode_canonical(o: object) -> str:
