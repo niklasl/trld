@@ -30,7 +30,7 @@ class BNodes:
         return bnode_id
 
 
-def flatten(element: JsonObject, ordered=False, bnodes: Optional[BNodes] = None) -> JsonObject:
+def flatten(element: JsonObject, ordered=False, bnodes: Optional[BNodes] = None) -> List[JsonMap]:
     if bnodes is None:
         bnodes = BNodes()
 
