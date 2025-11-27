@@ -1,0 +1,7 @@
+prefix : <https://example.org/ns/>
+base <https://example.org/>
+
+<x> a :Thing ;
+    :relatedTo _:y .
+
+_:y a :Thing ; :relatedTo <https://example.org/x> .

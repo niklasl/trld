@@ -1,0 +1,15 @@
+{
+  "@type": "Thing",
+  "name": "Thing 1",
+  "comment": [
+    {
+      "@language": "en",
+      "@value": "Thing one"
+    },
+    {
+      "@language": "sv",
+      "@value": "Sak ett"
+    },
+    "1"
+  ]
+}

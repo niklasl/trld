@@ -4,7 +4,7 @@ import os
 import sys
 
 from .platform.common import json_encode
-from .jsonld.keys import CONTAINER, CONTEXT, TYPE
+from .jsonld.keys import BASE, CONTAINER, CONTEXT, TYPE
 from .jsonld.compaction import compact
 from .jsonld.context import get_context
 from .jsonld.docloader import set_document_loader, any_document_loader
@@ -26,7 +26,6 @@ def process_source(source, args):
 
     ordered = args.sorted
 
-    context_ref = args.context
     expand_context = args.expand_context
 
     base_iri = (
@@ -57,21 +56,31 @@ def process_source(source, args):
 
         context = None
 
+        context_ref = args.context
+
         if context_ref:
             if context_ref is True:
                 context_ref = data if isinstance(data, dict) and CONTEXT in data else {}
             elif isinstance(context_ref, str):
                 context_ref = _absolutize(context_ref)
 
-            context = get_context(context_ref)
-            if args.base is not None:
-                context.base_iri = args.base
-
-            # TODO: Explicit flag instead of assuming data is already compacted?
-            if args.expand_context:
-                if args.context is True and expand_context:
+            if isinstance(context_ref, dict):
+                if args.expand_context is True:
+                    context = get_context(context_ref, base_iri)
+                    simplified = to_simple_context(context)
+                    # NOTE: Drop base only if added via base_iri.
+                    if (
+                        not isinstance(context_ref, dict) or BASE not in data[CONTEXT]
+                    ) and BASE in simplified:
+                        del simplified[BASE]
+                    context_ref = {CONTEXT: simplified}
+                elif args.expand_context:
                     context_ref = {CONTEXT: to_simple_context(get_context(expand_context))}
+
+            if context_ref:
                 context = get_context(context_ref)
+                if args.base is not None:
+                    context.base_iri = args.base
                 result = compact(context, result, base_iri, ordered=ordered)
 
             if isinstance(context_ref, dict) and CONTEXT in context_ref:
@@ -89,6 +98,9 @@ def process_source(source, args):
                     result[CONTEXT] = dict(sorted(ctx.items()))
 
                 result = dict(sorted(result.items()))
+
+        if args.no_context and isinstance(result, dict):
+            del result[CONTEXT]
 
         serialize_rdf(result, args.output_format, None, context)
 
@@ -139,7 +151,8 @@ def make_argsparser():
     argparser.add_argument('-B', '--embed-blanks', action='store_true')
     argparser.add_argument('-r', '--recompact', action='store_true',
                         help='Re-compact input into a Turtle-like shape (same as -e -f -c -B)')
-    argparser.add_argument('-s', '--sorted', action='store_true')
+    argparser.add_argument('-s', '--sorted', action='store_true', help='Sort output by @id and objects by key')
+    argparser.add_argument('-C', '--no-context', help='Exclude context from result JSON-LD', const=True, nargs='?')
 
     return argparser
 

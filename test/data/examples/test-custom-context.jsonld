@@ -1,0 +1,7 @@
+{
+  "@context": {
+    "@vocab": "http://example.org/ns/",
+    "comment": {},
+    "commentByLang": { "@id": "http://example.org/ns/comment", "@container": "@language" }
+  }
+}

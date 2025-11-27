@@ -1,0 +1,124 @@
++ python3 -m trld test/data/examples/test-basic-data.jsonld -e
+[
+  {
+    "@type": [
+      "http://example.org/ns/Thing"
+    ],
+    "http://example.org/ns/name": [
+      {
+        "@value": "Thing 1"
+      }
+    ],
+    "http://example.org/ns/comment": [
+      {
+        "@language": "en",
+        "@value": "Thing one"
+      },
+      {
+        "@language": "sv",
+        "@value": "Sak ett"
+      },
+      {
+        "@value": "1"
+      }
+    ]
+  }
+]
++ python3 -m trld test/data/examples/test-basic-data.jsonld -e -c -C
+{
+  "@type": "Thing",
+  "name": "Thing 1",
+  "comment": [
+    {
+      "@language": "en",
+      "@value": "Thing one"
+    },
+    {
+      "@language": "sv",
+      "@value": "Sak ett"
+    },
+    "1"
+  ]
+}
++ python3 -m trld test/data/examples/test-basic-data.json -e test/data/examples/test-basic-context.jsonld
+[
+  {
+    "@type": [
+      "http://example.org/ns/Thing"
+    ],
+    "http://example.org/ns/name": [
+      {
+        "@value": "Thing 1"
+      }
+    ],
+    "http://example.org/ns/comment": [
+      {
+        "@language": "en",
+        "@value": "Thing one"
+      },
+      {
+        "@language": "sv",
+        "@value": "Sak ett"
+      },
+      {
+        "@value": "1"
+      }
+    ]
+  }
+]
++ python3 -m trld test/data/examples/test-basic-data.json -e test/data/examples/test-basic-context.jsonld -c
+{
+  "@type": "Thing",
+  "name": "Thing 1",
+  "comment": [
+    {
+      "@language": "en",
+      "@value": "Thing one"
+    },
+    {
+      "@language": "sv",
+      "@value": "Sak ett"
+    },
+    "1"
+  ],
+  "@context": {
+    "@vocab": "http://example.org/ns/"
+  }
+}
++ python3 -m trld test/data/examples/test-basic-data.json -e test/data/examples/test-basic-context.jsonld -c test/data/examples/test-custom-context.jsonld
+{
+  "@type": "Thing",
+  "name": "Thing 1",
+  "commentByLang": {
+    "en": "Thing one",
+    "sv": "Sak ett"
+  },
+  "comment": "1"
+}
++ python3 -m trld test/data/examples/test-custom-data.jsonld -r
+{
+  "@id": "_:b0",
+  "@type": "Thing",
+  "comment": [
+    {
+      "@value": "Thing one",
+      "@language": "en"
+    },
+    {
+      "@value": "Sak ett",
+      "@language": "sv"
+    },
+    "1"
+  ],
+  "name": "Thing 1",
+  "@context": {
+    "@vocab": "http://example.org/ns/"
+  }
+}
++ python3 -m trld test/data/examples/test-denormalized.ttl -rottl
+prefix : <https://example.org/ns/>
+base <https://example.org/>
+
+<x> a :Thing ;
+  :relatedTo [ a :Thing ;
+      :relatedTo <x> ] .

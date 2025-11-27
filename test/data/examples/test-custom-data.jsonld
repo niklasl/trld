@@ -1,0 +1,10 @@
+{
+  "@context": "./test-custom-context.jsonld",
+  "@type": "Thing",
+  "name": "Thing 1",
+  "commentByLang": {
+    "en": "Thing one",
+    "sv": "Sak ett"
+  },
+  "comment": "1"
+}

@@ -35,7 +35,7 @@ pytest: | cache/json-ld-api cache/trig-tests
 	python3 -m trld.tvm.test
 	python3 -m trld.trig.test | grep '^Ran '
 	python3 -m trld.trig.test_serializer | grep '^Examined '
-	PYTHONPATH=. sh test/test_misc.sh
+	PYTHONPATH=. bash test/test_misc.sh
 
 pydev: dev-requirements.txt
 	python -c 'import sys; assert sys.prefix != sys.base_prefix, "Not in a venv"'
