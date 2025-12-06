@@ -130,18 +130,50 @@ def relativise_iri(base: str, iri: str) -> str:
     ```
     >>> relativise_iri("http://example.org/abc/", "http://example.org/abc")
     '../abc'
+
+    >>> relativise_iri("http://example.org/abc/", "http://example.org/abc/def")
+    'def'
+
+    >>> relativise_iri("http://example.org/abc", "http://example.org/abc/def")
+    'abc/def'
+
+    >>> relativise_iri("http://example.net/abc/", "http://example.org/abc/")
+    'http://example.org/abc/'
+    >>> relativise_iri("http://example.net/abc/", "http://example.org/")
+    'http://example.org/'
+    >>> relativise_iri("http://example.net/", "http://example.org/")
+    'http://example.org/'
+    >>> relativise_iri("http://example.net", "http://example.org")
+    'http://example.org'
+
+    >>> relativise_iri("file:///some/file.jsonld", "http://example.org/abc/")
+    'http://example.org/abc/'
+    >>> relativise_iri("file://some/file.jsonld", "http://example.org/abc/")
+    'http://example.org/abc/'
+    >>> relativise_iri("file:some/file.jsonld", "http://example.org/abc/")
+    'http://example.org/abc/'
+    >>> relativise_iri("/some/file.jsonld", "http://example.org/abc/")
+    'http://example.org/abc/'
     >>>
     ```
     """
     if iri.startswith(base + '#'):
         return iri[len(base):]
+
     if '?' in iri and iri.startswith(base):
         return iri[len(base):]
+
     if not base.endswith('/'):
         last: int = base.rfind('/')
         base = base[0:last + 1]
+        if base.endswith('://'):
+            return iri
+
     if iri.startswith(base):
         return iri[len(base):]
+
+    if '://' not in base:
+        return iri
 
     parentbase: str = base[:base.rfind('/')]
     leaf: str = iri[iri.rfind('/') + 1:]
