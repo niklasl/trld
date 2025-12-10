@@ -459,9 +459,13 @@ def to_jsonld_object(value: RdfObject,
     rtype: Optional[str] = None
 
     # 2.4)
+    # NOTE: spec errata <https://github.com/w3c/json-ld-api/issues/670>:
+    # We need to track if done to get to the else clauses.
+    done_converting = False
     if use_native_types:
         if literal.datatype == XSD_STRING:
             converted_value = literal.value
+            done_converting = True
         elif literal.datatype == XSD_BOOLEAN:
             if literal.value == 'true':
                 converted_value = True
@@ -469,16 +473,22 @@ def to_jsonld_object(value: RdfObject,
                 converted_value = False
             else:
                 rtype = XSD_BOOLEAN
+            done_converting = True
         elif literal.datatype == XSD_INTEGER and literal.value.isdecimal():
             converted_value = int(literal.value)
+            done_converting = True
         elif literal.datatype == XSD_DOUBLE:# and all(c == '.' or c.isdecimal() for c in literal.value):
             try:
                 converted_value = float(literal.value)
+                done_converting = True
             except ValueError:
                 pass
-        # TODO: spec errata; only done in an otherwise below (thus fromRdf/0018 fails)
+        # NOTE: part of spec errata; done in an elif branch below (see fromRdf/0018)
         elif literal.datatype != XSD_STRING:
             rtype = literal.datatype
+
+    if done_converting:
+        pass
     # 2.5)
     elif literal.datatype == RDF_JSON and processing_mode != JSONLD10:
         try:
