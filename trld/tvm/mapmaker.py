@@ -4,6 +4,7 @@ from collections import OrderedDict
 
 from ..jsonld.keys import CONTEXT, GRAPH, ID, LIST, REVERSE, TYPE, VOCAB
 from ..jsonld.base import as_list, JsonMap
+from ..jsonld.flattening import flatten
 from ..jsonld.extras.index import make_index
 
 
@@ -71,6 +72,8 @@ def make_target_map(vocab: object, target: object) -> Dict:
             target_dfn.update(cast(Dict, dfn))
 
     graph: List[JsonMap] = vocab if isinstance(vocab, List) else cast(List, cast(Dict, vocab)[GRAPH])
+
+    graph = flatten(graph)
 
     vocab_index: Dict[str, JsonMap] = make_index(graph)
 
