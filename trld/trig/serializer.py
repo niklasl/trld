@@ -149,6 +149,7 @@ class SerializerState:
             self.write_base(base_iri)
         elif self.base_iri:
             self.write_base(self.base_iri)
+
         if self.settings.prologue_end_line > 1:
             self.writeln()
 
@@ -285,7 +286,7 @@ class SerializerState:
                             items += iv
                         else:
                             items.append(iv)
-                    vo = items
+                    vo = cast(List, items)
 
             term = self.term_for(key)
 
