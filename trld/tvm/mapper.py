@@ -116,7 +116,7 @@ def _map(data_index: Dict, target_map: Dict, key: Union[str, int], value, drop_u
                         if TYPE in v:
                             vo = v
                         elif ID in v and v[ID] in data_index:
-                            v = data_index[v[ID]]
+                            vo = data_index[v[ID]]
 
                         for t in cast(List, vo.get(TYPE, [])):
                             if t == match[TYPE]:
