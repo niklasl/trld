@@ -1,6 +1,8 @@
 from typing import Optional, Dict, List, Set, Union, cast
+
+from ..jsonld.extras.index import make_index
 from ..jsonld.keys import CONTEXT, GRAPH, ID, TYPE, VOCAB
-from ..jsonld.base import as_list
+from ..jsonld.base import as_list, JsonMap
 
 
 ListOrJsonMap = Union[List, Dict[str, object]]
@@ -8,33 +10,37 @@ ListOrJsonMap = Union[List, Dict[str, object]]
 
 def map_to(target_map: Dict, indata, drop_unmapped=False) -> ListOrJsonMap:
     result: ListOrJsonMap = {} if isinstance(indata, Dict) else []
-    _modify(target_map, indata, result, drop_unmapped)
+
+    data_index: Dict[str, JsonMap] = make_index(indata)
+
+    _modify(data_index, target_map, indata, result, drop_unmapped)
+
     return result
 
 
-def _modify(target_map: Dict, ino: ListOrJsonMap, outo: Union[Dict, List], drop_unmapped: bool):
+def _modify(data_index: Dict, target_map: Dict, ino: ListOrJsonMap, outo: Union[Dict, List], drop_unmapped: bool):
     if isinstance(ino, Dict):
         for k, v in cast(Dict[str, object], ino).items(): # TODO: cast just for transpile
-            _modify_pair(target_map, k, v, outo, drop_unmapped)
+            _modify_pair(data_index, target_map, k, v, outo, drop_unmapped)
     elif isinstance(ino, List):
         i: int = 0
         for v in ino:
-            _modify_pair(target_map, i, v, outo, drop_unmapped)
+            _modify_pair(data_index, target_map, i, v, outo, drop_unmapped)
             i += 1
 
 
-def _modify_pair(target_map: Dict, k: Union[str, int], v: object, outo: Union[Dict, List], drop_unmapped: bool):
-    mapo: Dict[Union[str, int], Union[List, Dict, str]] = _map(target_map, k, v, drop_unmapped)
+def _modify_pair(data_index: Dict, target_map: Dict, k: Union[str, int], v: object, outo: Union[Dict, List], drop_unmapped: bool):
+    mapo: Dict[Union[str, int], Union[List, Dict, str]] = _map(data_index, target_map, k, v, drop_unmapped)
 
     for mapk, mapv in mapo.items():
         outv: Union[List, Dict]
         if isinstance(mapv, List):
             outv = []
-            _modify(target_map, mapv, outv, drop_unmapped)
+            _modify(data_index, target_map, mapv, outv, drop_unmapped)
             mapv = outv
         elif isinstance(mapv, Dict):
             outv = {}
-            _modify(target_map, mapv, outv, drop_unmapped)
+            _modify(data_index, target_map, mapv, outv, drop_unmapped)
             mapv = outv
 
         if isinstance(outo, Dict):
@@ -48,7 +54,7 @@ def _modify_pair(target_map: Dict, k: Union[str, int], v: object, outo: Union[Di
             outo.append(mapv)
 
 
-def _map(target_map: Dict, key: Union[str, int], value, drop_unmapped=False) -> Dict:
+def _map(data_index: Dict, target_map: Dict, key: Union[str, int], value, drop_unmapped=False) -> Dict:
     somerule: object = target_map.get(key)
 
     if drop_unmapped and somerule is None and isinstance(key, str) and key[0] != '@':
@@ -97,33 +103,49 @@ def _map(target_map: Dict, key: Union[str, int], value, drop_unmapped=False) -> 
             # TODO: if match + use base_map
 
             value_from: Optional[str] = rule.get('valueFrom')
-            if value_from is not None:
+            match: Optional[Dict[str, str]] = rule.get('match')
+            if value_from or match:
                 for v in objectvalues:
                     assert isinstance(v, Dict)
-                    match: Optional[Dict[str, str]] = rule.get('match')
-                    matches_type = False
+
+                    got_match = False
                     if match is None:
-                        matches_type = True
+                        got_match = True
                     elif TYPE in match:
-                        for t in cast(List, v.get(TYPE, [])):
+                        vo = v if TYPE in v else data_index.get(v.get(ID), v)
+                        for t in cast(List, vo.get(TYPE, [])):
                             if t == match[TYPE]:
-                                matches_type = True
+                                got_match = True
+                                break
+                    elif 'valueMatches' in match:
+                        vmatches = False
+                        for mk, mv in cast(Dict, match['valueMatches']).items():
+                            for vm in as_list(v[mk]):
+                                if vm == mv:
+                                    got_match = True
                                 break
 
-                    if match is None or matches_type:
-                        vv: object = v.get(value_from)
-                        if isinstance(vv, List):
-                            for m in vv:
-                                outvalue.append(m)
+                    if match is None or got_match:
+                        if value_from is not None:
+                            vv: object = v.get(value_from)
+                            if isinstance(vv, List):
+                                for m in vv:
+                                    outvalue.append(m)
+                            else:
+                                outvalue.append(vv)
+                        elif 'useValue' in rule:
+                            outvalue.append(rule['useValue'])
                         else:
-                            outvalue.append(vv)
+                            outvalue.append(v)
             else:
                 outvalue = value
 
-            #outvalue = [target_map.get(v, v) for v in outvalue]
             mappedvalue: List[object] = []
             for v in outvalue:
-                mappedvalue.append(target_map.get(v, v) if isinstance(v, str) else v)
+                if isinstance(v, str):
+                    v = target_map.get(v, v)
+                mappedvalue += as_list(v)
+
             outvalue = mappedvalue
 
             if property is not None and outvalue:
