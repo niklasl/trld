@@ -7,7 +7,7 @@ from ..jsonld.flattening import flatten
 from ..jsonld.compaction import compact
 from ..jsonld.extras.index import make_index
 from .mapmaker import make_target_map, leads_to
-from .mapper import map_to
+from .mapper import ListOrJsonMap, map_to
 
 
 DEBUG = False
@@ -782,7 +782,7 @@ def check(given: Dict, target: JsonObject, expect: Dict, assuming: Dict) -> None
     if DEBUG:
         print(_jsonstr(target_map))
     indata: JsonObject = expand(dict(context, **given), "")
-    outdata: JsonObject = map_to(target_map, indata, drop_unmapped)
+    outdata: JsonObject = map_to(target_map, cast(ListOrJsonMap, indata), drop_unmapped)
     outdata = compact(context, outdata)
     assert_json_equals(outdata, expect)
 

@@ -8,10 +8,10 @@ from ..jsonld.base import as_list, JsonMap
 ListOrJsonMap = Union[List, Dict[str, object]]
 
 
-def map_to(target_map: Dict, indata, drop_unmapped=False) -> ListOrJsonMap:
+def map_to(target_map: Dict, indata: ListOrJsonMap, drop_unmapped=False) -> ListOrJsonMap:
     result: ListOrJsonMap = {} if isinstance(indata, Dict) else []
 
-    data_index: Dict[str, JsonMap] = make_index(indata)
+    data_index: Dict[str, JsonMap] = make_index(as_list(indata))
 
     _modify(data_index, target_map, indata, result, drop_unmapped)
 
@@ -103,7 +103,7 @@ def _map(data_index: Dict, target_map: Dict, key: Union[str, int], value, drop_u
             # TODO: if match + use base_map
 
             value_from: Optional[str] = rule.get('valueFrom')
-            match: Optional[Dict[str, str]] = rule.get('match')
+            match: Optional[Dict[str, object]] = rule.get('match')
             if value_from or match:
                 for v in objectvalues:
                     assert isinstance(v, Dict)
@@ -112,14 +112,20 @@ def _map(data_index: Dict, target_map: Dict, key: Union[str, int], value, drop_u
                     if match is None:
                         got_match = True
                     elif TYPE in match:
-                        vo = v if TYPE in v else data_index.get(v.get(ID), v)
+                        vo: Dict = v
+                        if TYPE in v:
+                            vo = v
+                        elif ID in v and v[ID] in data_index:
+                            v = data_index[v[ID]]
+
                         for t in cast(List, vo.get(TYPE, [])):
                             if t == match[TYPE]:
                                 got_match = True
                                 break
                     elif 'valueMatches' in match:
+                        valmatch = cast(Dict[str, Dict], match['valueMatches'])
                         vmatches = False
-                        for mk, mv in cast(Dict, match['valueMatches']).items():
+                        for mk, mv in valmatch.items():
                             for vm in as_list(v[mk]):
                                 if vm == mv:
                                     got_match = True

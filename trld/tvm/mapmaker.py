@@ -147,7 +147,7 @@ def _process_class_relations(obj: Dict, vocab_index: Dict, target: Dict[str, obj
         match: Optional[Dict] = _class_to_match_node(candidate_id, vocab_index)
         if id and crel == OWL_equivalentClass and match and TYPE not in match:
             if 'valueMatches' in match:
-                source_id = match['property']
+                source_id: str = match['property']
                 rule = {
                     'property': TYPE,
                     'useValue': id,
@@ -302,15 +302,16 @@ def _process_property_chain(
                     break
 
         if rtype is not None:
-            if not source_property.startswith('_:'):
+            if source_property and not source_property.startswith('_:'):
                 property_from = source_property
 
             # TODO: Should get from last regular (non-rolified) property component,
             # and if followed by rolified, use to match value type.
             if len(prop_chain) == 3:
-                value_property = prop_chain[2]
-                if ID in value_property and not value_property[ID].startswith('_:'):
-                    value_from = value_property[ID]
+                value_property: Dict = prop_chain[2]
+                value_prop_id: str = value_property[ID]
+                if not value_prop_id.startswith('_:'):
+                    value_from = value_prop_id
 
     # TODO: Deprecate this blank subPropertyOf pattern in favour of the rolified form.
     # TODO: don't rely solely on anonymous subPropertyOf
@@ -361,27 +362,33 @@ def _extend_candidates(candidates: Candidates, candidate: Dict, rels: List[str])
                     candidates.append((None, sup))
 
 
-def _class_to_match_node(rtype, vocab_index) -> Optional[Dict]:
+def _class_to_match_node(rtype: Optional[str], vocab_index: Dict[str, JsonMap]) -> Optional[Dict]:
     if rtype is None:
         return None
 
-    if rtype.startswith('_:'):
-        restr = vocab_index.get(rtype)
+    if rtype.startswith('_:') and rtype in vocab_index:
+        restr = vocab_index[rtype]
 
-        if isinstance(restr, dict):
+        if isinstance(restr, Dict):
             if OWL_onProperty in restr:
-                match = {'property': restr[OWL_onProperty][0].get(ID)}
+                onprop = cast(List[Dict], restr[OWL_onProperty])
+                match = {'property': onprop[0].get(ID)}
 
                 valmatch: Union[str, Dict, None] = None
                 match_kind: Optional[str] = None
                 if OWL_someValuesFrom in restr:
-                    for somefrom in restr[OWL_someValuesFrom]:
+                    somevaluesfrom = cast(List[Dict], restr[OWL_someValuesFrom])
+                    for somefrom in somevaluesfrom:
+                        assert isinstance(somefrom, Dict)
                         if ID in somefrom:
                             match_kind = 'valueMatches'
-                            valmatch = _class_to_match_node(somefrom[ID], vocab_index)
+                            valmatch = _class_to_match_node(
+                                cast(str, somefrom[ID]), vocab_index
+                            )
                             break
                 elif OWL_hasValue in restr:
-                    for hasval in restr[OWL_hasValue]:
+                    hasvalue = cast(List[Dict], restr[OWL_hasValue])
+                    for hasval in hasvalue:
                         match_kind = 'valueMatches'
                         valmatch = hasval
                         break
