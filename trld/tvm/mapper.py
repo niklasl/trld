@@ -126,6 +126,8 @@ def _map(data_index: Dict, target_map: Dict, key: Union[str, int], value, drop_u
                         valmatch = cast(Dict[str, Dict], match['valueMatches'])
                         vmatches = False
                         for mk, mv in valmatch.items():
+                            if mk not in v:
+                                continue
                             for vm in as_list(v[mk]):
                                 if vm == mv:
                                     got_match = True
