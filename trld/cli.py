@@ -111,6 +111,15 @@ def process_source(source, args):
 
 
 def process_linestream(args, stream):
+    doc_cache = {}
+
+    def cached_document_loader(url, options=None):
+        if url not in doc_cache:
+            doc_cache[url] = any_document_loader(url, options)
+        return doc_cache[url]
+
+    set_document_loader(cached_document_loader)
+
     container_context = {}
 
     if isinstance(args.context, str):
