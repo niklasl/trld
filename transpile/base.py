@@ -1012,7 +1012,8 @@ class Transpiler(ast.NodeVisitor):
 
         elif isinstance(expr, ast.UnaryOp) and isinstance(expr.op, ast.USub):
             s, t = self.repr_expr_and_type(expr.operand)
-            return f'-{expr.operand.n}', t # type: ignore
+            n = expr.operand.value if isinstance(expr.operand, ast.Constant) else expr.operand.n
+            return f'-{n}', t # type: ignore
 
         elif isinstance(expr, ast.Name):
             name = self.map_name(expr.id, callargs, instance=instance)
