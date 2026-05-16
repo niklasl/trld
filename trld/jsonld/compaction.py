@@ -715,9 +715,9 @@ def iri_compaction(active_context: Context, iri: str,
         return compact_iri
 
     # 9)
-    colonx: int = iri.find(':')
-    if colonx > -1 and '//' not in iri:
-        term: Optional[Term] = active_context.terms.get(iri[0:colonx])
+    prefix = _get_prefix(iri)
+    if prefix is not None:
+        term: Optional[Term] = active_context.terms.get(prefix)
         if term and term.is_prefix:
             raise IRIConfusedWithPrefixError(str(iri))
 
@@ -727,6 +727,16 @@ def iri_compaction(active_context: Context, iri: str,
 
     # 11)
     return iri
+
+
+def _get_prefix(term_or_iri: str) -> Optional[str]:
+    idx: int = term_or_iri.find(':')
+    if idx > -1:
+        after_pfx: str = term_or_iri[idx + 1 :]
+        if not after_pfx.startswith('//'):
+            return term_or_iri[0:idx]
+
+    return None
 
 
 def term_selection(active_context: Context,
