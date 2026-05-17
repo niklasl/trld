@@ -1,5 +1,5 @@
 from typing import (Dict, Iterable, Iterator, List, NamedTuple, Optional, Set,
-                    Union, cast)
+                    Tuple, Union, cast)
 
 from ..platform.common import json_decode, json_encode_canonical
 from ..rdfterms import (I18N, RDF_DIRECTION, RDF_FIRST, RDF_JSON,
@@ -36,21 +36,25 @@ RdfObject = Union[str, RdfLiteral]
 
 
 class RdfTriple(NamedTuple):
-    s: str
-    p: str
-    o: RdfObject
+    subject: str
+    predicate: str
+    object: RdfObject
 
 
 class RdfGraph:
-    name: Optional[str]
-    triples: List[RdfTriple]
+    _triples: List[RdfTriple]
 
-    def __init__(self, name: Optional[str] = None):
-        self.name = name
-        self.triples = []
+    def __init__(self) -> None:
+        self._triples = []
 
     def add(self, triple: RdfTriple):
-        self.triples.append(triple)
+        self._triples.append(triple)
+
+    def __iter__(self) -> Iterator[RdfTriple]:
+        yield from self._triples
+
+
+NamedGraph = Tuple[Optional[str], RdfGraph]
 
 
 class RdfDataset:
@@ -61,15 +65,12 @@ class RdfDataset:
         self.default_graph = RdfGraph()
         self.named_graphs = {}
 
-    def add(self, graph: RdfGraph):
-        if graph.name:
-            self.named_graphs[graph.name] = graph
-        else:
-            self.default_graph = graph
+    def add(self, name: str, graph: RdfGraph):
+        self.named_graphs[name] = graph
 
-    def __iter__(self) -> Iterator[RdfGraph]:
-        yield self.default_graph
-        yield from self.named_graphs.values()
+    def __iter__(self) -> Iterator[NamedGraph]:
+        yield None, self.default_graph
+        yield from self.named_graphs.items()
 
 
 class _Usage(NamedTuple):
@@ -103,8 +104,8 @@ def jsonld_to_rdf_dataset(node_map: NodeMap, dataset: RdfDataset,
         if graph_name == DEFAULT:
             triples = dataset.default_graph
         else:
-            triples = RdfGraph(graph_name)
-            dataset.add(triples)
+            triples = RdfGraph()
+            dataset.add(graph_name, triples)
         # 1.3)
         for subject in cast(Iterable[str], sorted(graph.keys())):
             node: JsonMap = graph[subject]
@@ -264,9 +265,9 @@ def to_jsonld(dataset: RdfDataset,
     compound_literal_subjects: Dict[str, Set[str]] = {}
 
     # 5)
-    for graph in dataset:
+    for graph_name, graph in dataset:
         # 5.1)
-        name: str = DEFAULT if graph.name is None else graph.name
+        name: str = DEFAULT if graph_name is None else graph_name
         # 5.2)
         graph_map.setdefault(name, {})
         # 5.3)
@@ -280,28 +281,28 @@ def to_jsonld(dataset: RdfDataset,
         compounds: Set[str] = compound_literal_subjects[name]
 
         # 5.7)
-        for triple in graph.triples:
+        for triple in graph:
             # 5.7.1)
-            if triple.s not in node_map:
-                node_map[triple.s] = {ID: triple.s}
+            if triple.subject not in node_map:
+                node_map[triple.subject] = {ID: triple.subject}
             # 5.7.2)
-            node: JsonMap = node_map[triple.s]
+            node: JsonMap = node_map[triple.subject]
             # 5.7.3)
-            if rdf_direction == COMPOUND_LITERAL and triple.p == RDF_DIRECTION:
-                compounds.add(triple.s)
+            if rdf_direction == COMPOUND_LITERAL and triple.predicate == RDF_DIRECTION:
+                compounds.add(triple.subject)
             # 5.7.4)
-            if isinstance(triple.o, str) and triple.o not in node_map:
-                node_map[triple.o] = {ID: triple.o}
+            if isinstance(triple.object, str) and triple.object not in node_map:
+                node_map[triple.object] = {ID: triple.object}
             # 5.7.5)
-            if triple.p == RDF_TYPE and not use_rdf_type and isinstance(triple.o, str):
+            if triple.predicate == RDF_TYPE and not use_rdf_type and isinstance(triple.object, str):
                 types: List = cast(List, node.setdefault(TYPE, []))
-                if not any(t == triple.o for t in types):
-                    types.append(triple.o)
+                if not any(t == triple.object for t in types):
+                    types.append(triple.object)
                 continue
             # 5.7.6)
-            value: JsonMap = to_jsonld_object(triple.o, rdf_direction, use_native_types)
+            value: JsonMap = to_jsonld_object(triple.object, rdf_direction, use_native_types)
             # 5.7.7)
-            values: List[JsonObject] = cast(List, node.setdefault(triple.p, []))
+            values: List[JsonObject] = cast(List, node.setdefault(triple.predicate, []))
             # 5.7.8)
             # TODO: spec errata; continue instead, to avoid duplicates in 5.7.9
             # (see fromRdf/0022)
@@ -309,20 +310,20 @@ def to_jsonld(dataset: RdfDataset,
                 continue
             values.append(value)
             # 5.7.9)
-            if triple.o == RDF_NIL:
+            if triple.object == RDF_NIL:
                 # 5.7.9.1)
-                obj: JsonMap = node_map[cast(str, triple.o)]
+                obj: JsonMap = node_map[cast(str, triple.object)]
                 obj_usages: List = cast(List, obj.setdefault(USAGES, []))
                 # 5.7.9.2)
-                obj_usages.append(_Usage(node, triple.p, value))
+                obj_usages.append(_Usage(node, triple.predicate, value))
             # 5.7.10)
-            elif triple.o in referenced_once:
-                referenced_once[cast(str, triple.o)] = False
+            elif triple.object in referenced_once:
+                referenced_once[cast(str, triple.object)] = False
             # 5.7.11)
-            elif isinstance(triple.o, str) and is_blank(triple.o):
+            elif isinstance(triple.object, str) and is_blank(triple.object):
                 # 5.7.11.1)
-                usage: _Usage = _Usage(node, triple.p, value)
-                referenced_once[triple.o] = usage
+                usage: _Usage = _Usage(node, triple.predicate, value)
+                referenced_once[triple.object] = usage
                 # TODO: spec seems to have an overeager copy/paste error
                 # ("and values to the usages array") from just above.
 

@@ -1,32 +1,32 @@
 from typing import Optional
 from ..platform.io import Output
 from ..jsonld.base import is_blank
-from ..jsonld.rdf import RdfDataset, RdfGraph, RdfTriple, RdfLiteral
+from ..jsonld.rdf import RdfDataset, RdfGraph, RdfLiteral, RdfObject, RdfTriple
 from ..rdfterms import XSD_STRING
 
 
 def serialize(dataset: RdfDataset, out: Output):
-    for graph in dataset:
-        write_graph(graph, out)
+    for graph_name, graph in dataset:
+        write_graph(graph_name, graph, out)
 
 
-def write_graph(graph: RdfGraph, out: Output):
-    for triple in graph.triples:
-        if triple.s is None or triple.p is None or triple.o is None:
+def write_graph(graph_name: Optional[str], graph: RdfGraph, out: Output):
+    for triple in graph:
+        if triple.subject is None or triple.predicate is None or triple.object is None:
             continue
-        out.writeln(repr_quad(triple, graph.name))
+        out.writeln(repr_quad(triple, graph_name))
 
 
 def repr_quad(triple: RdfTriple, graph_name: Optional[str]) -> str:
-    s: str = repr_term(triple.s)
-    p: str = repr_term(triple.p)
-    o: str = repr_term(triple.o)
+    s: str = repr_term(triple.subject)
+    p: str = repr_term(triple.predicate)
+    o: str = repr_term(triple.object)
     spo: str = f'{s} {p} {o}'
     quad: str = f'{spo} {repr_term(graph_name)}' if graph_name else spo
     return f'{quad} .'
 
 
-def repr_term(t: object) -> str:
+def repr_term(t: RdfObject) -> str:
     if isinstance(t, str):
         if is_blank(t):
             return t

@@ -167,7 +167,7 @@ def handle_statement(dataset: RdfDataset, terms: List):
             graph = dataset.default_graph = RdfGraph()
     else:
         if g not in dataset.named_graphs:
-            dataset.named_graphs[g] = RdfGraph(g)
+            dataset.named_graphs[g] = RdfGraph()
         graph = dataset.named_graphs[g]
 
     graph.add(RdfTriple(s, p, o))

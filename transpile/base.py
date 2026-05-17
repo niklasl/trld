@@ -626,11 +626,17 @@ class Transpiler(ast.NodeVisitor):
             container.rsplit('.', 1)[0] if container.endswith(')') else container
         )
         ctype = ctypeinfo[0] if ctypeinfo else self._last_cast
+
+        if ctype in self._iterables:
+            parttype = self._iterables[ctype]
+            ctype = self.types.get('Iterable', 'Iterable')
+            return ctype, parttype
+
         containertype = self.container_type(ctype)
         # TODO: hacked this fix to let transpile.js further along, but really
         # check this logic! (I've lost my way in my djungle of code...)
-        if not containertype or not containertype.contained:
-            containertype = self.container_type(self._last_cast)
+        #if not containertype or not containertype.contained:
+        #    containertype = self.container_type(self._last_cast)
 
         if containertype:
             ctype, parttype = containertype
@@ -638,10 +644,6 @@ class Transpiler(ast.NodeVisitor):
             otype = self.types.get('object')
             assert otype is not None
             ctype, parttype = (ctype or otype), otype
-
-        if ctype in self._iterables:
-            parttype = self._iterables[ctype]
-            ctype = self.types.get('Iterable', 'Iterable')
 
         return ctype, parttype
 
