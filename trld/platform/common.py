@@ -1,7 +1,13 @@
+import hashlib
 import json
 import sys
 import uuid
+from itertools import permutations
 from urllib.parse import urljoin, urlparse
+
+
+def hash_hexdigest(algorithm: str, data: str) -> str:
+    return hashlib.new(algorithm, data.encode('utf-8')).hexdigest()
 
 
 def json_decode(s: str) -> object:

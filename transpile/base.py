@@ -541,6 +541,14 @@ class Transpiler(ast.NodeVisitor):
         self.stmt(self.map_delitem(owner, key), node=node)
 
     def visit_Expr(self, node):
+        if (
+            not self._within
+            and isinstance(node.value, ast.Constant)
+            and isinstance(node.value.value, str)
+        ):
+            print("Skipping module docstring:", node.value.value)
+            return
+
         self.stmt(self.repr_expr(node.value), node=node)
 
     def visit_If(self, node, continued=False):
@@ -581,6 +589,8 @@ class Transpiler(ast.NodeVisitor):
             assert not any(name.asname for name in node.names)
         elif node.module == 'builtins' and node.level > 0:
             pass # Members are treated at global names and mapped differently
+        elif node.module == '__future__':
+            pass
         else:
             self.handle_import(node)
 

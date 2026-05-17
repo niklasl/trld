@@ -1,4 +1,4 @@
-trld_modules = trld/jsonld/base.py trld/jsonld/expansion.py trld/jsonld/compaction.py trld/jsonld/flattening.py trld/jsonld/rdf.py trld/jsonld/testbase.py trld/nq/parser.py trld/nq/serializer.py trld/trig/parser.py trld/trig/serializer.py trld/tvm/mapmaker.py trld/tvm/mapper.py trld/tvm/test.py -I trld/builtins.py trld/platform/*.py
+trld_modules = trld/jsonld/base.py trld/jsonld/expansion.py trld/jsonld/compaction.py trld/jsonld/flattening.py trld/jsonld/rdf.py trld/jsonld/testbase.py trld/nq/parser.py trld/nq/serializer.py trld/trig/parser.py trld/trig/serializer.py trld/c14n.py trld/tvm/mapmaker.py trld/tvm/mapper.py trld/tvm/test.py -I trld/builtins.py trld/platform/*.py
 
 mkdir = python -c 'import sys, pathlib; pathlib.Path(sys.argv[1]).resolve().mkdir(parents=1, exist_ok=1)'
 
@@ -16,6 +16,9 @@ dist:
 
 cache/json-ld-api: | cache
 	git clone https://github.com/w3c/json-ld-api.git cache/json-ld-api
+
+cache/rdf-canon: | cache
+	git clone https://github.com/w3c/rdf-canon.git cache/rdf-canon
 
 cache/trig-tests.tar.gz: | cache
 	curl -o $@ https://www.w3.org/2013/TrigTests/TESTS.tar.gz
