@@ -8,15 +8,15 @@ See: <https://www.w3.org/TR/rdf-canon/>.
 from __future__ import annotations
 
 from collections import OrderedDict
-from typing import Dict, Iterable, List, NamedTuple, Optional, Set, Tuple, cast
+from typing import Dict, Iterable, List, NamedTuple, Optional, Tuple, cast
 
 from .jsonld.rdf import RdfDataset, RdfGraph, RdfLiteral, RdfObject, RdfTriple
 from .nq.serializer import repr_quad
 from .platform.common import hash_hexdigest, permutations
 
 
-def canonicalize(input_ds: RdfDataset) -> RdfDataset:
-    c14n_state = CanonicalizationState()
+def canonicalize(input_ds: RdfDataset, hash_algorithm='sha256') -> RdfDataset:
+    c14n_state = CanonicalizationState(hash_algorithm)
     c14n_state.canonicalize(input_ds)
     mapper = c14n_state.get_mapper()
 
@@ -49,7 +49,7 @@ class CanonicalizationState:
     canonical_issuer: BNodeIdentifierIssuer
     hash_algorithm: str
 
-    def __init__(self, hash_algorithm='sha256'):
+    def __init__(self, hash_algorithm: str):
         self.blank_node_to_quads_map = {}
         self.hash_to_blank_nodes_map = {}
         self.canonical_issuer = BNodeIdentifierIssuer()
@@ -94,7 +94,8 @@ class CanonicalizationState:
             del self.hash_to_blank_nodes_map[hash]
 
         # 5) For each hash to identifier list map entry in hash to blank nodes map, code point ordered by hash:
-        for hash, id_list in self.hash_to_blank_nodes_map.items():
+        for hash in sorted(self.hash_to_blank_nodes_map.keys()):
+            id_list = self.hash_to_blank_nodes_map[hash]
             # 5.1) Create hash path list where each item will be a result of running the Hash N-Degree Quads algorithm.
             hash_path_list: List[Tuple[BNodeIdentifierIssuer, str]] = []
             # 5.2) For each blank node identifier n in identifier list:
@@ -160,8 +161,11 @@ class CanonicalizationState:
             input_chunks.append(f"<{quad.p}>")
         # 3. If there is a canonical identifier for related, or an identifier issued by issuer, append the string _:, followed by that identifier (using the canonical identifier if present, otherwise the one issued by issuer) to input.
         identifier: Optional[str] = self.canonical_issuer.issued_identifiers_map.get(
-            related, issuer.issued_identifiers_map.get(related)
+            related
         )
+        if identifier is None:
+            identifier = issuer.issued_identifiers_map.get(related)
+
         if identifier is not None:
             input_chunks.append(f"_:{identifier}")
         # 4. Otherwise, append the result of the Hash First Degree Quads algorithm, passing related to input.
