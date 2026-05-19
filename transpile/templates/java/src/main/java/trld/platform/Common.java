@@ -8,6 +8,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.IntPredicate;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
@@ -52,6 +53,20 @@ public class Common {
       }
       return permutations;
     }
+
+    public static String escapeCodepoints(String s, IntPredicate needsEsc) {
+        StringBuilder sb = new  StringBuilder();
+        s.codePoints().forEach(cp -> {
+            if (needsEsc.test(cp)) {
+                sb.append(String.format("\\u%04X", cp));
+            } else {
+                sb.appendCodePoint(cp);
+            }
+        });
+        return sb.toString();
+    }
+
+
     public static String resolveIri(String base, String relative) {
         try {
             return new URI(base).resolve(relative).toString();

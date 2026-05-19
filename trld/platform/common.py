@@ -1,3 +1,4 @@
+from typing import Callable
 import hashlib
 import json
 import sys
@@ -8,6 +9,10 @@ from urllib.parse import urljoin, urlparse
 
 def hash_hexdigest(algorithm: str, data: str) -> str:
     return hashlib.new(algorithm, data.encode('utf-8')).hexdigest()
+
+
+def escape_codepoints(s: str, needs_esc: Callable[[int], bool]) -> str:
+    return ''.join(fr"\u{ord(c):04X}" if needs_esc(ord(c)) else c for c in s)
 
 
 def json_decode(s: str) -> object:

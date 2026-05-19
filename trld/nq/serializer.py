@@ -1,4 +1,5 @@
 from typing import Optional
+from ..platform.common import escape_codepoints
 from ..platform.io import Output
 from ..jsonld.base import is_blank
 from ..jsonld.rdf import RdfDataset, RdfGraph, RdfLiteral, RdfObject, RdfTriple
@@ -54,7 +55,7 @@ def repr_term(t: RdfObject) -> str:
         # (delete, code point U+007F), and characters not matching the Char
         # production from [XML11] MUST be represented by UCHAR using a
         # lowercase \u with 4 HEXes.
-        v = ''.join(fr"\u{ord(c):04X}" if _needs_unicode_esc(c) else c for c in v)
+        v = escape_codepoints(v, lambda c: _needs_unicode_esc(c))
 
         # All characters not required to be represented by ECHAR or UCHAR MUST
         # be represented by their native [UNICODE] representation.
@@ -68,17 +69,16 @@ def repr_term(t: RdfObject) -> str:
             return v
 
 
-def _needs_unicode_esc(c: str) -> bool:
-    cp = ord(c)
+def _needs_unicode_esc(cp: int) -> bool:
     return (
-        (0x00 < cp <= 0x07)
+        (0x00 < cp and cp <= 0x07)
         or cp == 0x0B
-        or (0x0E < cp <= 0x1F)
+        or (0x0E < cp and cp <= 0x1F)
         or cp == 0x7F
         or not (
             # Char from <https://www.w3.org/TR/xml11/#charsets>
-            (0x01 < cp <= 0xD7FF)
-            or (0xE000 < cp <= 0xFFFD)
-            or (0x10000 < cp <= 0x10FFFF)
+            (0x01 < cp and cp <= 0xD7FF)
+            or (0xE000 < cp and cp <= 0xFFFD)
+            or (0x10000 < cp and cp <= 0x10FFFF)
         )
     )

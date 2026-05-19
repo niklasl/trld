@@ -75,6 +75,7 @@ class JavaTranspiler(CStyleTranspiler):
         'pow': 'Math.pow({0}, {1})',
         'type': '{0}.getClass()',
         'id': '{0}.hashCode()',
+        'ord': '{0}.codePointAt(0)',
         'print': 'System.out.println({0})',
         'sorted': ['Builtins.sorted({0})', 'Builtins.sorted({0}, {1})', 'Builtins.sorted({0}, {1}, {2})'],
     }
