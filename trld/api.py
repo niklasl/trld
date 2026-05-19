@@ -56,7 +56,9 @@ def serialize_rdf(result: Any, fmt: Optional[str], out=None, context=None) -> No
 
         return
 
-    out = Output(out or sys.stdout)
+    if not isinstance(out, Output):
+        out = Output(out or sys.stdout)
+
     if fmt in {'trig', 'ttl', 'turtle', 'turtle-union'}:
         from .trig import serializer as trig
 
