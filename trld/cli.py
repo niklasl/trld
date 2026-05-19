@@ -161,7 +161,7 @@ def make_argsparser():
     argparser.add_argument('-r', '--recompact', action='store_true',
                         help='Re-compact input into a Turtle-like shape (same as -e -f -c -B)')
     argparser.add_argument('-s', '--sorted', action='store_true', help='Sort output by @id and objects by key')
-    argparser.add_argument('-C', '--no-context', help='Exclude context from result JSON-LD', const=True, nargs='?')
+    argparser.add_argument('-C', '--no-context', help='Exclude context from result JSON-LD', action='store_true')
 
     return argparser
 
