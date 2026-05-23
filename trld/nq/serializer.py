@@ -71,14 +71,14 @@ def repr_term(t: RdfObject) -> str:
 
 def _needs_unicode_esc(cp: int) -> bool:
     return (
-        (0x00 < cp and cp <= 0x07)
+        (0x00 <= cp and cp <= 0x07)
         or cp == 0x0B
-        or (0x0E < cp and cp <= 0x1F)
+        or (0x0E <= cp and cp <= 0x1F)
         or cp == 0x7F
         or not (
             # Char from <https://www.w3.org/TR/xml11/#charsets>
-            (0x01 < cp and cp <= 0xD7FF)
-            or (0xE000 < cp and cp <= 0xFFFD)
-            or (0x10000 < cp and cp <= 0x10FFFF)
+            (0x01 <= cp and cp <= 0xD7FF)
+            or (0xE000 <= cp and cp <= 0xFFFD)
+            or (0x10000 <= cp and cp <= 0x10FFFF)
         )
     )

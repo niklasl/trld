@@ -15,7 +15,9 @@ from .nq.serializer import repr_quad
 from .platform.common import hash_hexdigest, permutations
 
 
-def canonicalize(input_ds: RdfDataset, hash_algorithm='sha256') -> RdfDataset:
+def canonicalize(input_ds: RdfDataset, hash_algorithm: Optional[str] = None) -> RdfDataset:
+    if hash_algorithm is None:
+        hash_algorithm = 'sha256'
     c14n_state = CanonicalizationState(hash_algorithm)
     c14n_state.canonicalize(input_ds)
     mapper = c14n_state.get_mapper()
@@ -386,7 +388,7 @@ def _remap_quad_component(component: RdfObject, ref_blank_node_id: str) -> RdfOb
     if isinstance(component, str):
         bnode_id = _get_bnode_id(component)
         if bnode_id is not None:
-            return "a" if bnode_id == ref_blank_node_id else "z"
+            return "_:a" if bnode_id == ref_blank_node_id else "_:z"
     return component
     # 3.1.1.1 If the blank node's existing blank node identifier matches the reference blank node identifier then use the blank node identifier a, otherwise, use the blank node identifier z.
 
