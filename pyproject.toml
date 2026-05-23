@@ -1,6 +1,30 @@
-[build-system]
-requires = [
-    "setuptools>=42",
-    "wheel"
+[project]
+name = "trld"
+authors = [
+    {name = "Niklas Lindström", email = "lindstream@gmail.com"},
 ]
-build-backend = "setuptools.build_meta"
+description = "A library of algorithms for working with JSON-LD and translating between various forms of RDF."
+keywords = ["Linked Data", "JSON-LD", "RDF"]
+classifiers = [
+    "License :: OSI Approved :: Zero-Clause BSD (0BSD)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Typing :: Typed",
+]
+license = "0BSD"
+readme = "README.md"
+dynamic = ["version"]
+requires-python = ">=3.10"
+
+[project.urls]
+source = "https://github.com/niklasl/trld"
+
+[project.scripts]
+trld = "trld.cli:main"
+
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "vcs"
