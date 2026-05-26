@@ -204,8 +204,9 @@ class SerializerState:
             in_list = False,
     ) -> List[StrObject]:
         if depth > 0 and isinstance(obj, Dict) and CONTEXT in obj:
-            # TODO: use SerializerState(node[CONTEXT], None, None, state)
-            raise Exception('Nested context not supported yet')
+            # TODO: use SerializerState(node[CONTEXT], None, None, state)?
+            # Or just require a simple context to be used for input.
+            raise Exception('Nested context not supported')
 
         if via_key and self.is_lang_container(via_key) and isinstance(obj, Dict):
             first = True
@@ -508,7 +509,10 @@ class SerializerState:
             if datatype:
                 parts.append("^^" + self.to_valid_term(cast(str, self.term_for(datatype))))
             elif isinstance(lang, str):
-                parts.append(f"@{lang}")
+                # Robustness principle:
+                if len(lang) > 0:
+                    parts.append(f"@{lang}")
+                # else: # TODO: Warn? JSON-LD with empty string lang is invalid.
             return ''.join(parts)
         elif isinstance(v, bool):
             return 'true' if v else 'false'
