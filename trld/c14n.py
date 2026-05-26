@@ -18,6 +18,7 @@ from .platform.common import hash_hexdigest, permutations
 def canonicalize(input_ds: RdfDataset, hash_algorithm: Optional[str] = None) -> RdfDataset:
     if hash_algorithm is None:
         hash_algorithm = 'sha256'
+
     c14n_state = CanonicalizationState(hash_algorithm)
     c14n_state.canonicalize(input_ds)
     mapper = c14n_state.get_mapper()

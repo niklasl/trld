@@ -19,7 +19,6 @@ def test_testcase(entry: dict) -> None:
     ds = canonicalize(ds, entry.get('hashAlgorithm'))
     out = Output()
     serialize(ds, out)
-    print(out.get_value())
     result_lines = sorted(l for l in set(out.get_value().split('\n')) if l)
 
     with (tests_dir / entry['result']).open() as f:

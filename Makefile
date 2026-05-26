@@ -31,7 +31,7 @@ pytestreport: | cache/json-ld-api
 	python3 -m trld.jsonld.test cache/json-ld-api/tests/expand-manifest.jsonld cache/json-ld-api/tests/compact-manifest.jsonld cache/json-ld-api/tests/flatten-manifest.jsonld cache/json-ld-api/tests/fromRdf-manifest.jsonld cache/json-ld-api/tests/toRdf-manifest.jsonld --reports-dir build/reports 2>&1 | grep '^Running test suite\|^Ran '
 	cd build/reports; for fname in *-report.jsonld; do python3 -m trld $$fname -o ttl > $${fname%.jsonld}.ttl; done
 
-pytest: | cache/json-ld-api cache/trig-tests
+pytest: | cache/json-ld-api cache/trig-tests cache/rdf-canon
 	mypy trld/
 	pytest --doctest-modules trld/ test/
 	python3 -m trld.jsonld.test cache/json-ld-api/tests/expand-manifest.jsonld cache/json-ld-api/tests/compact-manifest.jsonld cache/json-ld-api/tests/flatten-manifest.jsonld cache/json-ld-api/tests/fromRdf-manifest.jsonld cache/json-ld-api/tests/toRdf-manifest.jsonld 2>&1 | grep '^Running test suite\|^Ran '
