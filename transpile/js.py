@@ -169,7 +169,10 @@ class JsTranspiler(CStyleTranspiler):
         if ctype.endswith('Map') or container.endswith('.entrySet()'):
             container = container.replace('.entrySet()', '')
             key, val = part.split(', ')
-            ktype, vtype = parttype.split(', ', 1)
+            if ', ' in parttype:
+                ktype, vtype = parttype.split(', ', 1)
+            else:
+                ktype, vtype = 'String', parttype
             stmts = [f'let {val} = {container}[{key}]']
             nametypes = [(key, ktype), (val, vtype)]
             return f'for (let {key} in {container})', stmts, nametypes
@@ -177,8 +180,17 @@ class JsTranspiler(CStyleTranspiler):
             typeinfo = self.gettype(container.split('.', 1)[0])
             wait = 'await ' if typeinfo and typeinfo[0] == 'Input' else ''
             if ',' in part:
+                parts = part.split(', ', 1)
+                if parttype.startswith('Tuple<'):
+                    parttype = parttype.removeprefix('Tuple<').removesuffix('>')
+                parttypes = parttype.split(', ', 1)
+                nametypes = list(zip(parts, parttypes))
+                print(nametypes)
                 part = f'[{part}]'
-            return f'for {wait}(let {part} of {container})', [], [(part, parttype)]
+            else:
+                nametypes = [(part, parttype)]
+
+            return f'for {wait}(let {part} of {container})', [], nametypes
 
     def map_for_to(self, counter, ceiling):
         ct = [(counter, 'Number')]
