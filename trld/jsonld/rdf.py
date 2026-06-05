@@ -454,18 +454,16 @@ def to_jsonld_object(value: RdfObject,
     result: JsonMap = {}
     # 2.2)
     # TODO: spec errata? says: value
-    converted_value: JsonObject = literal.value
+    converted_value: Optional[JsonObject] = None
     # 2.3)
     rtype: Optional[str] = None
 
     # 2.4)
     # NOTE: spec errata <https://github.com/w3c/json-ld-api/issues/670>:
-    # We need to track if done to get to the else clauses.
-    done_converting = False
+    # We need to track if converted_value is set to get to the else clauses.
     if use_native_types:
         if literal.datatype == XSD_STRING:
             converted_value = literal.value
-            done_converting = True
         elif literal.datatype == XSD_BOOLEAN:
             if literal.value == 'true':
                 converted_value = True
@@ -473,57 +471,52 @@ def to_jsonld_object(value: RdfObject,
                 converted_value = False
             else:
                 rtype = XSD_BOOLEAN
-            done_converting = True
+                converted_value = literal.value
         elif literal.datatype == XSD_INTEGER and literal.value.isdecimal():
             converted_value = int(literal.value)
-            done_converting = True
         elif literal.datatype == XSD_DOUBLE:# and all(c == '.' or c.isdecimal() for c in literal.value):
             try:
                 converted_value = float(literal.value)
-                done_converting = True
             except ValueError:
                 pass
-        # NOTE: part of spec errata; done in an elif branch below (see fromRdf/0018)
-        elif literal.datatype != XSD_STRING:
-            rtype = literal.datatype
 
-    if done_converting:
-        pass
-    # 2.5)
-    elif literal.datatype == RDF_JSON and processing_mode != JSONLD10:
-        try:
-            converted_value = cast(JsonObject, json_decode(literal.value))
-        except:# json.decoder.JSONDecodeError
-            pass
-        rtype = JSON
-    # 2.6)
-    elif rdf_direction == I18N_DATATYPE and literal.datatype is not None and literal.datatype.startswith(I18N):
-        # 2.6.1)
+    if converted_value is None:
         converted_value = literal.value
-        # 2.6.2)
-        frag_id: str = literal.datatype[len(I18N):]
-        i: int = frag_id.find('_')
-        lang: str = frag_id
-        direction: str = ''
-        if i > -1:
-            lang = frag_id[:i]
-            direction = frag_id[i + 1:]
-        if len(lang) > 0:
-            result[LANGUAGE] = lang
-        # 2.6.3)
-        if len(direction) > 0:
-            result[DIRECTION] = direction
-    # 2.7)
-    elif literal.language is not None:
-        result[LANGUAGE] = literal.language
-    # 2.8)
-    elif literal.datatype and literal.datatype != XSD_STRING:
-        rtype = literal.datatype
+        # 2.5)
+        if literal.datatype == RDF_JSON and processing_mode != JSONLD10:
+            try:
+                converted_value = cast(JsonObject, json_decode(literal.value))
+            except:# json.decoder.JSONDecodeError
+                pass
+            rtype = JSON
+        # 2.6)
+        elif rdf_direction == I18N_DATATYPE and literal.datatype is not None and literal.datatype.startswith(I18N):
+            # 2.6.1)
+            pass
+            # 2.6.2)
+            frag_id: str = literal.datatype[len(I18N):]
+            i: int = frag_id.find('_')
+            lang: str = frag_id
+            direction: str = ''
+            if i > -1:
+                lang = frag_id[:i]
+                direction = frag_id[i + 1:]
+            if len(lang) > 0:
+                result[LANGUAGE] = lang
+            # 2.6.3)
+            if len(direction) > 0:
+                result[DIRECTION] = direction
+        # 2.7)
+        elif literal.language is not None:
+            result[LANGUAGE] = literal.language
+        # 2.8)
+        elif literal.datatype and literal.datatype != XSD_STRING:
+            rtype = literal.datatype
 
     # 2.9)
     result[VALUE] = converted_value
     # 2.10)
-    if rtype:
+    if rtype is not None:
         result[TYPE] = rtype
 
     # 2.11)
