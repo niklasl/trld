@@ -464,17 +464,22 @@ def to_jsonld_object(value: RdfObject,
         if literal.datatype == XSD_STRING:
             converted_value = literal.value
         elif literal.datatype == XSD_BOOLEAN:
-            if literal.value == 'true':
+            if literal.value == 'true' or literal.value == '1':
                 converted_value = True
-            elif literal.value == 'false':
+            elif literal.value == 'false' or literal.value == '0':
                 converted_value = False
             else:
                 rtype = XSD_BOOLEAN
+                converted_value = literal.value
         elif literal.datatype == XSD_INTEGER and literal.value.isdecimal():
             converted_value = int(literal.value)
-        elif literal.datatype == XSD_DOUBLE:# and all(c == '.' or c.isdecimal() for c in literal.value):
+        elif literal.datatype == XSD_DOUBLE and literal.value != 'INF' and literal.value != '-INF':
             try:
                 converted_value = float(literal.value)
+                # sys.float_info.max (same as java.lang.Double.MAX_VALUE)
+                if cast(float, converted_value) > 1.7976931348623157e+308:
+                    converted_value = literal.value
+                    rtype = XSD_DOUBLE
             except ValueError:
                 pass
         # TODO: spec errata; only done in an otherwise below (thus fromRdf/0018 fails)
