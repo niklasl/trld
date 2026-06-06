@@ -78,7 +78,7 @@ JS-based command-line usage:
     $ cd build/js
     $ node -r esm lib/jsonld/cli.js [-f] [-c CONTEXT] FILE
 
-## Building & Testing (& Status)
+## Building, Testing and Status
 
 Build requirements:
 
@@ -94,23 +94,21 @@ For Python, this runs mypy, pytest and the test suite:
     $ make pytest
     [...]
 
-    python3 -m trld.jsonld.test [...]
     Running test suite: cache/json-ld-api/tests/expand-manifest.jsonld
-    Ran 376 test cases. Passed: 371. Failed: 4. Errors: 1.
+    Ran 376 test cases. Passed: 372. Failed: 3. Errors: 1.
     Running test suite: cache/json-ld-api/tests/compact-manifest.jsonld
-    Ran 244 test cases. Passed: 241. Failed: 3. Errors: 0.
+    Ran 244 test cases. Passed: 241. Failed: 2. Errors: 1.
     Running test suite: cache/json-ld-api/tests/flatten-manifest.jsonld
     Ran 55 test cases. Passed: 55. Failed: 0. Errors: 0.
     Running test suite: cache/json-ld-api/tests/fromRdf-manifest.jsonld
-    Ran 52 test cases. Passed: 51. Failed: 1. Errors: 0.
+    Ran 52 test cases. Passed: 52. Failed: 0. Errors: 0.
     Running test suite: cache/json-ld-api/tests/toRdf-manifest.jsonld
     Ran 456 test cases. Passed: 405. Failed: 50. Errors: 1.
-
     python3 -m trld.tvm.test
     Running [...]: OK
 
     python3 -m trld.trig.test | grep '^Ran '
-    Ran 335 tests. Passed 299, failed 36
+    Ran 335 tests. Passed 303, failed 32
 
     python3 -m trld.trig.test_serializer | grep '^Examined '
     Examined 335 tests. Round-tripped 232, passed 223, failed 6
