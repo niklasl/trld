@@ -454,14 +454,13 @@ def to_jsonld_object(value: RdfObject,
     # 2.1)
     result: JsonMap = {}
     # 2.2)
-    # TODO: spec errata? says: value
+    # NOTE: Changed to fix spec errata <https://github.com/w3c/json-ld-api/issues/670>:
+    # Track if converted_value is actually set to get to the other clauses.
     converted_value: Optional[JsonObject] = None
     # 2.3)
     rtype: Optional[str] = None
 
     # 2.4)
-    # NOTE: spec errata <https://github.com/w3c/json-ld-api/issues/670>:
-    # We need to track if converted_value is set to get to the else clauses.
     if use_native_types:
         if literal.datatype == XSD_STRING:
             converted_value = literal.value
@@ -470,9 +469,6 @@ def to_jsonld_object(value: RdfObject,
                 converted_value = True
             elif literal.value == 'false' or literal.value == '0':
                 converted_value = False
-            else:
-                rtype = XSD_BOOLEAN
-                converted_value = literal.value
         elif literal.datatype == XSD_INTEGER and literal.value.isdecimal():
             converted_value = int(literal.value)
         elif literal.datatype == XSD_DOUBLE and literal.value != 'INF' and literal.value != '-INF':
@@ -480,25 +476,25 @@ def to_jsonld_object(value: RdfObject,
                 converted_value = float(literal.value)
                 # sys.float_info.max (same as java.lang.Double.MAX_VALUE)
                 if cast(float, converted_value) > 1.7976931348623157e+308:
-                    converted_value = literal.value
-                    rtype = XSD_DOUBLE
+                    converted_value = None
             except ValueError:
                 pass
 
+    # NOTE: Numbers per proposed fix in <https://github.com/w3c/json-ld-api/issues/671>:
+    # 2.5)
     if converted_value is None:
+        # 2.5.1)
         converted_value = literal.value
-        # 2.5)
+        # 2.5.2)
         if literal.datatype == RDF_JSON and processing_mode != JSONLD10:
             try:
                 converted_value = cast(JsonObject, json_decode(literal.value))
             except:# json.decoder.JSONDecodeError
                 pass
             rtype = JSON
-        # 2.6)
+        # 2.5.3)
         elif rdf_direction == I18N_DATATYPE and literal.datatype is not None and literal.datatype.startswith(I18N):
-            # 2.6.1)
-            pass
-            # 2.6.2)
+            # 2.5.3.1)
             frag_id: str = literal.datatype[len(I18N):]
             i: int = frag_id.find('_')
             lang: str = frag_id
@@ -508,23 +504,23 @@ def to_jsonld_object(value: RdfObject,
                 direction = frag_id[i + 1:]
             if len(lang) > 0:
                 result[LANGUAGE] = lang
-            # 2.6.3)
+            # 2.5.3.2)
             if len(direction) > 0:
                 result[DIRECTION] = direction
-        # 2.7)
+        # 2.5.4)
         elif literal.language is not None:
             result[LANGUAGE] = literal.language
-        # 2.8)
+        # 2.5.5)
         elif literal.datatype and literal.datatype != XSD_STRING:
             rtype = literal.datatype
 
-    # 2.9)
+    # 2.6)
     result[VALUE] = converted_value
-    # 2.10)
+    # 2.7)
     if rtype is not None:
         result[TYPE] = rtype
 
-    # 2.11)
+    # 2.8)
     return result
 
 
