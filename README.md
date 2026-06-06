@@ -83,11 +83,13 @@ JS-based command-line usage:
 Build requirements:
 
 * Make
-* For Python: Python >=3.10,<3.14 (plus mypy and pytest for development)
+* For Python: Python >=3.10,<3.14 (plus mypy and pytest for development, and hatchling for packaging)
 * For Java: Java 11+ (uses Gradle Wrapper)
 * For JS: Node 20+ (using ES6 & ESM)
 
 *Note: TRLD runs well on Python 3.14, but the transpiler does not (yet).*
+
+(A `pixi.toml` file is available for declarative development environments using [Pixi](https://pixi.sh/).)
 
 For Python, this runs mypy, pytest and the test suite:
 

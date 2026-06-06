@@ -40,12 +40,8 @@ pytest: | cache/json-ld-api cache/trig-tests cache/rdf-canon
 	python3 -m trld.trig.test_serializer | grep '^Examined '
 	PYTHONPATH=. bash test/test_misc.sh
 
-pydev: dev-requirements.txt
-	python -c 'import sys; assert sys.prefix != sys.base_prefix, "Not in a venv"'
-	pip install -r dev-requirements.txt
-
-pypkg: build dist pydev pytest
-	python3 -m build
+pypkg: build dist pytest
+	hatch build
 
 javatr: build | cache/json-ld-api cache/trig-tests
 	mkdir -p build/java
