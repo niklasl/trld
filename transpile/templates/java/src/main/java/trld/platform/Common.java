@@ -3,6 +3,13 @@ package trld.platform;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.IntPredicate;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -10,6 +17,55 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 public class Common {
 
     private static final ObjectMapper mapper = new ObjectMapper();
+
+    public static String hashHexdigest(String algorithm, String data) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(data.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hexString = new StringBuilder(2 * hash.length);
+            for (int i = 0; i < hash.length; i++) {
+                String hex = Integer.toHexString(0xff & hash[i]);
+                if(hex.length() == 1) {
+                    hexString.append('0');
+                }
+                hexString.append(hex);
+            }
+            return hexString.toString();
+        } catch (NoSuchAlgorithmException e) {
+            return null;
+        }
+    }
+
+    public static <A> List<List<A>> permutations(List<A> original) {
+      List<List<A>> permutations = new ArrayList<>();
+      if (original.isEmpty()) {
+        permutations.add(original);
+      } else {
+          A first = original.get(0);
+          List<List<A>> subpermutations = permutations(original.subList(1, original.size()));
+          for (List<A> smaller : subpermutations) {
+              for (int i=0; i <= smaller.size(); ++i) {
+                  List<A> mut = new ArrayList<>(smaller);
+                  mut.add(i, first);
+                  permutations.add(mut);
+              }
+          }
+      }
+      return permutations;
+    }
+
+    public static String escapeCodepoints(String s, IntPredicate needsEsc) {
+        StringBuilder sb = new  StringBuilder();
+        s.codePoints().forEach(cp -> {
+            if (needsEsc.test(cp)) {
+                sb.append(String.format("\\u%04X", cp));
+            } else {
+                sb.appendCodePoint(cp);
+            }
+        });
+        return sb.toString();
+    }
+
 
     public static String resolveIri(String base, String relative) {
         try {

@@ -2,8 +2,10 @@ import argparse
 import json
 import os
 import sys
+from typing import Any, cast
 
 from .platform.common import json_encode
+from .platform.io import Output
 from .jsonld.keys import BASE, CONTAINER, CONTEXT, TYPE
 from .jsonld.compaction import compact
 from .jsonld.context import get_context
@@ -21,12 +23,15 @@ def printerr(msg):
     print(msg, file=sys.stderr)
 
 
-def process_source(source, args):
+def process_source(source, args) -> None:
     source_is_data = isinstance(source, (dict, list))
 
     ordered = args.sorted
 
     expand_context = args.expand_context
+
+    if not expand_context and (args.c14n or args.output_format == 'nq'):
+        expand_context = True
 
     base_iri = (
         args.base if args.base
@@ -35,24 +40,42 @@ def process_source(source, args):
         else source
     )
 
+    out = Output(sys.stdout)
+
     try:
+        result: Any
         if source_is_data:
             data = source
         else:
             data = parse_rdf(source, args.input_format)
 
         if expand_context:
-            if expand_context == True:
-                expand_context = None
-            elif isinstance(expand_context, str):
+            if isinstance(expand_context, str):
                 expand_context = _absolutize(args.expand_context)
+            elif expand_context == True:
+                expand_context = None
 
             result = expand(data, base_iri, expand_context, ordered=ordered)
         else:
             result = data
 
-        if args.flatten or args.output_format in {'nq', True}:
+        if args.flatten or args.c14n or args.output_format in {'nq', True}:
             result = flatten(result, ordered=ordered)
+
+        if args.c14n:
+            from .jsonld import rdf
+            from . import c14n
+
+            dataset = rdf.to_rdf_dataset(result)
+            canon_dataset = c14n.canonicalize(dataset)
+
+            if args.output_format == 'nq':
+                from .nq import serializer as nq
+
+                nq.serialize(canon_dataset, out)
+                return
+            else:
+                result = rdf.to_jsonld(canon_dataset)
 
         context = None
 
@@ -66,8 +89,7 @@ def process_source(source, args):
 
             if isinstance(context_ref, dict):
                 if args.expand_context is True:
-                    context = get_context(context_ref, base_iri)
-                    simplified = to_simple_context(context)
+                    simplified = to_simple_context(get_context(context_ref, base_iri))
                     # NOTE: Drop base only if added via base_iri.
                     if (
                         not isinstance(context_ref, dict) or BASE not in data[CONTEXT]
@@ -81,13 +103,14 @@ def process_source(source, args):
                 context = get_context(context_ref)
                 if args.base is not None:
                     context.base_iri = args.base
+
                 result = compact(context, result, base_iri, ordered=ordered)
 
             if isinstance(context_ref, dict) and CONTEXT in context_ref:
                 result[CONTEXT] = context_ref[CONTEXT]
 
         if args.embed_blanks:
-            from .jsonld.extras.frameblanks import frameblanks  # type: ignore[import]
+            from .jsonld.extras.frameblanks import frameblanks
 
             result = frameblanks(result)
 
@@ -102,7 +125,7 @@ def process_source(source, args):
         if args.no_context and isinstance(result, dict):
             del result[CONTEXT]
 
-        serialize_rdf(result, args.output_format, None, context)
+        serialize_rdf(result, args.output_format, out, context)
 
     except Exception as e:
         printerr(f"Error in file '{source}'")
@@ -111,6 +134,15 @@ def process_source(source, args):
 
 
 def process_linestream(args, stream):
+    doc_cache = {}
+
+    def cached_document_loader(url, options=None):
+        if url not in doc_cache:
+            doc_cache[url] = any_document_loader(url, options)
+        return doc_cache[url]
+
+    set_document_loader(cached_document_loader)
+
     container_context = {}
 
     if isinstance(args.context, str):
@@ -152,7 +184,8 @@ def make_argsparser():
     argparser.add_argument('-r', '--recompact', action='store_true',
                         help='Re-compact input into a Turtle-like shape (same as -e -f -c -B)')
     argparser.add_argument('-s', '--sorted', action='store_true', help='Sort output by @id and objects by key')
-    argparser.add_argument('-C', '--no-context', help='Exclude context from result JSON-LD', const=True, nargs='?')
+    argparser.add_argument('-C', '--no-context', help='Exclude context from result JSON-LD', action='store_true')
+    argparser.add_argument('--c14n', help='Relabel blank nodes using RDF Canonicalization', action='store_true')
 
     return argparser
 

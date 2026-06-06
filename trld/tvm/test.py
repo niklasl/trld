@@ -7,7 +7,7 @@ from ..jsonld.flattening import flatten
 from ..jsonld.compaction import compact
 from ..jsonld.extras.index import make_index
 from .mapmaker import make_target_map, leads_to
-from .mapper import map_to
+from .mapper import ListOrJsonMap, map_to
 
 
 DEBUG = False
@@ -507,6 +507,104 @@ def test_property_chains_for_events_rolified():
     check(given, target, expect, assuming)
 
 
+def test_property_chains_matching_rolified_types():
+    given = {
+        "@id": "/work/a",
+        "schema:category": [
+            {
+                "@type": "bf:GenreForm",
+                "@id":"/gf/Literature"
+            },
+            {
+                "@type": "bf:Content",
+                "@id":"/rda/Text"
+            }
+        ]
+    }
+
+    target = {"@vocab": "http://id.loc.gov/ontologies/bibframe/"}
+
+    expect = {
+        "@id": "/work/a",
+        "bf:content": {
+            "@type": "bf:Content",
+            "@id": "/rda/Text"
+        },
+        "bf:genreForm": {
+            "@type": "bf:GenreForm",
+            "@id": "/gf/Literature"
+        }
+    }
+
+    assuming = {
+        "@graph": [
+            {
+                "@id": "bf:content",
+                "owl:propertyChainAxiom": {
+                    "@list": [
+                        {"@id": "schema:category"},
+                        {"@id": "_:a_Content"}
+                    ]
+                }
+            },
+            {
+                "owl:hasSelf": True,
+                "owl:onProperty": {"@id": "_:a_Content"},
+                "owl:equivalentClass": {"@id": "bf:Content"}
+            },
+            {
+                "@id": "bf:genreForm",
+                "owl:propertyChainAxiom": {
+                    "@list": [
+                        {"@id": "schema:category"},
+                        {"@id": "_:a_GenreForm"}
+                    ]
+                }
+            },
+            {
+                "owl:hasSelf": True,
+                "owl:onProperty": {"@id": "_:a_GenreForm"},
+                "owl:equivalentClass": {"@id": "bf:GenreForm"}
+            }
+        ]
+    }
+
+    check(given, target, expect, assuming)
+
+
+def test_type_from_matching_restriction():
+    given = {
+        "@id": "/work/a",
+        "bf:content": [
+            {
+                "@type": "bf:Content",
+                "@id":"/rda/Text"
+            }
+        ]
+    }
+
+    target = {"@vocab": "http://id.loc.gov/ontologies/bibframe/"}
+
+    expect = {
+        "@id": "/work/a",
+        "@type": "bf:Text"
+    }
+
+    assuming = {
+        "@graph": [
+            {
+                "@id": "bf:Text",
+                "owl:equivalentClass": {
+                    "owl:onProperty": {"@id": "bf:content"},
+                    "owl:hasValue": {"@id": "/rda/Text"}
+                }
+            }
+        ]
+    }
+
+    check(given, target, expect, assuming)
+
+
 def test_add_to_existing_key():
     given = {
         "@id": "",
@@ -684,7 +782,7 @@ def check(given: Dict, target: JsonObject, expect: Dict, assuming: Dict) -> None
     if DEBUG:
         print(_jsonstr(target_map))
     indata: JsonObject = expand(dict(context, **given), "")
-    outdata: JsonObject = map_to(target_map, indata, drop_unmapped)
+    outdata: JsonObject = map_to(target_map, cast(ListOrJsonMap, indata), drop_unmapped)
     outdata = compact(context, outdata)
     assert_json_equals(outdata, expect)
 

@@ -1,4 +1,4 @@
-trld_modules = trld/jsonld/base.py trld/jsonld/expansion.py trld/jsonld/compaction.py trld/jsonld/flattening.py trld/jsonld/rdf.py trld/jsonld/testbase.py trld/nq/parser.py trld/nq/serializer.py trld/trig/parser.py trld/trig/serializer.py trld/tvm/mapmaker.py trld/tvm/mapper.py trld/tvm/test.py -I trld/builtins.py trld/platform/*.py
+trld_modules = trld/jsonld/base.py trld/jsonld/expansion.py trld/jsonld/compaction.py trld/jsonld/flattening.py trld/jsonld/rdf.py trld/jsonld/testbase.py trld/nq/parser.py trld/nq/serializer.py trld/trig/parser.py trld/trig/serializer.py trld/c14n.py trld/tvm/mapmaker.py trld/tvm/mapper.py trld/tvm/test.py -I trld/builtins.py trld/platform/*.py
 
 mkdir = python -c 'import sys, pathlib; pathlib.Path(sys.argv[1]).resolve().mkdir(parents=1, exist_ok=1)'
 
@@ -17,6 +17,9 @@ dist:
 cache/json-ld-api: | cache
 	git clone https://github.com/w3c/json-ld-api.git cache/json-ld-api
 
+cache/rdf-canon: | cache
+	git clone https://github.com/w3c/rdf-canon.git cache/rdf-canon
+
 cache/trig-tests.tar.gz: | cache
 	curl -o $@ https://www.w3.org/2013/TrigTests/TESTS.tar.gz
 
@@ -28,7 +31,7 @@ pytestreport: | cache/json-ld-api
 	python3 -m trld.jsonld.test cache/json-ld-api/tests/expand-manifest.jsonld cache/json-ld-api/tests/compact-manifest.jsonld cache/json-ld-api/tests/flatten-manifest.jsonld cache/json-ld-api/tests/fromRdf-manifest.jsonld cache/json-ld-api/tests/toRdf-manifest.jsonld --reports-dir build/reports 2>&1 | grep '^Running test suite\|^Ran '
 	cd build/reports; for fname in *-report.jsonld; do python3 -m trld $$fname -o ttl > $${fname%.jsonld}.ttl; done
 
-pytest: | cache/json-ld-api cache/trig-tests
+pytest: | cache/json-ld-api cache/trig-tests cache/rdf-canon
 	mypy trld/
 	pytest --doctest-modules trld/ test/
 	python3 -m trld.jsonld.test cache/json-ld-api/tests/expand-manifest.jsonld cache/json-ld-api/tests/compact-manifest.jsonld cache/json-ld-api/tests/flatten-manifest.jsonld cache/json-ld-api/tests/fromRdf-manifest.jsonld cache/json-ld-api/tests/toRdf-manifest.jsonld 2>&1 | grep '^Running test suite\|^Ran '

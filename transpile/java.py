@@ -75,6 +75,7 @@ class JavaTranspiler(CStyleTranspiler):
         'pow': 'Math.pow({0}, {1})',
         'type': '{0}.getClass()',
         'id': '{0}.hashCode()',
+        'ord': '{0}.codePointAt(0)',
         'print': 'System.out.println({0})',
         'sorted': ['Builtins.sorted({0})', 'Builtins.sorted({0}, {1})', 'Builtins.sorted({0}, {1}, {2})'],
     }
@@ -243,6 +244,13 @@ class JavaTranspiler(CStyleTranspiler):
                 typedentry = f'{parttype} {part}'
                 nametypes = [(part, parttype)]
         else:
+            if ', ' in parttype:
+                parttypes = parttype.split(', ')
+                if container.endswith('keySet()'):
+                    parttype = parttypes[0]
+                elif container.endswith('values()'):
+                    parttype = parttypes[1]
+
             typedentry = f'{parttype} {part}'
             nametypes = [(part, parttype)]
 
@@ -291,7 +299,10 @@ class JavaTranspiler(CStyleTranspiler):
                 return f'Collections.reverse({owner})'
 
             if attr == 'copy' and self._is_map(ownertype):
-                return f'new HashMap({owner})'
+                ctor = ownertype.split('<', 1)[0]
+                if ctor == 'Map':
+                    ctor = 'HashMap'
+                return f'new {ctor}({owner})'
 
         member = self.to_attribute_name(attr)
         rtype = None
@@ -433,7 +444,7 @@ class JavaTranspiler(CStyleTranspiler):
             method = 'set'
             key = f'{castowner}.size() - 1'
         else:
-            assert self.gettype(owner)[0].startswith(('Map', 'HashMap', 'TreeMap'))
+            assert self.gettype(owner)[0].startswith(('Map', 'HashMap', 'LinkedHashMap', 'TreeMap'))
             method = 'put'
 
         key = self._cast(key)
@@ -452,7 +463,10 @@ class JavaTranspiler(CStyleTranspiler):
         return f'{self._cast(owner, parens=True)}.remove({key})'
 
     def map_in(self, container, contained, negated=False):
-        contains = 'containsKey' if self.gettype(container) and self.gettype(container)[0].startswith('Map') else 'contains'
+        contains = 'contains'
+        ctype_info = self.gettype(container)
+        if ctype_info and self._is_map(ctype_info[0]):
+            contains = 'containsKey'
         castcontainer = self._cast(container, parens=True)
         result = f'{castcontainer}.{contains}({contained})'
         if negated:
@@ -561,7 +575,7 @@ class JavaTranspiler(CStyleTranspiler):
 
     def _is_map(self, typerepr: str) -> bool:
         #return (self.container_type(typerepr) or typerepr).endswith(('Map', 'HashMap'))
-        return typerepr.split('<', 1)[0] in {'Map', 'HashMap'}
+        return typerepr.split('<', 1)[0] in {'Map', 'HashMap', 'LinkedHashMap'}
 
     def _is_list(self, typerepr: str) -> bool:
         #return (self.container_type(typerepr) or typerepr).endswith(('List', 'ArrayList'))
@@ -601,6 +615,9 @@ class JavaTranspiler(CStyleTranspiler):
                 ttype = ttype_narrowed[0]
                 if ttype and '<' in ttype:
                     ttype = ttype.split('<', 1)[1][:-1]
+                    # All this is shallow string-hacking...
+                    #if ttype.split(',', 1)[0].isalnum():
+                    #    ttype = ttype.split(',', 1)[1]
         else:
             objpath = assignedto.split('(', 1)[0]
             ttype_narrowed = self.gettype(objpath)

@@ -541,6 +541,14 @@ class Transpiler(ast.NodeVisitor):
         self.stmt(self.map_delitem(owner, key), node=node)
 
     def visit_Expr(self, node):
+        if (
+            not self._within
+            and isinstance(node.value, ast.Constant)
+            and isinstance(node.value.value, str)
+        ):
+            print("Skipping module docstring:", node.value.value)
+            return
+
         self.stmt(self.repr_expr(node.value), node=node)
 
     def visit_If(self, node, continued=False):
@@ -581,6 +589,8 @@ class Transpiler(ast.NodeVisitor):
             assert not any(name.asname for name in node.names)
         elif node.module == 'builtins' and node.level > 0:
             pass # Members are treated at global names and mapped differently
+        elif node.module == '__future__':
+            pass
         else:
             self.handle_import(node)
 
@@ -626,11 +636,17 @@ class Transpiler(ast.NodeVisitor):
             container.rsplit('.', 1)[0] if container.endswith(')') else container
         )
         ctype = ctypeinfo[0] if ctypeinfo else self._last_cast
+
+        if ctype in self._iterables:
+            parttype = self._iterables[ctype]
+            ctype = self.types.get('Iterable', 'Iterable')
+            return ctype, parttype
+
         containertype = self.container_type(ctype)
         # TODO: hacked this fix to let transpile.js further along, but really
         # check this logic! (I've lost my way in my djungle of code...)
-        if not containertype or not containertype.contained:
-            containertype = self.container_type(self._last_cast)
+        #if not containertype or not containertype.contained:
+        #    containertype = self.container_type(self._last_cast)
 
         if containertype:
             ctype, parttype = containertype
@@ -638,10 +654,6 @@ class Transpiler(ast.NodeVisitor):
             otype = self.types.get('object')
             assert otype is not None
             ctype, parttype = (ctype or otype), otype
-
-        if ctype in self._iterables:
-            parttype = self._iterables[ctype]
-            ctype = self.types.get('Iterable', 'Iterable')
 
         return ctype, parttype
 
@@ -1012,7 +1024,8 @@ class Transpiler(ast.NodeVisitor):
 
         elif isinstance(expr, ast.UnaryOp) and isinstance(expr.op, ast.USub):
             s, t = self.repr_expr_and_type(expr.operand)
-            return f'-{expr.operand.n}', t # type: ignore
+            n = expr.operand.value if isinstance(expr.operand, ast.Constant) else expr.operand.n
+            return f'-{n}', t # type: ignore
 
         elif isinstance(expr, ast.Name):
             name = self.map_name(expr.id, callargs, instance=instance)

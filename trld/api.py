@@ -50,13 +50,16 @@ def parse_rdf(source: Any, fmt: Optional[str] = None) -> Any:
 def serialize_rdf(result: Any, fmt: Optional[str], out=None, context=None) -> None:
     if fmt is None or fmt == 'jsonld':
         if out is not None:
-            return json.dump(result, out, indent=2, ensure_ascii=False)
+            json.dump(result, out, indent=2, ensure_ascii=False)
+            print(file=out)
         else:
             print(json_encode(result, pretty=True))
 
         return
 
-    out = Output(out or sys.stdout)
+    if not isinstance(out, Output):
+        out = Output(out or sys.stdout)
+
     if fmt in {'trig', 'ttl', 'turtle', 'turtle-union'}:
         from .trig import serializer as trig
 

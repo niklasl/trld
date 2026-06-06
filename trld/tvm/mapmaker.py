@@ -4,6 +4,7 @@ from collections import OrderedDict
 
 from ..jsonld.keys import CONTEXT, GRAPH, ID, LIST, REVERSE, TYPE, VOCAB
 from ..jsonld.base import as_list, JsonMap
+from ..jsonld.flattening import flatten
 from ..jsonld.extras.index import make_index
 
 
@@ -34,7 +35,7 @@ OWL_propertyChainAxiom: str = f'{OWL}propertyChainAxiom'
 OWL_onProperty: str = f'{OWL}onProperty'
 OWL_hasValue: str = f'{OWL}hasValue'
 OWL_hasSelf: str = f'{OWL}hasSelf'
-OWL_allValuesFrom: str = f'{OWL}allValuesFrom'
+OWL_someValuesFrom: str = f'{OWL}someValuesFrom'
 
 SKOS: str = 'http://www.w3.org/2004/02/skos/core#'
 SKOS_broadMatch: str = f'{SKOS}broadMatch'
@@ -71,6 +72,8 @@ def make_target_map(vocab: object, target: object) -> Dict:
             target_dfn.update(cast(Dict, dfn))
 
     graph: List[JsonMap] = vocab if isinstance(vocab, List) else cast(List, cast(Dict, vocab)[GRAPH])
+
+    graph = flatten(graph)
 
     vocab_index: Dict[str, JsonMap] = make_index(graph)
 
@@ -138,7 +141,21 @@ def _process_class_relations(obj: Dict, vocab_index: Dict, target: Dict[str, obj
         crel, candidate = candidates.pop(0)
         if ID not in candidate:
             continue
+
         candidate_id: str = candidate[ID]
+
+        match: Optional[Dict] = _class_to_match_node(candidate_id, vocab_index)
+        if id and crel == OWL_equivalentClass and match and TYPE not in match:
+            if 'valueMatches' in match:
+                source_id: str = match['property']
+                rule = {
+                    'property': TYPE,
+                    'useValue': id,
+                    'match': match
+                }
+                _add_rule(target_map, source_id, rule, id_target_prio)
+                continue
+
         candidate = cast(Dict, vocab_index.get(candidate_id, candidate))
 
         target_prio: int = _get_target_priority(target, candidate_id)
@@ -197,6 +214,7 @@ def _process_property_relations(obj: Dict, vocab_index: Dict, target: Dict[str, 
         crel, candidate = candidates.pop(0)
         if ID not in candidate:
             continue
+
         candidate_id: str = candidate[ID]
         candidate = cast(Dict, vocab_index.get(candidate_id, candidate))
 
@@ -231,15 +249,15 @@ def _process_property_chain(
     if OWL_propertyChainAxiom not in obj:
         return False
 
-    prop_chain: List[Dict] = cast(List[Dict], obj[OWL_propertyChainAxiom])
+    prop_chain_node: List[Dict] = cast(List[Dict], obj[OWL_propertyChainAxiom])
     source_property: Optional[str] = None
 
-    lst: List[Dict] = prop_chain[0][LIST]
-    if len(lst) == 0:
+    prop_chain: List[Dict] = prop_chain_node[0][LIST]
+    if len(prop_chain) == 0:
         return False
 
-    first: Dict = lst[0]
-    if len(lst) <= 1:
+    first: Dict = prop_chain[0]
+    if len(prop_chain) <= 1:
         return False
 
     if ID in first:
@@ -247,15 +265,18 @@ def _process_property_chain(
         if id_key in vocab_index:
             first = vocab_index[id_key]
 
-    second_id: str = lst[1][ID]
+    second_id: str = prop_chain[1][ID]
 
     source_property = first.get(ID)
 
     rtype: Optional[str] = None
     value_from: Optional[str] = None
+    property_from: Optional[str] = None
 
     rolified: Optional[JsonMap] = None
 
+    # TODO: These are very brittle heuristics; for starters, any chain part may
+    # be a rolified.
     step_desc: Optional[Dict] = vocab_index.get(second_id)
     if step_desc is not None and REVERSE in step_desc:
         reverses: Dict[str, List] = step_desc[REVERSE]
@@ -273,8 +294,25 @@ def _process_property_chain(
             for equiv in cast(List[Dict], rolified[OWL_equivalentClass]):  # or RDFS_subClassOf...
                 rtype = equiv[ID]
                 break
-        if rtype is not None and len(lst) > 2:
-            value_from = lst[2][ID]
+        elif REVERSE in rolified:
+            reverses = cast(Dict, rolified[REVERSE])
+            if OWL_equivalentClass in reverses:
+                for equiv in cast(List[Dict], reverses[OWL_equivalentClass]):  # or RDFS_subClassOf...
+                    rtype = equiv[ID]
+                    break
+
+        if rtype is not None:
+            if source_property and not source_property.startswith('_:'):
+                property_from = source_property
+
+            # TODO: Should get from last regular (non-rolified) property component,
+            # and if followed by rolified, use to match value type.
+            if len(prop_chain) == 3:
+                value_property: Dict = prop_chain[2]
+                value_prop_id: str = value_property[ID]
+                if not value_prop_id.startswith('_:'):
+                    value_from = value_prop_id
+
     # TODO: Deprecate this blank subPropertyOf pattern in favour of the rolified form.
     # TODO: don't rely solely on anonymous subPropertyOf
     elif source_property is None or source_property.startswith('_:'):
@@ -289,14 +327,12 @@ def _process_property_chain(
     else:
         value_from = second_id
 
-    match: Optional[Dict] = {TYPE: rtype} if rtype else None
-    # TODO: also match OWL_Restriction using OWL_onProperty PLUS
-    # OWL_hasValue OR OWL_allValuesFrom
+    match: Optional[Dict] = _class_to_match_node(rtype, vocab_index)
 
-    if source_property and value_from:
+    if source_property and (value_from or property_from):
         if source_property != candidate_prop:
             for prio, baseprop in baseprops:
-                rule: Dict = _rule_from(baseprop, None, value_from, match)
+                rule: Dict = _rule_from(baseprop, property_from, value_from, match)
                 if _get_target_priority(target, source_property) < prio:
                     # TODO: only if rule is "explicit enough" (has a 'propertyFrom' or 'match' term)?
                     _add_rule(target_map, source_property, rule, prio)
@@ -324,6 +360,45 @@ def _extend_candidates(candidates: Candidates, candidate: Dict, rels: List[str])
             for sup in superrefs:
                 if ID in sup:
                     candidates.append((None, sup))
+
+
+def _class_to_match_node(rtype: Optional[str], vocab_index: Dict[str, JsonMap]) -> Optional[Dict]:
+    if rtype is None:
+        return None
+
+    if rtype.startswith('_:') and rtype in vocab_index:
+        restr = vocab_index[rtype]
+
+        if isinstance(restr, Dict):
+            if OWL_onProperty in restr:
+                onprop = cast(List[Dict], restr[OWL_onProperty])
+                match = {'property': onprop[0].get(ID)}
+
+                valmatch: Union[str, Dict, None] = None
+                match_kind: Optional[str] = None
+                if OWL_someValuesFrom in restr:
+                    somevaluesfrom = cast(List[Dict], restr[OWL_someValuesFrom])
+                    for somefrom in somevaluesfrom:
+                        assert isinstance(somefrom, Dict)
+                        if ID in somefrom:
+                            match_kind = 'valueMatches'
+                            valmatch = _class_to_match_node(
+                                cast(str, somefrom[ID]), vocab_index
+                            )
+                            break
+                elif OWL_hasValue in restr:
+                    hasvalue = cast(List[Dict], restr[OWL_hasValue])
+                    for hasval in hasvalue:
+                        match_kind = 'valueMatches'
+                        valmatch = hasval
+                        break
+
+                if match_kind:
+                    match[match_kind] = valmatch
+
+                return match
+
+    return {TYPE: rtype}
 
 
 def _process_reified_forms(obj: Dict, vocab_index: Dict, target_map: Dict[str, object]):
