@@ -52,6 +52,10 @@ preferably re-compact it into a simpler form.
 - [x] Parser
 - [x] Serializer
 
+### [RDF Dataset Canonicalization](https://www.w3.org/TR/rdf-canon/) _(W3C Spec)_
+- [x] Canonicalization
+- [x] Canonical n-quads form
+
 ### [Target Vocabulary Maps](https://github.com/niklasl/ldtvm#target-vocabulary-maps) _(Experimental)_
 - [x] Basic RDFS & OWL
 - [x] Property chains
