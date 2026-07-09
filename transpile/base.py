@@ -552,7 +552,7 @@ class Transpiler(ast.NodeVisitor):
         self.stmt(self.repr_expr(node.value), node=node)
 
     def visit_If(self, node, continued=False):
-        if isinstance(node.test, ast.Compare) and isinstance(node.test.left, ast.Name) and node.test.left.id == '__name__' and node.test.comparators[0].s == '__main__':
+        if isinstance(node.test, ast.Compare) and isinstance(node.test.left, ast.Name) and node.test.left.id == '__name__' and node.test.comparators[0].value == '__main__':
             return
 
         scope = self.new_scope(node)
@@ -635,7 +635,7 @@ class Transpiler(ast.NodeVisitor):
         ctypeinfo = self.gettype(
             container.rsplit('.', 1)[0] if container.endswith(')') else container
         )
-        ctype = ctypeinfo[0] if ctypeinfo else self._last_cast
+        ctype = ctypeinfo[0] if ctypeinfo else self._last_cast # FIXME: reset on func scope exit!
 
         if ctype in self._iterables:
             parttype = self._iterables[ctype]
@@ -999,6 +999,14 @@ class Transpiler(ast.NodeVisitor):
                 typeinfo = self.gettype(r)
                 return r, typeinfo[0] if typeinfo else etype
 
+        def repr_str(v):
+            # TODO: just use repr(s) with some cleanup?
+            s = v.replace('\\', '\\\\')
+            s = s.replace('"', r'\"')
+            s = ''.join(repr(c)[1:-1].replace(r'\x', r'\u00')
+                        if c.isspace() else c for c in s)
+            return (str(v) if annot else f'"{s}"'), gt('str')
+
         if isinstance(expr, AST_ELLIPSIS):
             return '/* ... */', None
 
@@ -1006,12 +1014,7 @@ class Transpiler(ast.NodeVisitor):
             return self.constants.get(expr.value, (expr.value, None))
 
         elif isinstance(expr, AST_STR):
-            # TODO: just use repr(s) with some cleanup?
-            s = expr.s.replace('\\', '\\\\')
-            s = s.replace('"', r'\"')
-            s = ''.join(repr(c)[1:-1].replace(r'\x', r'\u00')
-                        if c.isspace() else c for c in s)
-            return (str(expr.s) if annot else f'"{s}"'), gt('str')
+            return repr_str(expr.s)
 
         elif isinstance(expr, AST_NUM):
             s = str(expr.n)
@@ -1020,7 +1023,19 @@ class Transpiler(ast.NodeVisitor):
         elif isinstance(expr, ast.Constant):
             if expr.value is Ellipsis:
                 return '/* ... */', None
-            return self.constants.get(expr.value, (expr.value, None))
+
+            if isinstance(expr.value, str):
+                return repr_str(expr.value)
+
+            if isinstance(expr.value, (int, float)):
+                if not isinstance(expr.value, bool):
+                    s = str(expr.value)
+                    return s, gt('float' if '.' in s else 'int')
+
+            v = str(expr.value)
+            vt = gt(type(v).__name__)
+
+            return self.constants.get(expr.value, (v, vt))
 
         elif isinstance(expr, ast.UnaryOp) and isinstance(expr.op, ast.USub):
             s, t = self.repr_expr_and_type(expr.operand)
