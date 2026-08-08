@@ -367,7 +367,11 @@ def compaction(
                 # 12.8.9.6)
                 elif INDEX in container and index_key != INDEX:
                     # 12.8.9.6.1)
-                    container_key = iri_compaction(active_context, index_key)
+                    # NOTE: 1.1 errata (<https://github.com/w3c/json-ld-api/issues/674>)
+                    if index_key == active_context.expand_vocab_iri(index_key):
+                        container_key = iri_compaction(active_context, index_key)
+                    else:
+                        container_key = index_key
                     # 12.8.9.6.2)
                     # 12.8.9.6.3)
                     if isinstance(compacted_item, Dict) and container_key in compacted_item:
