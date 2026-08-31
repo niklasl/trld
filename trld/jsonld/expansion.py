@@ -171,8 +171,10 @@ def expansion(active_context: Context,
             values.sort()
             # 11.2)
             for value in values:
+                if not isinstance(value, str):
+                    continue
                 term: Optional[Term] = type_scoped_context.terms.get(value)
-                if isinstance(value, str) and term and term.has_local_context:
+                if term is not None and term.has_local_context:
                     active_context = term.get_local_context(type_scoped_context, False)
 
     # 12)
