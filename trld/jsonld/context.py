@@ -795,10 +795,12 @@ class Term:
         if LANGUAGE in dfn and TYPE not in dfn:
             # 22.1)
             lang: object = dfn[LANGUAGE]
-            if not isinstance(lang, str) and lang is not None:
-                raise InvalidLanguageMappingError
-            if not is_lang_tag(lang):
-                warning(f'Language tag {lang} in term {term} is not well-formed')
+            if lang is not None:  # TODO: clarify in spec
+                if not isinstance(lang, str):
+                    raise InvalidLanguageMappingError
+                if not is_lang_tag(lang):
+                    warning(f'Language tag {lang} in term {term} is not well-formed')
+
             # 22.2)
             # TODO: [5f6117d4] spec uses maps with key missing != null; note this difference
             self.language = NULL if lang is None else lang.lower()
