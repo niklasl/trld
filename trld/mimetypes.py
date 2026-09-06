@@ -4,6 +4,7 @@ SUFFIX_MIME_TYPE_MAP = {
     'trig': 'application/trig',
     'ttl': 'text/turtle',
     'jsonld': 'application/ld+json',
+    'json': 'application/json',
     'xml': 'application/rdf+xml',
     'rdf': 'application/rdf+xml',
     'rdfs': 'application/rdf+xml',
