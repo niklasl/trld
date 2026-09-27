@@ -2,6 +2,8 @@ package trld;
 
 import java.util.*;
 import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class Builtins {
 
@@ -54,5 +56,10 @@ public class Builtins {
             }
         }
         return result;
+    }
+
+    public static /*@Nullable*/Matcher getMatch(Pattern pattern, String v) {
+      Matcher matcher = pattern.matcher(v);
+      return matcher.lookingAt() ? matcher : null;
     }
 }

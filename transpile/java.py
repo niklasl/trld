@@ -42,6 +42,7 @@ class JavaTranspiler(CStyleTranspiler):
         'Tuple': 'Map.Entry',
         'Callable': 'Function',
         're.Pattern': 'Pattern',
+        're.Match': 'Matcher',
     }
     protocol_interfaces = ['java.util.function.Function', 'java.util.function.BiFunction']
 
@@ -158,6 +159,7 @@ class JavaTranspiler(CStyleTranspiler):
         self.stmt('import java.util.*')
         self.stmt('import java.util.function.Function')
         self.stmt('import java.util.regex.Pattern')
+        self.stmt('import java.util.regex.Matcher')
         self.stmt('import java.util.stream.Stream')
         self.stmt('import java.util.stream.Collectors')
         self.stmt('import java.io.*')
@@ -342,7 +344,7 @@ class JavaTranspiler(CStyleTranspiler):
         elif ownertype and ownertype == 'Pattern' and attr == 'match':
             v = callargs.pop()
             assert not callargs
-            return f'({castowner}.matcher({v}).matches() ? {v} : null)'
+            return f'Builtins.getMatch({castowner}, {v})'
         elif ownertype and ownertype == 'Pattern' and attr == 'search':
             v = callargs.pop()
             assert not callargs
