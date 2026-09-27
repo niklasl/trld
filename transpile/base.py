@@ -1133,6 +1133,21 @@ class Transpiler(ast.NodeVisitor):
             return self.none, None
 
         elif isinstance(expr, ast.BinOp):
+            if annot:
+                if isinstance(expr.op, ast.BitOr):
+                    if (
+                        isinstance(expr.right, ast.Constant)
+                        and expr.right.value is None
+                        and self.optional_type_form
+                    ):
+                        tname = self.repr_expr(expr.left, annot=annot)
+                        tname = self.types.get(tname, tname)
+                        return self.optional_type_form.format(tname), None
+                    elif self.union_surrogate:
+                        return self.union_surrogate, None
+
+                raise NotImplementedError(f'unhandled annotation: {(ast.dump(expr))}')
+
             if isinstance(expr.op, ast.Add):
                 lexpr = self.repr_expr(expr.left)
                 ltype = self.gettype(lexpr)
