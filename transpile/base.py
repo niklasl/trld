@@ -1120,7 +1120,8 @@ class Transpiler(ast.NodeVisitor):
             # TODO: just support GeneratorExp with any/all
             #raise NotImplementedError(ast.dump(expr))
             #return self.map_generator(expr), None
-            return ast.dump(expr), None
+            #return ast.dump(expr), None
+            return repr_and_type(self.map_listcomp(expr), gt('List'))
 
         elif isinstance(expr, ast.ListComp):
             return repr_and_type(self.map_listcomp(expr), gt('List'))
