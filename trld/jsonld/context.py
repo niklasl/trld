@@ -800,10 +800,12 @@ class Term:
                     raise InvalidLanguageMappingError
                 if not is_lang_tag(lang):
                     warning(f'Language tag {lang} in term {term} is not well-formed')
+                assert isinstance(lang, str)
+                lang = lang.lower()
 
             # 22.2)
             # TODO: [5f6117d4] spec uses maps with key missing != null; note this difference
-            self.language = NULL if lang is None else lang.lower()
+            self.language = NULL if lang is None else cast(str, lang)
 
         # 23)
         if DIRECTION in dfn and TYPE not in dfn:
