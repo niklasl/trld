@@ -79,7 +79,7 @@ public class Test {
           try {
             expected = trld.nq.Parser.parse(new Input(nqPath));
           } catch (RuntimeException e) {
-            System.out.println("Error parsing NQuads " + nqPath);
+            System.out.println("Error parsing NQuads " + nqPath + "e: " + e);
             throw e;
           }
           String baseUri = "http://www.w3.org/2013/TriGTests/";
