@@ -42,13 +42,13 @@ class RdfTriple(NamedTuple):
 
 
 class RdfGraph:
-    _triples: List[RdfTriple]
+    _triples: Set[RdfTriple]
 
     def __init__(self) -> None:
-        self._triples = []
+        self._triples = set()
 
     def add(self, triple: RdfTriple):
-        self._triples.append(triple)
+        self._triples.add(triple)
 
     def __iter__(self) -> Iterator[RdfTriple]:
         yield from self._triples
