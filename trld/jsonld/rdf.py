@@ -28,7 +28,7 @@ processing_mode: str = JSONLD11
 
 class RdfLiteral(NamedTuple):
     value: str
-    datatype: Optional[str] = None
+    datatype: str
     language: Optional[str] = None
 
 
@@ -217,12 +217,12 @@ def object_to_rdf_data(item: JsonMap, list_triples: List, bnodes: BNodes,
             literal = nodeid
             # 13.3.2)
             # TODO: spec errata? says to use item[VALUE] (not to use the stringified value)
-            list_triples.append(RdfTriple(nodeid, RDF_VALUE, RdfLiteral(value)))
+            list_triples.append(RdfTriple(nodeid, RDF_VALUE, RdfLiteral(value, XSD_STRING)))
             # 13.3.3)
             if LANGUAGE in item:
-                list_triples.append(RdfTriple(nodeid, RDF_LANGUAGE, RdfLiteral(cast(str, item[LANGUAGE]))))
+                list_triples.append(RdfTriple(nodeid, RDF_LANGUAGE, RdfLiteral(cast(str, item[LANGUAGE]), XSD_STRING)))
             # 13.3.4)
-            list_triples.append(RdfTriple(nodeid, RDF_DIRECTION, RdfLiteral(cast(str, item[DIRECTION]))))
+            list_triples.append(RdfTriple(nodeid, RDF_DIRECTION, RdfLiteral(cast(str, item[DIRECTION]), XSD_STRING)))
     # 14)
     else:
         literal = RdfLiteral(value, datatype, cast(Optional[str], item.get(LANGUAGE)))
