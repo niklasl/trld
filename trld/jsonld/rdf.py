@@ -150,27 +150,36 @@ def object_to_rdf_data(item: JsonMap, list_triples: List, bnodes: BNodes,
     # 1)
     if ID in item and not is_iri_or_blank(cast(str, item[ID])):
         return None
+
     # 2)
     if ID in item:
         return cast(str, item[ID])
+
     # 3)
     if LIST in item:
         return list_to_rdf_list(cast(List, item[LIST]), list_triples, bnodes, rdf_direction)
+
     # 4)
-    assert VALUE in item
+    if VALUE not in item:
+        raise ValueError(f"Expected value object: {item!r}")
+
     value: JsonObject = item[VALUE]
     # 5)
     datatype: Optional[str] = cast(Optional[str], item.get(TYPE))
+
     # 6)
     if datatype is not None and not is_iri(datatype) and not datatype == JSON:
         return None
+
     # 7)
     if LANGUAGE in item and not is_lang_tag(cast(str, item[LANGUAGE])):
         return None
+
     # 8)
     if datatype == JSON:
         value = json_encode_canonical(value)
         datatype = RDF_JSON
+
     # 9)
     if isinstance(value, bool):
         value = 'true' if value else 'false'
@@ -189,6 +198,7 @@ def object_to_rdf_data(item: JsonMap, list_triples: List, bnodes: BNodes,
     # 12)
     elif datatype is None:
         datatype = RDF_LANGSTRING if LANGUAGE in item else XSD_STRING
+
     # 13)
     assert isinstance(value, str)
     literal: Optional[RdfObject] = None
