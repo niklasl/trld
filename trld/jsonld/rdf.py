@@ -2,7 +2,7 @@ from typing import (Dict, Iterable, Iterator, List, NamedTuple, Optional, Set,
                     Tuple, Union, cast)
 
 from ..platform.common import json_decode, json_encode_canonical
-from ..rdfterms import (I18N, RDF_DIRECTION, RDF_FIRST, RDF_JSON,
+from ..rdfterms import (I18N, RDF_DIRECTION, RDF_DIRLANGSTRING, RDF_FIRST, RDF_JSON,
                         RDF_LANGSTRING, RDF_LANGUAGE, RDF_LIST, RDF_NIL,
                         RDF_REST, RDF_TYPE, RDF_VALUE, XSD_BOOLEAN, XSD_DOUBLE,
                         XSD_INTEGER, XSD_STRING)
@@ -12,7 +12,7 @@ from .context import InvalidBaseDirectionError
 from .expansion import InvalidLanguageTaggedStringError
 from .flattening import BNodes, NodeMap, make_node_map
 from .keys import (DEFAULT, DIRECTION, DIRECTIONS, GRAPH, ID, JSON, JSONLD10,
-                   JSONLD11, KEYWORDS, LANGUAGE, LIST, TYPE, VALUE)
+                   JSONLD12, KEYWORDS, LANGUAGE, LIST, TYPE, VALUE)
 
 MAX_INT: float = pow(10, 21)
 
@@ -23,13 +23,14 @@ USAGES: str = 'usages'
 
 
 # TODO: global flag or add to processor
-processing_mode: str = JSONLD11
+processing_mode: str = JSONLD12
 
 
 class RdfLiteral(NamedTuple):
     value: str
     datatype: str
     language: Optional[str] = None
+    direction: Optional[str] = None
 
 
 RdfObject = Union[str, RdfLiteral]
@@ -223,6 +224,8 @@ def object_to_rdf_data(item: JsonMap, list_triples: List, bnodes: BNodes,
                 list_triples.append(RdfTriple(nodeid, RDF_LANGUAGE, RdfLiteral(cast(str, item[LANGUAGE]), XSD_STRING)))
             # 13.3.4)
             list_triples.append(RdfTriple(nodeid, RDF_DIRECTION, RdfLiteral(cast(str, item[DIRECTION]), XSD_STRING)))
+    elif DIRECTION in item and LANGUAGE in item:
+        literal = RdfLiteral(value, RDF_DIRLANGSTRING, cast(str, item[LANGUAGE]), cast(str, item[DIRECTION]))
     # 14)
     else:
         literal = RdfLiteral(value, datatype, cast(Optional[str], item.get(LANGUAGE)))
@@ -520,6 +523,8 @@ def to_jsonld_object(value: RdfObject,
         # 2.5.4)
         elif literal.language is not None:
             result[LANGUAGE] = literal.language
+            if literal.direction is not None:
+                result[DIRECTION] = literal.direction
         # 2.5.5)
         elif literal.datatype and literal.datatype != XSD_STRING:
             rtype = literal.datatype
