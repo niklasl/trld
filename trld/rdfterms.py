@@ -10,6 +10,7 @@ RDF_LANGUAGE: str = f'{RDF}language'
 RDF_JSON: str = f'{RDF}JSON'
 RDF_LANGSTRING: str = f'{RDF}langString'
 RDF_DIRLANGSTRING: str = f'{RDF}dirLangString'
+RDF_REIFIES = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#reifies'
 
 XSD: str = 'http://www.w3.org/2001/XMLSchema#'
 XSD_BOOLEAN: str = f'{XSD}boolean'

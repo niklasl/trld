@@ -1,18 +1,20 @@
+from __future__ import annotations
 from typing import (Dict, Iterable, Iterator, List, NamedTuple, Optional, Set,
                     Tuple, Union, cast)
 
 from ..platform.common import json_decode, json_encode_canonical
 from ..rdfterms import (I18N, RDF_DIRECTION, RDF_DIRLANGSTRING, RDF_FIRST, RDF_JSON,
                         RDF_LANGSTRING, RDF_LANGUAGE, RDF_LIST, RDF_NIL,
-                        RDF_REST, RDF_TYPE, RDF_VALUE, XSD_BOOLEAN, XSD_DOUBLE,
-                        XSD_INTEGER, XSD_STRING)
+                        RDF_REIFIES, RDF_REST, RDF_TYPE, RDF_VALUE,
+                        XSD_BOOLEAN, XSD_DOUBLE, XSD_INTEGER, XSD_STRING)
 from .base import (JsonMap, JsonObject, as_list, is_blank, is_iri, is_lang_tag,
                    node_equals)
 from .context import InvalidBaseDirectionError
 from .expansion import InvalidLanguageTaggedStringError
 from .flattening import BNodes, NodeMap, make_node_map
 from .keys import (DEFAULT, DIRECTION, DIRECTIONS, GRAPH, ID, JSON, JSONLD10,
-                   JSONLD12, KEYWORDS, LANGUAGE, LIST, TYPE, VALUE)
+                   JSONLD13, KEYWORDS, LANGUAGE, LIST, TYPE, VALUE)
+from .keys import REIFIES, TRIPLE
 
 MAX_INT: float = pow(10, 21)
 
@@ -23,7 +25,7 @@ USAGES: str = 'usages'
 
 
 # TODO: global flag or add to processor
-processing_mode: str = JSONLD12
+processing_mode: str = JSONLD13
 
 
 class RdfLiteral(NamedTuple):
@@ -33,13 +35,13 @@ class RdfLiteral(NamedTuple):
     direction: Optional[str] = None
 
 
-RdfObject = Union[str, RdfLiteral]
-
-
 class RdfTriple(NamedTuple):
     subject: str
     predicate: str
     object: RdfObject
+
+
+RdfObject = Union[str, RdfLiteral, RdfTriple]
 
 
 class RdfGraph:
@@ -118,6 +120,11 @@ def jsonld_to_rdf_dataset(node_map: NodeMap, dataset: RdfDataset,
                 # TODO: isn't this always a list if this is properly expanded
                 # and flattened (as this algoritm implicitly expects..)?
                 values: List[object] = as_list(node[property])
+
+                if property == REIFIES:
+                    property = RDF_REIFIES
+                    values = [{TRIPLE: value} for value in values]
+
                 # 1.3.2.1)
                 if property == TYPE:
                     for type in values:
@@ -159,6 +166,12 @@ def object_to_rdf_data(item: JsonMap, list_triples: List, bnodes: BNodes,
     # 3)
     if LIST in item:
         return list_to_rdf_list(cast(List, item[LIST]), list_triples, bnodes, rdf_direction)
+
+    # X)
+    if TRIPLE in item:
+        return triple_to_rdf_triple(
+            cast(JsonMap, item[TRIPLE]), list_triples, bnodes, rdf_direction
+        )
 
     # 4)
     if VALUE not in item:
@@ -261,6 +274,37 @@ def list_to_rdf_list(l: List[JsonMap], list_triples: List, bnodes: BNodes,
         list_triples += embedded_triples
     # 4)
     return first if i > 0 else RDF_NIL
+
+
+def triple_to_rdf_triple(
+    triple: JsonMap,
+    list_triples: List,
+    bnodes: BNodes,
+    rdf_direction: Optional[str] = None
+) -> RdfTriple:
+    s = triple[ID]
+    assert isinstance(s, str)
+
+    p: str | None = None
+    for k in triple.keys():
+        if k == ID:
+            continue
+        else:
+            p = k
+            break
+
+    if p is None:
+        raise ValueError("Missing predicate")
+
+    v = triple[p]
+    if isinstance(v, list):
+        assert len(v) == 1
+        v = v[0]
+    assert isinstance(v, dict)
+    o = object_to_rdf_data(v, list_triples, bnodes, rdf_direction)
+    assert o is not None
+
+    return RdfTriple(s, p, o)
 
 
 def to_jsonld(dataset: RdfDataset,
@@ -461,6 +505,13 @@ def to_jsonld_object(value: RdfObject,
     # 1)
     if isinstance(value, str):
         return {ID: value}
+
+    if isinstance(value, RdfTriple):
+        node = to_jsonld_object(value.subject, rdf_direction, use_native_types)
+        node[value.predicate] = to_jsonld_object(
+            value.object, rdf_direction, use_native_types
+        )
+        return {TRIPLE: node}
 
     # 2)
     literal: RdfLiteral = value

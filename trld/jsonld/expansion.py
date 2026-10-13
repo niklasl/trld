@@ -16,6 +16,7 @@ from .keys import (ANY, CONTEXT, DEFAULT, DIRECTION, DIRECTIONS, GRAPH, ID,
                    INCLUDED, INDEX, JSON, JSONLD10, JSONLD11, KEYWORDS,
                    LANGUAGE, LIST, NEST, NONE, NOTHING, NULL, NULLS, REVERSE,
                    SET, TYPE, VALUE, VALUE_KEYWORDS, VOCAB)
+from .keys import ANNOTATION, REIFIES, TRIPLE
 
 
 # framing keywords
@@ -220,7 +221,7 @@ def expansion(active_context: Context,
     elif SET in result or LIST in result:
         # 17.1)
         if len(result) > 1:
-            if len(result) > 2 or INDEX not in result:
+            if len(result) > 2 or (INDEX not in result and ANNOTATION not in result):
                 raise InvalidSetOrListObjectError(str(result))
         # 17.2)
         if SET in result:
@@ -341,11 +342,13 @@ def _expand_element(active_context: Context,
                 #    result[TYPE] = expanded_value
 
             # 13.4.5)
-            elif expanded_property == GRAPH:
-                expanded_value = as_list(expansion(active_context,
-                    GRAPH, value,
+            elif expanded_property in {GRAPH, TRIPLE, REIFIES, ANNOTATION}:
+                expanded_value = expansion(active_context,
+                    expanded_property, value,
                     base_url, frame_expansion, ordered, from_map,
-                    warn_on_keywordlike_terms, warn_on_empty_keys, warn_on_bnode_properties))
+                    warn_on_keywordlike_terms, warn_on_empty_keys, warn_on_bnode_properties)
+                if expanded_property != TRIPLE:
+                    expanded_value = as_list(expanded_value)
 
             # 13.4.6)
             elif expanded_property == INCLUDED:
