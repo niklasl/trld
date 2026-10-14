@@ -34,6 +34,11 @@ def repr_term(t: RdfObject) -> str:
             return t
         else:
             return f'<{t}>'
+    elif isinstance(t, RdfTriple):
+        s = repr_term(t.subject)
+        p = repr_term(t.predicate)
+        o = repr_term(t.object)
+        return f'<<( {s} {p} {o} )>>'
     else:
         assert isinstance(t, RdfLiteral)
         v: str = t.value
@@ -61,7 +66,10 @@ def repr_term(t: RdfObject) -> str:
         # be represented by their native [UNICODE] representation.
         v = f'"{v}"'
         if t.language is not None:
-            return f'{v}@{t.language}'
+            if t.direction is not None:
+                return f'{v}@{t.language}--{t.direction}'
+            else:
+                return f'{v}@{t.language}'
         elif t.datatype is not None and t.datatype != XSD_STRING:
             dt: str = repr_term(t.datatype)
             return f'{v}^^{dt}'
