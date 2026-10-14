@@ -9,12 +9,16 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.IntPredicate;
+import java.util.regex.Pattern;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import com.fasterxml.jackson.databind.SerializationFeature;
 
 public class Common {
+
+    static final Pattern ESC_BACKSLASH_RE = Pattern.compile("\\\\\\\\");
+    static final Pattern LITERAL_CODEPOINT_RE = Pattern.compile("\\\\u[0-9A-Fa-f]{4}|\\\\U[0-9A-Fa-f]{8}");
 
     private static final ObjectMapper mapper = new ObjectMapper();
 
@@ -55,7 +59,7 @@ public class Common {
     }
 
     public static String escapeCodepoints(String s, IntPredicate needsEsc) {
-        StringBuilder sb = new  StringBuilder();
+        StringBuilder sb = new StringBuilder();
         s.codePoints().forEach(cp -> {
             if (needsEsc.test(cp)) {
                 sb.append(String.format("\\u%04X", cp));
@@ -66,6 +70,36 @@ public class Common {
         return sb.toString();
     }
 
+    public static String decodeEscapes(String s) {
+        var sb = new StringBuilder();
+        var m = ESC_BACKSLASH_RE.matcher(s);
+        int lastEnd = 0;
+        while (m.find()) {
+            sb.append(decodePartEscapes(s.substring(lastEnd, m.start())));
+            sb.append("\\");
+            lastEnd = m.end();
+        }
+        sb.append(decodePartEscapes(s.substring(lastEnd)));
+        return sb.toString();
+    }
+
+    private static String decodePartEscapes(String s) {
+      s = decodeUnicodeEscapes(s);
+      s = s.replace((CharSequence) "\\\"", "\"");
+      s = s.replace((CharSequence) "\'", "'");
+      s = s.replace((CharSequence) "\\b", "\b");
+      s = s.replace((CharSequence) "\\t", "\t");
+      s = s.replace((CharSequence) "\\n", "\n");
+      s = s.replace((CharSequence) "\\f", "\f");
+      s = s.replace((CharSequence) "\\r", "\r");
+      return s;
+    }
+
+    public static String decodeUnicodeEscapes(String s) {
+      return LITERAL_CODEPOINT_RE.matcher(s).replaceAll(
+            m -> String.valueOf((char) Integer.parseInt(m.group(0).substring(2), 16))
+        );
+    }
 
     public static String resolveIri(String base, String relative) {
         try {
