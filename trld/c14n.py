@@ -132,6 +132,10 @@ class CanonicalizationState:
                 if bnode_id not in self.blank_node_to_quads_map:
                     self.blank_node_to_quads_map[bnode_id] = []
                 self.blank_node_to_quads_map[bnode_id].append(q)
+        elif isinstance(component, RdfTriple):
+            self._add_component_ref(component.subject, q)
+            self._add_component_ref(component.predicate, q)
+            self._add_component_ref(component.object, q)
 
     def get_mapper(self) -> CanonicalIdMapper:
         return CanonicalIdMapper(self.canonical_issuer.issued_identifiers_map)
@@ -366,6 +370,12 @@ class CanonicalIdMapper:
     def remap(self, node: RdfObject) -> RdfObject:
         if isinstance(node, str):
             return self.remap_id(node)
+        elif isinstance(node, RdfTriple):
+            return RdfTriple(
+                cast(str, self.remap_id(node.subject)),
+                cast(str, self.remap_id(node.predicate)),
+                self.remap(node.object)
+            )
         return node
 
 
@@ -390,6 +400,12 @@ def _remap_quad_component(component: RdfObject, ref_blank_node_id: str) -> RdfOb
         bnode_id = _get_bnode_id(component)
         if bnode_id is not None:
             return "_:a" if bnode_id == ref_blank_node_id else "_:z"
+    elif isinstance(component, RdfTriple):
+        return RdfTriple(
+            cast(str, _remap_quad_component(component.subject, ref_blank_node_id)),
+            cast(str, _remap_quad_component(component.predicate, ref_blank_node_id)),
+            _remap_quad_component(component.object, ref_blank_node_id)
+        )
     return component
     # 3.1.1.1 If the blank node's existing blank node identifier matches the reference blank node identifier then use the blank node identifier a, otherwise, use the blank node identifier z.
 
