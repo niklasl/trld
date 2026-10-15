@@ -2,10 +2,11 @@ import re
 from typing import Callable, Dict, Final, List, NamedTuple, Optional, Union, cast
 
 from ..jsonld.base import PREFIX_DELIMS
-from ..jsonld.keys import (BASE, CONTAINER, CONTEXT, GRAPH, ID, INDEX,
+from ..jsonld.keys import (BASE, CONTAINER, CONTEXT, GRAPH, DIRECTION, ID, INDEX,
                            LANGUAGE, LIST, NONE, PREFIX, REVERSE, TYPE, VALUE,
                            VOCAB)
-from ..jsonld.star import ANNOTATED_TYPE_KEY, ANNOTATION
+from ..jsonld.keys import ANNOTATION, REIFIES, TRIPLE
+from ..jsonld.keys import ANNOTATED_TYPE_KEY
 from ..platform.common import uuid4
 from ..platform.io import Output
 
@@ -21,7 +22,7 @@ PNAME_LOCAL_ESC = re.compile(
 class Settings(NamedTuple):
     turtle_only: bool = False
     turtle_drop_named: bool = False
-    drop_rdfstar: bool = False
+    drop_rdfstar: bool = False  # TODO: rename to basic_rdf
     indent_chars: str = '  '
     use_graph_keyword: bool = True
     upcase_keywords: bool = False
@@ -39,11 +40,14 @@ class KeyAliases(NamedTuple):
     value: str = VALUE
     type: str = TYPE
     lang: str = LANGUAGE
+    langdir: str = DIRECTION
     graph: str = GRAPH
     list_: str = LIST
     reverse: str = REVERSE
     index_: str = INDEX
     annotation: str = ANNOTATION
+    reifies: str = REIFIES
+    triple: str = TRIPLE
 
 
 def serialize(
@@ -224,6 +228,15 @@ class SerializerState:
             self.to_literal(cast(object, obj), via_key)
             return []
 
+        if not isinstance(obj, Dict) or self.aliases.triple in obj:
+            # TODO: improve from just remaking a reified triple...
+            triple: str = self.repr_triple(
+                obj[self.aliases.triple],
+            )
+            triple = "<<(" + triple[2:-2] + ")>>"
+            self._write(triple)
+            return []
+
         if not in_list and via_key and self.is_list_container(via_key):
             obj = { self.aliases.list_: obj }
 
@@ -252,6 +265,8 @@ class SerializerState:
         started_list: bool = is_list
 
         is_bracketed: Final[bool] = is_list or via_key == self.aliases.annotation
+
+        is_reifying: bool = self.aliases.reifies in obj
 
         subject_started: bool = False
 
@@ -304,22 +319,16 @@ class SerializerState:
             if term == self.aliases.annotation:
                 continue
 
-            vs: List = vo if isinstance(vo, List) else [vo] if vo is not None else []
-            vs = cast(List, [x for x in vs if x is not None])
-
-            if len(vs) == 0 and not is_list:
-                continue
-
-            if self.is_lang_container(key):
-                if isinstance(vo, Dict) and len(vo) == 0:
-                    continue
-                vs = [x for x in vs if not isinstance(x, Dict) or len(x) > 0]
-
             if not subject_started:
                 subject_started = True
                 if depth == 0:
                     self.writeln()
-                if is_list:
+                if is_reifying:
+                    triple: object = obj[self.aliases.reifies]
+                    id_key = self.aliases.id
+                    self.write(self.get_indent(depth - 1 + in_graph_add))
+                    self.out.write(self.repr_triple(triple, cast(str, obj.get(id_key))))
+                elif is_list:
                     if not_linked:
                         self.write('()')
                         is_list = False
@@ -334,6 +343,20 @@ class SerializerState:
                         if in_graph_add > 0:
                             self.write(self.get_indent(0))
                         self.write(self.ref_repr(s))
+
+            if term == self.aliases.reifies:
+                continue
+
+            vs: List = vo if isinstance(vo, List) else [vo] if vo is not None else []
+            vs = cast(List, [x for x in vs if x is not None])
+
+            if len(vs) == 0 and not is_list:
+                continue
+
+            if self.is_lang_container(key):
+                if isinstance(vo, Dict) and len(vo) == 0:
+                    continue
+                vs = [x for x in vs if not isinstance(x, Dict) or len(x) > 0]
 
             in_list: bool = is_list or self.is_list_container(key)
 
@@ -406,7 +429,7 @@ class SerializerState:
             self.write(" )")
 
         if depth == 0:
-            if not first:
+            if not first or is_reifying:
                 self.writeln(" .")
             #self.writeln()
             for it in top_objects:
@@ -430,11 +453,40 @@ class SerializerState:
             return
 
         if isinstance(v, Dict) and self.aliases.annotation in v:
-            annotation: StrObject = v[self.aliases.annotation]
-            if annotation is not None:
-                self.write(' {|')
-                self._emit_contents(self.aliases.annotation, depth + 2, annotation, None)
-                self.write('|}')
+            annotations: object = v[self.aliases.annotation]
+            if annotations is not None:
+                if not isinstance(annotations, list):
+                    annotations = [annotations]
+
+                single: bool
+                single = len(annotations) == 1
+                id_key = self.aliases.id
+
+                first = True
+                for annot in cast(List[Dict], annotations):
+                    assert isinstance(annot, Dict)
+
+                    if not first and not single:
+                        self.writeln()
+                        self.write(self.get_indent(depth + 1))
+
+                    a_id: str | None = self.ref_repr(annot[id_key]) if id_key in annot else None
+                    if a_id is not None:
+                        if first:
+                            self.write(' ')
+                            self.write(f"~ {a_id}")
+
+                    if a_id is None or len(annot) > 1:
+                        if id_key in annot:
+                            annot = annot.copy()
+                            del annot[id_key]
+                        self.write(' {|')
+                        self._emit_contents(
+                            self.aliases.annotation, depth + 2, annot, None
+                        )
+                        self.write('|}')
+
+                first = False
 
     def to_literal(
         self,
@@ -446,11 +498,13 @@ class SerializerState:
             write = lambda s: self._write(s)
         value = obj
         lang: Optional[object] = self.context.get(LANGUAGE)
+        langdir: Optional[object] = None
         datatype: Optional[str] = None
         if isinstance(obj, Dict):
             value = obj.get(self.aliases.value)
             datatype = cast(Optional[str], obj.get(self.aliases.type))
             lang = obj.get(self.aliases.lang)
+            langdir = obj.get(self.aliases.langdir)
         else:
             kdef: Optional[StrOrObject] = None
             if via_key is not None and via_key in self.context:
@@ -481,6 +535,8 @@ class SerializerState:
             else:
                 if isinstance(kdef, Dict) and LANGUAGE in kdef:
                     lang = kdef[LANGUAGE]
+                if isinstance(kdef, Dict) and DIRECTION in kdef:
+                    langdir = kdef[DIRECTION]
 
         next = False
         for v in as_list(value):
@@ -489,9 +545,15 @@ class SerializerState:
             else:
                 next = True
 
-            write(self.to_str(v, datatype, lang))
+            write(self.to_str(v, datatype, lang, langdir))
 
-    def to_str(self, v: object, datatype: Optional[str] = None, lang: Optional[object] = None) -> str:
+    def to_str(
+        self,
+        v: object,
+        datatype: Optional[str] = None,
+        lang: Optional[object] = None,
+        langdir: Optional[object] = None
+    ) -> str:
         if isinstance(v, str):
             parts: List[str] = []
             escaped = v.replace('\\', '\\\\')
@@ -512,6 +574,8 @@ class SerializerState:
                 # Robustness principle:
                 if len(lang) > 0:
                     parts.append(f"@{lang}")
+                    if isinstance(langdir, str):
+                        parts.append(f"--{langdir}")
                 # else: # TODO: Warn? JSON-LD with empty string lang is invalid.
             return ''.join(parts)
         elif isinstance(v, bool):
@@ -570,8 +634,11 @@ class SerializerState:
         if refobj is None:
             return '[]'
 
-        if isinstance(refobj, Dict) and self.aliases.id in refobj:
-            return self.repr_triple(refobj)
+        if isinstance(refobj, Dict) and self.aliases.reifies in refobj:
+            return self.repr_triple(
+                refobj[self.aliases.reifies],
+                cast(str, refobj.get(self.aliases.id))
+            )
 
         ref = cast(str, refobj)
 
@@ -598,22 +665,32 @@ class SerializerState:
 
         return f'<{ref}>'
 
-    def repr_triple(self, ref: StrObject) -> str:
+    def repr_triple(self, ref: object, reifier: Optional[str] = None) -> str:
         if self.settings.drop_rdfstar:
             raise Exception('Triple nodes disallowed unless in RDF-star mode')
 
-        s: str = self.ref_repr(cast(str, ref[self.aliases.id]))
+        # FIXME: declare all properly
+        if isinstance(ref, List):
+            if len(ref) == 1:
+                ref = ref[0]
+            else:
+                for ro in ref:
+                    self.writeln(self.repr_triple(ro, reifier) + " .")
+                return self.ref_repr(reifier)
+
+        ref_o = cast(StrObject, ref)
+        s: str = self.ref_repr(cast(str, ref_o.get(self.aliases.id)))
 
         p: str = ''
         obj: StrOrObject = ''
-        for k in ref.keys():
+        for k in ref_o.keys():
             if k == self.aliases.id:
                 continue
             if p != '':
                 raise Exception('Quoted triples cannot contain multiple statements')
 
             p = cast(str, self.term_for(k))
-            obj = cast(StrObject, ref[k])
+            obj = cast(StrObject, ref_o[k])
 
         o: str
         if p == self.aliases.type:
@@ -621,7 +698,11 @@ class SerializerState:
             o = self.repr_type(obj)
         else:
             if isinstance(obj, List):
-                raise Exception('Quoted triples must have one single object')
+                if len(obj) == 1:
+                    obj = obj[0]
+                else:
+                    raise Exception('Quoted triples must have one single object')
+
             if self.is_lang_container(p) and isinstance(obj, Dict):
                 raise Exception('Language containers not yet supported in quoted triples')
             if isinstance(obj, Dict) and self.aliases.list_ in obj:
@@ -635,7 +716,8 @@ class SerializerState:
                 assert isinstance(obj, Dict) and self.aliases.id in obj
                 o = self.ref_repr(cast(str, obj[self.aliases.id]))
 
-        return f'<< {s} {p} {o} >>'
+        rei: str = f'~ {self.ref_repr(reifier)} ' if reifier else ''
+        return f'<< {s} {p} {o} {rei}>>'
 
     def to_valid_term(self, term: str) -> str:
         term = self.clean_value(term)

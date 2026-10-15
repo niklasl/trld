@@ -4,9 +4,10 @@ from typing import (ClassVar, Dict, Iterable, List, Optional, Set, Tuple,
 
 from ..builtins import Char
 from ..jsonld.base import PREFIX_DELIMS
-from ..jsonld.keys import (BASE, CONTEXT, GRAPH, ID, LANGUAGE, LIST, PREFIX,
-                           TYPE, VALUE, VOCAB)
-from ..jsonld.star import ANNOTATED_TYPE_KEY, ANNOTATION
+from ..jsonld.keys import (BASE, CONTEXT, DIRECTION, GRAPH, ID, LANGUAGE, LIST,
+                           PREFIX, TYPE, VALUE, VERSION, VOCAB)
+from ..jsonld.keys import ANNOTATION, REIFIES, TRIPLE
+from ..jsonld.keys import ANNOTATED_TYPE_KEY
 from ..platform.common import json_encode
 from ..platform.io import Input
 from ..rdfterms import RDF_TYPE, XSD, XSD_BOOLEAN, XSD_DOUBLE, XSD_INTEGER
@@ -14,13 +15,14 @@ from ..rdfterms import RDF_TYPE, XSD, XSD_BOOLEAN, XSD_DOUBLE, XSD_INTEGER
 
 XSD_DECIMAL: str = f'{XSD}decimal'
 
-AT_KEYWORDS = {PREFIX, BASE}
+AT_KEYWORDS = {PREFIX, BASE, VERSION}
 
 RQ_PREFIX = 'prefix'
 RQ_BASE = 'base'
+RQ_VERSION = 'version'
 RQ_GRAPH = 'graph'
 
-RQ_KEYWORDS = {RQ_PREFIX, RQ_BASE, RQ_GRAPH}
+RQ_KEYWORDS = {RQ_PREFIX, RQ_BASE, RQ_GRAPH, RQ_VERSION}
 
 ESC_CHARS = {
     't': '\t',
@@ -43,6 +45,9 @@ NUMBER_LEAD_CHARS = re.compile(r'[+-.0-9]')
 
 LITERAL_QUOTE_CHARS = {'"', "'"}
 
+LANGDIR_SEP = '--'
+LANG_DIRS = {'ltr', 'rtl'}
+
 SYMBOL = '@symbol'
 EOF = ''
 
@@ -62,6 +67,13 @@ def set_use_native_types(use: bool) -> None:
 
 def get_use_native_types() -> bool:
     return _use_native_types
+
+
+
+PENDING_OPEN_BRACE = 1
+PENDING_OPEN_ANGLE = 2
+PENDING_CLOSING_ANGLE = 3
+PENDING_OPEN_BRACKET = 4
 
 
 class NotationError(Exception):
@@ -90,8 +102,8 @@ class ParserState:
     parent: 'ParserState'
     context: Dict[str, object]
 
-    def consume(self, c: str, prev_value) -> StateResult:
-        raise NotImplementedError
+    def consume(self, c: Char, prev_value) -> StateResult:
+        raise NotImplementedError(f"Unexpected {c!r} for {self}")
 
 
 class BaseParserState(ParserState):
@@ -108,7 +120,7 @@ class BaseParserState(ParserState):
     def symbol(self, value: Dict[str, str]) -> str:
         if SYMBOL in value:
             sym = value[SYMBOL]
-            if sym in self.context:
+            if sym in self.context:  # FIXME: not enough for vocab refs?
                 sym = cast(str, self.context[VOCAB]) + sym
             return sym
 
@@ -125,7 +137,7 @@ class ConsumeWs(BaseParserState):
     def accept(self, c: Char) -> bool:
         return self.MATCH.match(c) is not None
 
-    def consume(self, c: str, prev_value) -> StateResult:
+    def consume(self, c: Char, prev_value) -> StateResult:
         if self.accept(c):
             return self, None
         else:
@@ -134,7 +146,7 @@ class ConsumeWs(BaseParserState):
 
 class ConsumeComment(BaseParserState):
 
-    def consume(self, c: str, prev_value) -> StateResult:
+    def consume(self, c: Char, prev_value) -> StateResult:
         if c == '\n':
             return self.parent, None
         else:
@@ -204,7 +216,7 @@ class ReadTerm(BaseParserState):
 
         return False
 
-    def backtrack(self, prev_c: str, c: str, value) -> StateResult:
+    def backtrack(self, prev_c: Char, c: Char, value) -> StateResult:
         state, value = self.parent.consume(prev_c, value)
         return state.consume(c, value)
 
@@ -219,7 +231,7 @@ class ReadIRI(ReadTerm):
     def accept(self, c: Char) -> bool:
         return self.MATCH.match(c) is not None
 
-    def consume(self, c: str, prev_value) -> StateResult:
+    def consume(self, c: Char, prev_value) -> StateResult:
         if c == '>':
             value = self.pop()
             return self.parent, {ID: value}
@@ -250,7 +262,7 @@ class ReadSymbol(ReadTerm):
             return False
         return True
 
-    def consume(self, c: str, prev_value) -> StateResult:
+    def consume(self, c: Char, prev_value) -> StateResult:
         if len(self.collected) == 0 and c == '<':
             return ReadIRI(self.parent), None
         elif len(self.collected) == 0 and NUMBER_LEAD_CHARS.match(c) is not None:
@@ -310,7 +322,7 @@ class ReadNumber(ReadTerm):
         self.dot = ''
         self.exp = False
 
-    def consume(self, c: str, prev_value) -> StateResult:
+    def consume(self, c: Char, prev_value) -> StateResult:
         exp = c in EXP
         if exp:
             self.exp = True
@@ -377,7 +389,7 @@ class ReadLiteral(ReadTerm):
         self.value = None
         self.multiline = 0
 
-    def consume(self, c: str, prev_value) -> StateResult:
+    def consume(self, c: Char, prev_value) -> StateResult:
         if self.value == '' and c == self.quotechar:
             self.multiline = 1
             self.value = None
@@ -457,25 +469,39 @@ class ReadLanguage(ReadTerm):
     def accept(self, c: Char) -> bool:
         return self.MATCH.match(c) is not None
 
-    def consume(self, c: str, prev_value) -> StateResult:
+    def consume(self, c: Char, prev_value) -> StateResult:
         if self.accept(c):
             self.collect(c)
             return self, None
         else:
             if len(self.collected) == 0:
                 raise NotationError(f'Language tags must not be empty')
-            value = self.pop()
+            lang = self.pop()
+            langdir: Optional[str] = None
+            dirdash: int = lang.find(LANGDIR_SEP)
+            if dirdash > -1:
+                langdir = lang[dirdash+2:]
+                lang = lang[:dirdash]
+                if len(langdir) == 0:
+                    raise NotationError(f'Language direction must not be empty')
+                if langdir not in LANG_DIRS:
+                    raise NotationError(f'Language direction must be ltr or rtl')
             self.collected = []
-            return self.parent.consume(c, {LANGUAGE: value})
+            langdata = {LANGUAGE: lang}
+            if langdir is not None:
+                langdata[DIRECTION] = langdir
+            return self.parent.consume(c, langdata)
 
 
 class ReadCompound(BaseParserState):
 
     ws: ConsumeWs
     comment: ConsumeComment
+    pending: int
 
     def __init__(self, parent: Optional[ParserState]):
         super().__init__(parent)
+        self.pending = 0
         self.ws = ConsumeWs(self)
         self.comment = ConsumeComment(self)
 
@@ -486,6 +512,14 @@ class ReadCompound(BaseParserState):
             return self.comment, None
         else:
             return None
+
+    def take_predicate(self, value: object) -> str:
+        if value == TYPE:
+            return TYPE
+        else:
+            if not isinstance(value, Dict):
+                raise NotationError(f'Unexpected predicate: {value!r}')
+            return self.symbol(value)
 
     def node_with_id(self, value: Dict) -> Dict:
         if SYMBOL in value:
@@ -515,7 +549,7 @@ class ReadDecl(ReadCompound):
         self.final_dot = final_dot
         self.completed = False
 
-    def consume(self, c: str, prev_value) -> StateResult:
+    def consume(self, c: Char, prev_value) -> StateResult:
         if isinstance(prev_value, Dict):
             if not self.more_parts(prev_value):
                 self.completed = True
@@ -533,6 +567,9 @@ class ReadDecl(ReadCompound):
         elif self.completed and self.final_dot:
             raise NotationError(f'Expected a final dot')
 
+        return self.expected_value_reader(c)
+
+    def expected_value_reader(self, c: Char) -> StateResult:
         return ReadSymbol(self).consume(c, None)
 
     def more_parts(self, value: Dict) -> bool:
@@ -597,27 +634,51 @@ class ReadBase(ReadDecl):
         self.parent.context[BASE] = self.base
 
 
+class ReadVersion(ReadDecl):
+
+    version: Optional[str]
+
+    def init(self):
+        self.version = None
+
+    def more_parts(self, value: Dict) -> bool:
+        if VALUE not in value:
+            raise NotationError(f'Invalid version {value!r}')
+
+        if self.version is None:
+            trig_version: str = value[VALUE]
+            # TODO: check allowed versions; remap RDF ver to JSON-LD ver!
+            self.version = trig_version
+
+        return False
+
+    def expected_value_reader(self, c: Char) -> StateResult:
+        if c in LITERAL_QUOTE_CHARS:
+            return ReadLiteral(self, c), None
+        else:
+            raise NotationError(f'Invalid version start {c!r}')
+
+    def declare(self):
+        self.parent.context[VERSION] = self.version
+
+
 class ReadNode(ReadCompound):
 
     node: Optional[Dict]
     p: Optional[str]
     last_value: Optional[object]
-    open_brace: bool = False
 
     def fill_node(self, value: object):
         assert self.node is not None
 
         if self.p is None:
-            if value == TYPE:
-                self.p = TYPE
-            else:
-                if not isinstance(value, Dict):
-                    raise NotationError(f'Unexpected predicate: {value!r}')
-                self.p = self.symbol(value)
+            self.p = self.take_predicate(value)
         elif self.last_value is None:
             if self.p == TYPE:
-                assert isinstance(value, Dict)
-                value = cast(str, self.symbol(value))
+                if not isinstance(value, Dict) or SYMBOL not in value and ID not in value:
+                    self.p = RDF_TYPE
+                else:
+                    value = cast(str, self.symbol(value))
 
             value = self.compact_value(value)
 
@@ -630,37 +691,65 @@ class ReadNode(ReadCompound):
                 self.node[self.p] = value
             self.last_value = value
         elif isinstance(value, Dict) and ANNOTATION in value:
+            # NOTE/TODO?: value is only the annotation itself (stacked after); correct?
             last_value = self.last_value
             if self.p == TYPE:
                 last_value = {ANNOTATED_TYPE_KEY: last_value}
             elif not isinstance(last_value, Dict):
                 last_value = {VALUE: last_value}
-            last_value[ANNOTATION] = value[ANNOTATION]
-            if isinstance(self.node[self.p], List):
-                l: List = self.node[self.p]
+
+            _add_annots_from(last_value, value)
+
+            o: object = self.node[self.p]
+            l: Optional[List] = None
+            if isinstance(o, List):
+                l = o
+                o = o[-1]
+
+            if VALUE in last_value and isinstance(o, Dict) and ANNOTATION in o:
+                _add_annots_from(o, last_value)
+                last_value[ANNOTATION] = o[ANNOTATION]
+
+            # TODO: annotation already added and must be replaced by the real value?
+            if l is not None:
                 l[-1] = last_value
             else:
                 self.node[self.p] = last_value
         else:
             raise NotationError(f'Unexpected: {value!r}')
 
-    def consume_node_char(self, c: str) -> StateResult:
-        readspace = self.read_space(c)
-        if readspace:
-            return readspace
+    def consume_node_char(self, c: Char) -> StateResult:
+        if self.pending == PENDING_OPEN_ANGLE:
+            self.pending = 0
+            if c == '<':
+                return ReadTripleOrReifier(self), None
+            else:
+                return ReadIRI(self).consume(c, None)
+        else:
+            readspace = self.read_space(c)
+            if readspace:
+                return readspace
 
-        if c == '{':
-            self.open_brace = True
+        if c == '<':
+            self.pending = PENDING_OPEN_ANGLE
+            return self, None
+        elif c == '{':
+            self.pending = PENDING_OPEN_BRACE
             return self, None
         elif c == '|':
-            if not self.open_brace:
+            if self.pending != PENDING_OPEN_BRACE:
                 raise NotationError(f'Unexpected: {c!r}')
-            self.open_brace = False
+            assert self.last_value is not None
+            self.pending = 0
             return ReadAnnotation(self), None
         elif c == '[':
             return ReadBNode(self), None
         elif c == '(':
             return ReadCollection(self), None
+        elif c == '~':
+            if self.last_value is None:
+                raise NotationError(f'Unexpected: {c!r}')
+            return ReadAnnotationNameOrAnnotation(self), None
         elif c == ';':
             if self.node is None:
                 raise NotationError(f'Unexpected: {c!r}')
@@ -674,11 +763,186 @@ class ReadNode(ReadCompound):
         elif c in LITERAL_QUOTE_CHARS:
             return ReadLiteral(self, c), None
         else:
+            assert self.pending == 0
             return ReadSymbol(self).consume(c, None)
 
     def check_complete(self) -> None:
         if self.p is not None and self.last_value is None:
             raise NotationError(f'Missing triple object')
+
+
+def _add_annots_from(target: Dict, source: Dict):
+    if ANNOTATION in target:
+        annot_obj: object = target[ANNOTATION]
+        annots: List
+        if not isinstance(annot_obj, List):
+            annots = [annot_obj]
+            target[ANNOTATION] = annots
+        else:
+            annots = annot_obj
+
+        source_annot: object = source[ANNOTATION]
+        if isinstance(source_annot, List):
+            if annots[-1] is not source_annot[-1]:
+                annots += source_annot
+        else:
+            if annots[-1] is not source_annot:
+                annots.append(source_annot)
+    else:
+        target[ANNOTATION] = source[ANNOTATION]
+
+
+class ReadTripleOrReifier(ReadNode):
+
+    waiting_for_name: bool
+    name: Optional[str]
+    pending: int
+
+    def init(self):
+        self.reset()
+        self.pending = 0
+
+    def reset(self):
+        self.waiting_for_name = False
+        self.name = None
+        self.node = {}
+        self.p = None
+        self.last_value = None
+
+    def consume(self, c: Char, prev_value) -> StateResult:
+        if c == '(' and self.pending == 0:
+            return ReadTriple(self), None
+
+        new_node = False
+        if isinstance(prev_value, Dict):
+            if self.waiting_for_name:
+                self.name = self.symbol(prev_value)
+                return self, None
+
+            if self.p is None:
+                assert self.node is not None
+                if len(self.node) == 0:
+                    if len(prev_value) > 0:
+                        if TRIPLE in prev_value:
+                            self.node.update(prev_value)
+                        else:
+                            self.node[ID] = self.symbol(prev_value)
+                        new_node = True
+
+            if not new_node:
+                self.fill_node(prev_value)
+
+        if c == EOF:
+            raise NotationError(f'Unexpected {c!r} in bnode.')
+        elif c == '>':
+            if self.pending == PENDING_CLOSING_ANGLE:
+                self.pending = 0
+
+                if isinstance(self.node, dict) and TRIPLE in self.node:
+                    return self.parent, self.node
+
+                if (
+                    not isinstance(self.node, Dict)
+                    or ID not in self.node
+                    or len(self.node) != 2
+                    or not self._is_reifiable(self.node)
+                ):
+                    raise NotationError(f'Malformed reifier: {self.node}')
+
+                reifier: dict = {}
+                if self.name is not None:
+                    reifier[ID] = self.name
+                reifier[REIFIES] = self.node
+
+                return self.parent, reifier
+
+            elif self.pending == PENDING_OPEN_ANGLE:
+                self.pending = 0
+                return ReadIRI(self).consume(c, None)
+            else:
+                self.pending = PENDING_CLOSING_ANGLE
+                return self, None
+
+        elif c == '~':
+            assert not self.waiting_for_name
+            self.waiting_for_name = True
+            return self, None
+        elif self.waiting_for_name:
+            return ReadSymbol(self), None
+        else:
+            return self.consume_node_char(c)
+
+    def _is_reifiable(self, node: Dict[str, object]) -> bool:
+        for k, v in node.items():
+            if k == ID:
+                continue
+            elif isinstance(v, Dict):
+                if VALUE not in v and (
+                    (LIST in v and len(cast(List, v[LIST])) != 0)
+                    or (LIST not in v and ID not in v and len(v) != 0)
+                ):
+                    return False
+            elif isinstance(v, List):
+                return False
+
+        return True
+
+
+
+class ReadTriple(ReadCompound):
+
+    node: Optional[Dict]
+    p: Optional[str]
+    last_value: Optional[object]
+
+    def init(self):
+        self.reset()
+
+    def reset(self):
+        self.node = None
+        self.p = None
+        self.last_value = None
+        self.pending = 0
+
+    def consume(self, c: Char, prev_value) -> StateResult:
+        if self.pending == PENDING_OPEN_BRACKET:
+            if c != ']':
+                raise NotationError(f'Unexpected character {c!r} in triple.')
+            return self, {}
+
+        if isinstance(prev_value, Dict):
+            if self.node is None:
+                self.node = self.node_with_id(prev_value)
+            elif self.p is None:
+                self.p = self.take_predicate(prev_value)
+                return self, None
+
+        if prev_value is not None:
+            self.last_value = prev_value
+
+        readspace = self.read_space(c)
+        if readspace:
+            return readspace
+
+        # FIXME: duplicated ReadCollection logic (why negative checks down here)?
+        elif c == EOF:
+            raise NotationError(f'Unexpected EOF in triple.')
+        elif c == ';':
+            raise NotationError(f'Unexpected ";" in triple.')
+        elif c == '(':
+            raise NotationError(f'Unexpected "(" in triple.')
+        elif c == '[':
+            self.pending = PENDING_OPEN_BRACKET
+            return self, None
+        if c == ')':
+            assert self.node is not None
+            assert self.p is not None
+            self.node[self.p] = self.compact_value(self.last_value)
+            return self.parent, {TRIPLE: self.node}
+        elif c in LITERAL_QUOTE_CHARS:
+            return ReadLiteral(self, c), None
+        else:
+            return ReadSymbol(self).consume(c, None)
 
 
 class ReadBNode(ReadNode):
@@ -691,7 +955,7 @@ class ReadBNode(ReadNode):
         self.p = None
         self.last_value = None
 
-    def consume(self, c: str, prev_value) -> StateResult:
+    def consume(self, c: Char, prev_value) -> StateResult:
         if prev_value is not None:
             self.fill_node(prev_value)
 
@@ -707,14 +971,19 @@ class ReadBNode(ReadNode):
 class ReadAnnotation(ReadBNode): # TODO: Factor out ReadNodeBase
 
     end_started: bool = False
+    name: Optional[str]
 
-    def consume(self, c: str, prev_value) -> StateResult:
+    def __init__(self, parent: Optional[ParserState], name: Optional[str] = None):
+        super().__init__(parent)
+        self.name = name
+
+    def consume(self, c: Char, prev_value) -> StateResult:
         if prev_value is not None:
             self.fill_node(prev_value)
 
         if c == EOF:
             raise NotationError(f'Unexpected {c!r} in annotation.')
-        elif not self.open_brace and c == '|':
+        elif not self.pending == PENDING_OPEN_BRACE and c == '|':
             self.end_started = True
             return self, None
         elif c == '}':
@@ -722,12 +991,50 @@ class ReadAnnotation(ReadBNode): # TODO: Factor out ReadNodeBase
                 raise NotationError(f'Unexpected: {c!r}')
             self.end_started = False
             self.check_complete()
-            return self.parent, {ANNOTATION: self.node}
+            if self.name is not None and isinstance(self.node, dict):
+                self.node = {ID: self.name, **self.node}
+            annot = {ANNOTATION: self.node}
+            return self.parent, annot
         else:
             if self.end_started:
                 raise NotationError(f'Unexpected: {c!r}')
 
             return self.consume_node_char(c)
+
+
+class ReadAnnotationNameOrAnnotation(ReadCompound):
+
+    name: Optional[str]
+
+    def init(self):
+        self.name = None
+
+    def consume(self, c: Char, prev_value) -> StateResult:
+        if isinstance(prev_value, dict):
+            self.name = self.symbol(prev_value)
+
+        if self.pending != PENDING_OPEN_ANGLE:
+            readspace = self.read_space(c)
+            if readspace:
+                return readspace
+
+        if c == '{':
+            self.pending = PENDING_OPEN_BRACE
+            return self, None
+        elif c == '|':
+            assert self.pending == PENDING_OPEN_BRACE
+            self.pending = 0
+            readannot = ReadAnnotation(self.parent, self.name)
+            return readannot, None
+        elif c == '~':
+            return self.parent.consume(c, {ANNOTATION: {ID: self.name}})
+        elif self.name is not None:
+            assert isinstance(self.parent, ReadNode)
+            self.parent.fill_node({ANNOTATION: {ID: self.name}})
+            return self.parent.consume(c, prev_value)
+        else:
+            assert self.pending == 0
+            return ReadSymbol(self).consume(c, None)
 
 
 class ReadCollection(ReadCompound):
@@ -740,7 +1047,7 @@ class ReadCollection(ReadCompound):
     def reset(self):
         self.nodes = []
 
-    def consume(self, c: str, prev_value) -> StateResult:
+    def consume(self, c: Char, prev_value) -> StateResult:
         if prev_value is not None:
             self.nodes.append(self.compact_value(prev_value))
 
@@ -778,7 +1085,7 @@ class ReadNodes(ReadNode):
         self.last_value = None
         self.expect_graph = False
 
-    def consume(self, c: str, prev_value) -> StateResult:
+    def consume(self, c: Char, prev_value) -> StateResult:
         if prev_value is not None:
             if isinstance(prev_value, str):
                 prev_str: str = prev_value
@@ -791,6 +1098,8 @@ class ReadNodes(ReadNode):
                     return ReadPrefix(self, final_dot).consume(c, None)
                 elif prev_str == RQ_BASE:
                     return ReadBase(self, final_dot).consume(c, None)
+                elif prev_str == RQ_VERSION:
+                    return ReadVersion(self, final_dot).consume(c, None)
                 elif prev_str == RQ_GRAPH:
                     self.expect_graph = True
                     return self, None
@@ -811,13 +1120,13 @@ class ReadNodes(ReadNode):
         if c == EOF:
             result = {CONTEXT: self.context, GRAPH: self.nodes}
             return self.parent, result
-        elif c == '.' and (self.p is None or self.last_value is not None):
+        elif not self.pending and c == '.' and (self.p is None or self.last_value is not None):
             self.next_node()
             return self, None
         else:
-            if self.open_brace:
+            if self.pending == PENDING_OPEN_BRACE:
                 if c != '|':
-                    self.open_brace = False
+                    self.pending = 0
                     self.expect_graph = False
                     state = ReadGraph(self)
                     return state.consume(c, prev_value)
@@ -834,13 +1143,13 @@ class ReadNodes(ReadNode):
 
 class ReadGraph(ReadNodes):
 
-    def consume(self, c: str, prev_value) -> StateResult:
+    def consume(self, c: Char, prev_value) -> StateResult:
         if isinstance(prev_value, str) and prev_value != TYPE:
             raise NotationError(f'Directive not allowed in graph: {prev_value!r}')
 
         readnodes = cast(ReadNodes, self.parent)
 
-        if self.expect_graph or self.open_brace and c != '|':
+        if self.expect_graph or self.pending == PENDING_OPEN_BRACE and c != '|':
             raise NotationError('Nested graphs are not allowed in TriG')
 
         if c == '}':

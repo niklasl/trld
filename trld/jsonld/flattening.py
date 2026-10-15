@@ -4,6 +4,7 @@ from .base import (JsonLdError, JsonList, JsonMap, JsonObject, as_list,
                      is_blank, node_equals)
 from .keys import (DEFAULT, GRAPH, ID, INCLUDED, INDEX, KEYWORDS, LIST,
                    REVERSE, TYPE, VALUE)
+from .keys import ANNOTATION, REIFIES, TRIPLE
 
 
 NodeMap = Dict[str, JsonMap]
@@ -44,6 +45,7 @@ def flatten(element: JsonObject, ordered=False, bnodes: Optional[BNodes] = None)
     graph_names: List[str] = list(node_map.keys())
     if ordered:
         graph_names.sort()
+
     for graph_name in graph_names:
         if graph_name == DEFAULT:
             continue
@@ -64,16 +66,19 @@ def flatten(element: JsonObject, ordered=False, bnodes: Optional[BNodes] = None)
             node: JsonMap = cast(JsonMap, graph[node_id])
             if len(node) > 1 or ID not in node:
                 entry_graph.append(node)
+
     # 5)
     flattened: List[JsonMap] = []
     # 6)
     top_node_ids: List[str] = list(default_graph.keys())
     if ordered:
         top_node_ids.sort()
+
     for node_id in top_node_ids:
         top_node: JsonMap = cast(JsonMap, default_graph[node_id])
         if len(top_node) > 1 or ID not in top_node:
             flattened.append(top_node)
+
     # 7)
     return flattened
 
@@ -107,6 +112,42 @@ def make_node_map(bnodes: BNodes,
     if isinstance(active_subject, str):
         subject_node = cast(JsonMap, graph.get(active_subject))
 
+    # X)
+    annotation_ids: List[str] = []
+    reified: Optional[Dict] = None
+    rei_object: Optional[Dict] = None
+
+    # Turn annotations into reified forms
+    if ANNOTATION in element:
+        for annotation in cast(List[Dict], element[ANNOTATION]):
+            if ID not in annotation:
+                annotation = annotation.copy()
+                annotation[ID] = bnodes.make_bnode_id()
+            annotation_ids.append(cast(str, annotation[ID]))
+            make_node_map(bnodes, annotation, node_map, active_graph)
+        del element[ANNOTATION]
+
+        if len(annotation_ids) > 0:
+            if ID in element:
+                rei_object = {ID: element[ID]}
+            else:
+                rei_object = dict(element)
+            # NOTE: rei_object will be completed when element is further procesed below.
+            # TODO: If the object of reified is a list node, it is currently duplicated!
+            assert active_subject is not None
+            assert isinstance(active_property, str)
+            reified = {ID: active_subject, active_property: [rei_object]}
+
+        for x in annotation_ids:
+            reifier_id: str = bnodes.make_bnode_id(x) if x.startswith('_:') else x
+
+            reifier: Dict = cast(Dict, graph.setdefault(reifier_id, {}))
+            assert isinstance(reifier, dict)
+            reifier[ID] = reifier_id
+
+            reifies: List = reifier.setdefault(REIFIES, [])
+            reifies.append(reified)
+
     # 3)
     if TYPE in element:
         etype: object = element[TYPE]
@@ -119,7 +160,7 @@ def make_node_map(bnodes: BNodes,
         element[TYPE] = mapped_types if isinstance(etype, List) else mapped_types[0]
 
     # 4)
-    if VALUE in element:
+    if VALUE in element or TRIPLE in element:
         assert subject_node is not None
         assert isinstance(active_property, str)
         # 4.1)
@@ -163,9 +204,14 @@ def make_node_map(bnodes: BNodes,
         # 6.2)
         else:
             eid = bnodes.make_bnode_id(None)
+            if rei_object is not None:
+                rei_object.clear()
+                rei_object[ID] = eid
+
         # 6.3)
         if eid not in graph:
             graph[eid] = {ID: eid}
+
         # 6.4)
         node: JsonMap = cast(JsonMap, graph[eid])
         # 6.5)
@@ -185,11 +231,13 @@ def make_node_map(bnodes: BNodes,
             assert subject_node is not None
             # 6.6.1)
             reference: JsonMap = {ID: eid}
+
             # 6.6.2)
             if list_map is None:
                 # 6.6.2.1)
                 if active_property not in subject_node:
                     subject_node[active_property] = [reference]
+
                 # 6.6.2.2)
                 objects: List[JsonMap] = cast(List[JsonMap], subject_node[active_property])
                 if reference not in objects:
@@ -233,6 +281,13 @@ def make_node_map(bnodes: BNodes,
         if GRAPH in element:
             make_node_map(bnodes, element[GRAPH], node_map, eid)
             del element[GRAPH]
+
+        # 6.X)
+        if REIFIES in element:
+            if REIFIES not in node:
+                node[REIFIES] = []
+            reifies = cast(List, node[REIFIES])
+            reifies += cast(List, element.pop(REIFIES))
 
         # 6.11)
         if INCLUDED in element:

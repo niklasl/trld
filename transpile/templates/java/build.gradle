@@ -2,6 +2,11 @@ plugins {
     id 'java'
 }
 
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
 repositories {
     mavenCentral()
 }
@@ -28,7 +33,7 @@ task uberjar(type: Jar) {
         attributes 'Main-Class': 'trld.jsonld.Cmd'
     }
     archiveBaseName = 'trld-with-deps'
-    duplicatesStrategy 'exclude'
+    duplicatesStrategy = 'exclude'
     from { configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) } }
     with jar
 }

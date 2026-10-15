@@ -77,6 +77,11 @@ def process_source(source, args) -> None:
             else:
                 result = rdf.to_jsonld(canon_dataset)
 
+        if args.reduce_rdf:
+            from .jsonld.extras.rdfreducer import reduce_rdf_terms
+
+            result = reduce_rdf_terms(result)
+
         context = None
 
         context_ref = args.context
@@ -181,8 +186,10 @@ def make_argsparser():
                         help='Set the base IRI (default is current source)')
     argparser.add_argument('-f', '--flatten', action='store_true')
     argparser.add_argument('-B', '--embed-blanks', action='store_true')
+    argparser.add_argument('-R', '--reduce-rdf', action='store_true',
+                        help='Turn low-level RDF type and reified triple terms into JSON-LD keyword forms')
     argparser.add_argument('-r', '--recompact', action='store_true',
-                        help='Re-compact input into a Turtle-like shape (same as -e -f -c -B)')
+                        help='Re-compact input into a Turtle-like shape (same as -e -f -R -c -B)')
     argparser.add_argument('-s', '--sorted', action='store_true', help='Sort output by @id and objects by key')
     argparser.add_argument('-C', '--no-context', help='Exclude context from result JSON-LD', action='store_true')
     argparser.add_argument('--c14n', help='Relabel blank nodes using RDF Canonicalization', action='store_true')
@@ -196,6 +203,7 @@ def main():
     if args.recompact:
         args.expand_context = args.expand_context if isinstance(args.expand_context, str) else True
         args.flatten = True
+        args.reduce_rdf = True
         args.context = args.context if isinstance(args.context, str) else True
         args.embed_blanks = True
 

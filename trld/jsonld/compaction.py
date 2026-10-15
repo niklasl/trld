@@ -9,6 +9,7 @@ from .base import (JsonLdError, JsonList, JsonMap, JsonObject, add_value,
 from .keys import (ANY, DEFAULT, DIRECTION, GRAPH, ID, INCLUDED, INDEX, JSON,
                    JSONLD10, JSONLD11, KEYWORDS, LANGUAGE, LIST, NEST, NONE,
                    NULL, NULLS, REVERSE, SET, TYPE, VALUE, VOCAB)
+from .keys import ANNOTATION
 
 PRESERVE: str = '@preserve'
 
@@ -787,6 +788,8 @@ def value_compaction(
     direction: Optional[str] = active_context.default_base_direction
     if active_term and active_term.direction is not None:
         direction = active_term.direction
+
+    no_annot: bool = ANNOTATION not in value
     # 6)
     if ID in value and len(value) == 1 or len(value) == 2 and INDEX in value:
         # 6.1)
@@ -796,7 +799,7 @@ def value_compaction(
         elif active_term and active_term.type_mapping == VOCAB:
             result = iri_compaction(active_context, cast(str, value[ID]))
     # 7)
-    elif active_term and TYPE in value and value[TYPE] == active_term.type_mapping:
+    elif no_annot and active_term and TYPE in value and value[TYPE] == active_term.type_mapping:
         result = value[VALUE]
     # 8)
     elif (active_term and active_term.type_mapping == NONE) or TYPE in value and (active_term is None or value[TYPE] != active_term.type_mapping):
@@ -812,12 +815,12 @@ def value_compaction(
             else:
                 result[TYPE] = iri_compaction(active_context, cast(str, rtype))
     # 9)
-    elif VALUE in value and not isinstance(value[VALUE], str):
+    elif no_annot and VALUE in value and not isinstance(value[VALUE], str):
         # 9.1)
         if (INDEX in value and active_term and INDEX in active_term.container) or INDEX not in value:
             result = value[VALUE]
     # 10) # TODO: opague spec text.
-    elif VALUE in value and (LANGUAGE in value and value[LANGUAGE] == language or language in NULLS and LANGUAGE not in value):
+    elif no_annot and VALUE in value and (LANGUAGE in value and value[LANGUAGE] == language or language in NULLS and LANGUAGE not in value):
         if DIRECTION not in value or direction is not None and value[DIRECTION] == direction:
             # 10.1)
             if INDEX not in value or (active_term and INDEX in active_term.container):

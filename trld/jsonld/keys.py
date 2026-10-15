@@ -29,6 +29,11 @@ ANY: str = '@any'
 NULL: str = '@null'
 DEFAULT: str = '@default'
 
+ANNOTATION: str = '@annotation'
+ANNOTATED_TYPE_KEY: str = SET  # TODO: Experimental!
+REIFIES: str = '@reifies'
+TRIPLE: str = '@triple'
+
 KEYWORDS: Set[str] = {
     BASE,
     CONTAINER,
@@ -52,7 +57,10 @@ KEYWORDS: Set[str] = {
     TYPE,
     VALUE,
     VERSION,
-    VOCAB
+    VOCAB,
+    ANNOTATION,
+    REIFIES,
+    TRIPLE
 }
 
 CONTEXT_KEYWORDS: Set[str] = {
@@ -67,7 +75,7 @@ CONTEXT_KEYWORDS: Set[str] = {
 }
 
 VALUE_KEYWORDS: Set[str] = {
-    DIRECTION, INDEX, LANGUAGE, TYPE, VALUE
+    DIRECTION, INDEX, LANGUAGE, TYPE, VALUE, ANNOTATION
 }
 
 CONTAINER_KEYWORDS: Set[str] = {GRAPH, ID, INDEX, LANGUAGE, LIST, SET, TYPE}
@@ -76,6 +84,8 @@ DIRECTIONS: Set[str] = {'rtl', 'ltr'}
 
 JSONLD10: str = 'json-ld-1.0'
 JSONLD11: str = 'json-ld-1.1'
+JSONLD12: str = 'json-ld-1.2'
+JSONLD13: str = 'json-ld-1.3'
 
 JSONLD_CONTEXT_RELATION: str = 'http://www.w3.org/ns/json-ld#context'
 
